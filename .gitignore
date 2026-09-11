@@ -1,0 +1,11 @@
+.DS_Store
+.idea/
+.gradle/
+build/
+DerivedData/
+*.xcuserstate
+.vs/
+**/bin/
+**/obj/
+.env
+local.properties
