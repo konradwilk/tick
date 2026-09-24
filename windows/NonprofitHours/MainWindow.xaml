@@ -1,0 +1,21 @@
+<Window x:Class="NonprofitHours.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Nonprofit Hours">
+  <ScrollViewer><StackPanel Padding="24" Spacing="14" MaxWidth="800" HorizontalAlignment="Stretch">
+    <TextBlock Text="Nonprofit Hours" FontSize="30" FontWeight="Bold" />
+    <TextBlock x:Name="ErrorText" Foreground="Firebrick" TextWrapping="Wrap" />
+    <StackPanel x:Name="Controls" Spacing="14">
+      <TextBox x:Name="NewName" Header="New nonprofit" />
+      <Button x:Name="AddButton" Content="Add nonprofit" Click="AddNonprofit" />
+      <ComboBox x:Name="Nonprofits" Header="Nonprofit" DisplayMemberPath="Name" HorizontalAlignment="Stretch" />
+      <TextBox x:Name="Notes" Header="Notes (optional)" />
+      <TextBlock x:Name="Status" FontSize="22" TextWrapping="Wrap" />
+      <Button x:Name="Toggle" Click="ToggleTracking" HorizontalAlignment="Stretch" Foreground="White" FontSize="24" />
+      <TextBlock x:Name="Total" />
+      <Button x:Name="ExportButton" Content="Export CSV for Google Sheets" Click="Export" />
+      <TextBlock Text="Timing continues when the app closes. Reopen and press Stop to finish." TextWrapping="Wrap" />
+    </StackPanel>
+    <TextBlock Text="History" FontSize="22" />
+    <ItemsControl x:Name="History"><ItemsControl.ItemTemplate><DataTemplate>
+      <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,14" />
+    </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+  </StackPanel></ScrollViewer>
+</Window>
