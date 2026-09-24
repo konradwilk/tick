@@ -13,3 +13,6 @@ local.properties
 # Swift package build artifacts
 .build/
 .swiftpm/
+
+# Windows publish output
+windows/publish/

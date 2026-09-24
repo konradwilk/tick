@@ -55,8 +55,8 @@ and press Stop to finish. Data is stored locally in
 `~/Library/Application Support/NonprofitHours/sessions.json`.
 
 Export completed sessions with **Export CSV…** and import the file in Google Sheets
-using File → Import. Automatic Sheets sync and native iOS, Android, and Windows
-clients are still pending. The shared Swift tracking library is available for iOS.
+using File → Import. Automatic Sheets sync and the native iOS app are still pending.
+Android and Windows source projects are now included. The shared Swift tracking library is available for iOS.
 The app bundle is unsigned and intended for local use.
 
 Run the tracking tests:
@@ -64,3 +64,19 @@ Run the tracking tests:
 ```sh
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path apple
 ```
+
+## Android and Windows
+
+- [Android build and installation](android/README.md): Kotlin / Jetpack Compose.
+- [Windows build and installation](windows/README.md): C# / WinUI 3.
+
+Both implement the local tracking milestone: nonprofit selection/creation,
+Start/Stop, notes, persistent sessions, history, totals, and CSV export. They use the
+logical session schema in `docs/session-schema.md`; local files are not intended to
+be copied between platforms. Google Sheets automatic sync remains a future milestone.
+
+`.github/workflows/native-clients.yml` builds and tests both platforms and uploads
+an Android debug APK and Windows x64 publish folder. These new platform builds have
+not been executed on the development Mac, which lacks Android SDK/JDK/Gradle and
+.NET/Windows tools. Check the workflow results or build on a configured machine
+before distributing either app.
