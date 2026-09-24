@@ -9,3 +9,7 @@ DerivedData/
 **/obj/
 .env
 local.properties
+
+# Swift package build artifacts
+.build/
+.swiftpm/
