@@ -22,6 +22,12 @@ the app is unpackaged and includes its runtime dependencies. For ARM64 use
 library and tests are independent of WinUI. The repository's Native clients workflow
 builds the x64 app and uploads the published directory. No installer or signing yet.
 
+The green clock icon in the Windows system tray stays available when you close the
+window. Click it to reopen, or right-click for **Open Nonprofit Hours** and **Quit**.
+Launching the app again also reopens the existing window. Windows may initially
+place the icon in the hidden-icons menu near the clock; drag it onto the tray to
+keep it visible. Quitting preserves any active session; press Stop to finish tracking.
+
 Data lives in `%LOCALAPPDATA%\NonprofitHours\sessions.json`. Back up this file or export
 CSV to preserve hours. Saves replace the file only after writing the new state. An
 unreadable file disables tracking rather than overwriting saved data. One application

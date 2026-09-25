@@ -15,8 +15,19 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.WindowsDesktop.App.WindowsForms" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260804001" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.4654" />
     <ProjectReference Include="../HoursCore/HoursCore.csproj" />
   </ItemGroup>
+  <!-- The .NET publish pipeline does not automatically include these WinUI outputs. -->
+  <Target Name="IncludeWinUIResourcesInPublish" AfterTargets="ComputeFilesToPublish">
+    <ItemGroup>
+      <_WinUIResource Include="$(TargetDir)$(AssemblyName).pri;$(TargetDir)**\*.xbf" />
+      <ResolvedFileToPublish Include="@(_WinUIResource)">
+        <RelativePath>%(_WinUIResource.RecursiveDir)%(_WinUIResource.Filename)%(_WinUIResource.Extension)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
 </Project>

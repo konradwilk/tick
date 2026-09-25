@@ -14,7 +14,7 @@
       <Button x:Name="Toggle" Click="ToggleTracking" HorizontalAlignment="Stretch" Foreground="White" FontSize="24" />
       <TextBlock x:Name="Total" />
       <Button x:Name="ExportButton" Content="Export CSV for Google Sheets" Click="Export" />
-      <TextBlock Text="Timing continues when the app closes. Reopen and press Stop to finish." TextWrapping="Wrap" />
+      <TextBlock Text="Closing this window hides it to the system tray. Click the clock icon to reopen, or right-click it to quit. Timing continues until you press Stop." TextWrapping="Wrap" />
     </StackPanel>
     <TextBlock Text="History" FontSize="22" />
     <ItemsControl x:Name="History"><ItemsControl.ItemTemplate><DataTemplate>
