@@ -16,3 +16,7 @@ local.properties
 
 # Windows publish output
 windows/publish/
+
+# Python
+__pycache__/
+*.py[cod]

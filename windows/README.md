@@ -31,3 +31,15 @@ Dates use UTC ISO-8601 and exports contain completed sessions only. Export does 
 mark sessions synced.
 
 Dependency reference: [Windows App SDK 1.8 release notes](https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/release-notes/windows-app-sdk-1-8).
+
+## Configure the data folder
+
+Use **Data location** to choose where the app stores its working data. The selected
+folder is remembered across restarts; every subsequent read/save uses
+`nonprofit-hours.json` there. Existing data in that folder is loaded without being
+overwritten. Otherwise the current data is copied there and the old file is retained.
+The previously documented private/default path applies only until you choose a folder.
+
+The file can be used by macOS, iOS, Android, Windows, and Linux. See
+[shared data storage](../docs/data-storage.md) for compatibility and access details.
+Use one device at a time and wait for any cloud synchronization before switching.

@@ -12,7 +12,7 @@ Each completed or in-progress work session uses this logical model:
   "durationSeconds": 6120,
   "notes": "Board work",
   "deviceId": "uuid",
-  "platform": "android|ios|macos|windows",
+  "platform": "android|ios|macos|windows|linux",
   "updatedAtUtc": "2026-09-11T02:14:03Z",
   "syncState": "pending|synced|failed"
 }
@@ -25,3 +25,8 @@ Each completed or in-progress work session uses this logical model:
 - `durationSeconds = endTimeUtc - startTimeUtc` for completed sessions.
 - Backend writes are idempotent by `sessionId`.
 - Edits reuse the same `sessionId` and update the existing row.
+
+## Shared data file
+
+Sessions are stored in the versioned cross-platform envelope described in
+[data-storage.md](data-storage.md). The data location is configured per device.

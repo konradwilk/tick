@@ -14,7 +14,8 @@ import java.util.UUID
 )
 @Serializable data class TrackerState(
     val deviceId: String = UUID.randomUUID().toString(),
-    val nonprofits: List<Nonprofit> = emptyList(), val sessions: List<Session> = emptyList()
+    val nonprofits: List<Nonprofit> = emptyList(), val sessions: List<Session> = emptyList(),
+    val schemaVersion: Int = 1
 ) { val active: Session? get() = sessions.firstOrNull { it.endTimeUtc == null } }
 
 class Tracker(initial: TrackerState, private val save: (TrackerState) -> Unit) {

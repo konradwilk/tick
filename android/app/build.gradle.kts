@@ -14,6 +14,7 @@ android {
         versionCode = 1
         versionName = "0.1.0"
     }
+    sourceSets.getByName("test").resources.srcDir("../../fixtures")
     buildFeatures { compose = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

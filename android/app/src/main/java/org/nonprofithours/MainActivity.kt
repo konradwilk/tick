@@ -25,23 +25,34 @@ import java.time.Duration
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val loaded = runCatching {
-            val file = AtomicFile(File(filesDir, "sessions.json"))
-            // openRead also recovers an interrupted write's backup, if present.
-            val initial = if (file.baseFile.exists() || File(file.baseFile.path + ".bak").exists())
-                Json.decodeFromString<TrackerState>(file.openRead().bufferedReader().use { it.readText() }) else TrackerState()
-            Tracker(initial) { next ->
-                val bytes = Json.encodeToString(next).toByteArray(Charsets.UTF_8)
-                val stream = file.startWrite()
-                try { stream.write(bytes); file.finishWrite(stream) }
-                catch (e: Exception) { file.failWrite(stream); throw e }
-            }
-        }
+        val storage = StorageLocation(this)
+        val loaded = runCatching { storage.open() }
         setContent { MaterialTheme {
+            var tracker by remember { mutableStateOf(loaded.getOrNull()) }
+            var storageError by remember { mutableStateOf(loaded.exceptionOrNull()?.message) }
+            var location by remember { mutableStateOf(storage.label) }
+            val chooseFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+                if (uri != null) {
+                    try {
+                        val next = storage.select(uri, tracker)
+                        tracker = next
+                        location = storage.label
+                        storageError = null
+                    } catch (error: Exception) { storageError = error.message }
+                }
+            }
             Surface(Modifier.fillMaxSize()) {
-                val tracker = loaded.getOrNull()
-                if (tracker == null) Text("Could not load saved hours. Your file was not changed. ${loaded.exceptionOrNull()?.message}", Modifier.padding(24.dp))
-                else TrackerScreen(tracker)
+                Column(Modifier.safeDrawingPadding()) {
+                    OutlinedButton(onClick = { chooseFolder.launch(null) }, modifier = Modifier.padding(horizontal = 20.dp)) { Text("Data location…") }
+                    Text(location, Modifier.padding(horizontal = 20.dp), style = MaterialTheme.typography.bodySmall)
+                    Text("All changes are saved here. Use one device at a time.", Modifier.padding(horizontal = 20.dp), style = MaterialTheme.typography.bodySmall)
+                    storageError?.let { Text(it, Modifier.padding(20.dp), color = MaterialTheme.colorScheme.error) }
+                    Box(Modifier.weight(1f)) {
+                        val current = tracker
+                        if (current != null) key(current) { TrackerScreen(current) }
+                        else Text("Choose a folder containing your data to resume. The original file was not changed.", Modifier.padding(20.dp))
+                    }
+                }
             }
         } }
     }

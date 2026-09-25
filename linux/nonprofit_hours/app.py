@@ -4,7 +4,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, Gio, GLib, Gdk
 from datetime import datetime, timezone
-from .core import FileStore, Tracker, data_path, elapsed, parse
+from .core import FileStore, Tracker, data_path, elapsed, parse, StorageLocation
 
 
 class HoursWindow(Gtk.ApplicationWindow):
@@ -14,6 +14,7 @@ class HoursWindow(Gtk.ApplicationWindow):
         self.timer = None
         self.chooser = None
         self.selected_id = None
+        self.location = StorageLocation()
         self.connect("close-request", self.on_close)
         scroll = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
         self.set_child(scroll)
@@ -27,6 +28,12 @@ class HoursWindow(Gtk.ApplicationWindow):
         self.error = Gtk.Label(xalign=0, wrap=True, selectable=True)
         self.error.add_css_class("error")
         box.append(self.error)
+        location_button = Gtk.Button(label="Data location…")
+        location_button.connect("clicked", lambda *_: self.choose_data_location())
+        box.append(location_button)
+        self.location_label = Gtk.Label(xalign=0, wrap=True, selectable=True)
+        box.append(self.location_label)
+        box.append(Gtk.Label(label="All changes are saved in this folder. Use one device at a time.", xalign=0, wrap=True))
         self.controls = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         box.append(self.controls)
         add_row = Gtk.Box(spacing=8)
@@ -59,7 +66,7 @@ class HoursWindow(Gtk.ApplicationWindow):
         self.history = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         box.append(self.history)
         try:
-            self.tracker = Tracker(FileStore(path or data_path()))
+            self.tracker = Tracker(FileStore(path)) if path else self.location.open()
             active = self.tracker.active
             self.selected_id = active["nonprofitId"] if active else next((n["id"] for n in self.tracker.state["nonprofits"]), None)
             self.notes.set_text(active["notes"] if active else "")
@@ -100,6 +107,8 @@ class HoursWindow(Gtk.ApplicationWindow):
         self.perform(operation)
 
     def refresh(self):
+        self.controls.set_sensitive(True)
+        self.location_label.set_text(str(self.tracker.store.path.parent))
         state = self.tracker.state
         selected = self.selected_id
         nonprofits = state["nonprofits"]
@@ -134,6 +143,37 @@ class HoursWindow(Gtk.ApplicationWindow):
         else:
             self.clock.set_text("Ready when you are")
         return GLib.SOURCE_CONTINUE
+
+    def choose_data_location(self):
+        if self.chooser:
+            self.chooser.show()
+            return
+        self.chooser = Gtk.FileChooserNative.new("Choose data folder", self,
+            Gtk.FileChooserAction.SELECT_FOLDER, "Use this folder", "Cancel")
+        self.chooser.connect("response", self.on_data_response)
+        self.chooser.show()
+
+    def on_data_response(self, chooser, response):
+        try:
+            if response == Gtk.ResponseType.ACCEPT:
+                target = chooser.get_file()
+                path = target.get_path() if target else None
+                if not path:
+                    raise ValueError("Choose a local file or a mounted cloud/network folder.")
+                next_tracker = self.location.select(path, self.tracker)
+                self.tracker = next_tracker
+                active = self.tracker.active
+                self.selected_id = active["nonprofitId"] if active else next((n["id"] for n in self.tracker.state["nonprofits"]), None)
+                self.notes.set_text(active["notes"] if active else "")
+                self.refresh()
+                if self.timer is None:
+                    self.timer = GLib.timeout_add_seconds(1, self.update_clock)
+                self.error.set_text("")
+        except Exception as error:
+            self.error.set_text(str(error))
+        finally:
+            chooser.destroy()
+            self.chooser = None
 
     def export_csv(self, *_):
         if self.chooser:

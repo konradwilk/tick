@@ -28,3 +28,15 @@ Dates use UTC ISO-8601. Export includes only completed sessions and does not mar
 anything synced. System clock changes affect elapsed time; negative duration is rejected.
 
 Toolchain reference: [Android Gradle plugin 8.9 compatibility](https://developer.android.com/build/releases/agp-8-9-0-release-notes).
+
+## Configure the data folder
+
+Use **Data location** to choose where the app stores its working data. The selected
+folder is remembered across restarts; every subsequent read/save uses
+`nonprofit-hours.json` there. Existing data in that folder is loaded without being
+overwritten. Otherwise the current data is copied there and the old file is retained.
+The previously documented private/default path applies only until you choose a folder.
+
+The file can be used by macOS, iOS, Android, Windows, and Linux. See
+[shared data storage](../docs/data-storage.md) for compatibility and access details.
+Use one device at a time and wait for any cloud synchronization before switching.

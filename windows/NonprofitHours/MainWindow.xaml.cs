@@ -7,20 +7,23 @@ namespace NonprofitHours;
 public sealed partial class MainWindow : Window
 {
     private Tracker? tracker;
+    private readonly StorageLocation location = new(
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NonprofitHours", "location.json"),
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NonprofitHours", "sessions.json"));
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(1) };
     public MainWindow()
     {
         InitializeComponent();
+        timer.Tick += (_, _) => UpdateClock();
+        timer.Start();
+        Closed += (_, _) => timer.Stop();
         try
         {
-            var store = new FileStore(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NonprofitHours", "sessions.json"));
-            tracker = new Tracker(store.Load(), store.Save);
+            tracker = location.Open();
             Refresh();
             Nonprofits.SelectedItem = tracker.State.Nonprofits.FirstOrDefault(n => n.Id == tracker.State.Active?.NonprofitId) ?? tracker.State.Nonprofits.FirstOrDefault();
             Notes.Text = tracker.State.Active?.Notes ?? "";
-            timer.Tick += (_, _) => UpdateClock();
-            timer.Start();
-            Closed += (_, _) => timer.Stop();
+
         }
         catch (Exception e) { Controls.IsEnabled = false; ErrorText.Text = "Could not load saved hours. Your file was not changed. " + e.Message; }
     }
@@ -44,6 +47,8 @@ public sealed partial class MainWindow : Window
     });
     private void Refresh()
     {
+        Controls.IsEnabled = true;
+        DataLocation.Text = Path.GetDirectoryName(location.CurrentPath);
         var state = tracker!.State;
         var selected = (Nonprofits.SelectedItem as Nonprofit)?.Id;
         Nonprofits.ItemsSource = state.Nonprofits;
@@ -62,6 +67,25 @@ public sealed partial class MainWindow : Window
     {
         var active = tracker?.State.Active;
         Status.Text = active == null ? "Ready when you are" : $"{active.NonprofitName}: {Elapsed(Math.Max(0, (long)(DateTimeOffset.UtcNow - active.StartTimeUtc).TotalSeconds))}";
+    }
+    private async void ChooseDataLocation(object sender, RoutedEventArgs args)
+    {
+        try
+        {
+            var picker = new FolderPicker();
+            picker.FileTypeFilter.Add("*");
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
+            var folder = await picker.PickSingleFolderAsync();
+            if (folder == null) return;
+            if (string.IsNullOrEmpty(folder.Path)) throw new IOException("Choose a local or mounted cloud folder.");
+            var next = location.Select(folder.Path, tracker?.State);
+            tracker = next;
+            Refresh();
+            Nonprofits.SelectedItem = tracker.State.Nonprofits.FirstOrDefault(n => n.Id == tracker.State.Active?.NonprofitId) ?? tracker.State.Nonprofits.FirstOrDefault();
+            Notes.Text = tracker.State.Active?.Notes ?? "";
+            ErrorText.Text = "";
+        }
+        catch (Exception e) { ErrorText.Text = e.Message; }
     }
     private async void Export(object sender, RoutedEventArgs args)
     {

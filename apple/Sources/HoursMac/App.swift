@@ -9,10 +9,15 @@ import HoursCore
     var error: String?
     var selected: UUID?
     var notes = ""
+    var dataLocation = ""
+    private let storage = StorageLocation()
     init() {
         do {
             let folder = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-            let tracker = try Tracker(file: folder.appending(path: "NonprofitHours/sessions.json"))
+            let location = try storage.resolve(defaultURL: folder.appending(path: "NonprofitHours/sessions.json"))
+            let file = location.selected ? location.url.appendingPathComponent("nonprofit-hours.json") : location.url
+            dataLocation = file.deletingLastPathComponent().path
+            let tracker = try Tracker(file: file, requireExisting: location.selected)
             self.tracker = tracker
             state = tracker.state
             selected = state.active?.nonprofitId ?? state.nonprofits.first?.id
@@ -29,6 +34,36 @@ import HoursCore
             if state.active != nil { try tracker.stop(); notes = "" }
             else if let selected { try tracker.start(nonprofitId: selected, notes: notes) }
         }
+    }
+    func chooseDataLocation() {
+        do {
+            let panel = NSOpenPanel()
+            panel.title = "Choose data folder"
+            panel.prompt = "Use this folder"
+            panel.canChooseFiles = false
+            panel.canChooseDirectories = true
+            panel.canCreateDirectories = true
+            panel.allowsMultipleSelection = false
+            guard panel.runModal() == .OK, let folder = panel.url else { return }
+            let access = folder.startAccessingSecurityScopedResource()
+            defer { if access { folder.stopAccessingSecurityScopedResource() } }
+            let file = folder.appendingPathComponent("nonprofit-hours.json")
+            let next: Tracker
+            if FileManager.default.fileExists(atPath: file.path) {
+                next = try Tracker(file: file, requireExisting: true)
+            } else if let tracker {
+                next = try tracker.saveAs(file)
+            } else {
+                throw CocoaError(.fileReadNoSuchFile)
+            }
+            try storage.remember(folder)
+            tracker = next
+            state = next.state
+            dataLocation = folder.path
+            selected = state.active?.nonprofitId ?? state.nonprofits.first?.id
+            notes = state.active?.notes ?? ""
+            error = nil
+        } catch { self.error = error.localizedDescription }
     }
     func export() {
         guard let tracker else { return }
@@ -65,12 +100,15 @@ struct TrackerView: View {
         VStack(alignment: .leading, spacing: 18) {
             Text("Nonprofit Hours").font(.largeTitle.bold())
             Text("Make your time count.").foregroundStyle(.secondary)
+            Button("Data location…") { model.chooseDataLocation() }
+            Text(model.dataLocation).font(.caption).textSelection(.enabled)
+            Text("All changes are saved in this folder. Use one device at a time.").font(.caption).foregroundStyle(.secondary)
             HStack {
                 TextField("Add a nonprofit", text: $newName)
                     .onSubmit { addNonprofit() }
                 Button("Add", action: addNonprofit).disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
-            .disabled(active != nil)
+            .disabled(active != nil || model.tracker == nil)
             Picker("Nonprofit", selection: $model.selected) {
                 Text("Choose a nonprofit").tag(nil as UUID?)
                 ForEach(model.state.nonprofits) { Text($0.name).tag(Optional($0.id)) }
@@ -108,7 +146,6 @@ struct TrackerView: View {
                 }.padding(.vertical, 4)
             }
         }.padding(24).frame(minWidth: 560, minHeight: 580)
-        .disabled(model.tracker == nil)
         .alert("Unable to complete action", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
             Button("OK") { model.error = nil }
         } message: { Text(model.error ?? "") }

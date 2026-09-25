@@ -6,8 +6,8 @@ import json
 import os
 from pathlib import Path
 import tempfile
-from datetime import datetime, timezone
-from uuid import uuid4
+from datetime import datetime, timezone, timedelta
+from uuid import uuid4, UUID
 
 
 def timestamp(value=None):
@@ -30,50 +30,86 @@ def data_path():
     return base / "nonprofit-hours/sessions.json"
 
 
+def decode_data(raw):
+    state = json.loads(raw)
+    if not isinstance(state, dict):
+        raise ValueError("Invalid data file.")
+    legacy = "schemaVersion" not in state
+    if state.get("schemaVersion", 1) != 1:
+        raise ValueError("Unsupported data file version.")
+    state["schemaVersion"] = 1
+    state["deviceId"] = str(UUID(state["deviceId"]))
+    for nonprofit in state["nonprofits"]:
+        nonprofit["id"] = str(UUID(nonprofit["id"]))
+    for session in state["sessions"]:
+        for key in ("sessionId", "nonprofitId", "deviceId"):
+            session[key] = str(UUID(session[key]))
+        if legacy:
+            session.setdefault("platform", "android")
+            session.setdefault("syncState", "pending")
+            for key in ("startTimeUtc", "endTimeUtc", "updatedAtUtc"):
+                value = session.get(key)
+                if type(value) in (int, float):
+                    session[key] = timestamp(datetime(2001, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=value))
+        session.setdefault("endTimeUtc", None)
+        session.setdefault("durationSeconds", None)
+        if session.get("platform") not in ("android", "ios", "macos", "windows", "linux") or session.get("syncState") not in ("pending", "synced", "failed"):
+            raise ValueError("Invalid session platform or sync state.")
+    # Refuse malformed state rather than overwriting an unreadable history.
+    if not isinstance(state, dict) or not isinstance(state.get("deviceId"), str):
+        raise ValueError("Invalid saved device identity.")
+    for key in ("nonprofits", "sessions"):
+        if not isinstance(state.get(key), list):
+            raise ValueError("Invalid saved " + key)
+    ids = set()
+    for nonprofit in state["nonprofits"]:
+        if not isinstance(nonprofit.get("id"), str) or not isinstance(nonprofit.get("name"), str) or nonprofit["id"] in ids:
+            raise ValueError("Invalid saved nonprofit.")
+        ids.add(nonprofit["id"])
+    sessions = set()
+    active = 0
+    for session in state["sessions"]:
+        for key in ("sessionId", "nonprofitId", "nonprofitName", "startTimeUtc", "notes", "deviceId", "platform", "updatedAtUtc", "syncState"):
+            if not isinstance(session.get(key), str):
+                raise ValueError("Invalid saved session field: " + key)
+        if session["sessionId"] in sessions or session["nonprofitId"] not in ids:
+            raise ValueError("Invalid saved session identity.")
+        sessions.add(session["sessionId"])
+        start = parse(session["startTimeUtc"])
+        parse(session["updatedAtUtc"])
+        if session.get("endTimeUtc") is None:
+            active += 1
+            if session.get("durationSeconds") is not None:
+                raise ValueError("Active session has a duration.")
+        else:
+            seconds = (parse(session["endTimeUtc"]) - start).total_seconds()
+            if seconds < 0 or type(session.get("durationSeconds")) is not int or session["durationSeconds"] < 0 or abs(session["durationSeconds"] - seconds) >= 1.01:
+                raise ValueError("Invalid saved duration.")
+    if active > 1:
+        raise ValueError("Multiple active sessions in saved file.")
+    return state
+
 class FileStore:
-    def __init__(self, path):
+    def __init__(self, path, require_existing=False):
         self.path = Path(path)
+        self.require_existing = require_existing
+        self.snapshot = None
 
     def load(self):
-        if not self.path.exists():
-            return {"deviceId": str(uuid4()), "nonprofits": [], "sessions": []}
-        state = json.loads(self.path.read_text(encoding="utf-8"))
-        # Refuse malformed state rather than overwriting an unreadable history.
-        if not isinstance(state, dict) or not isinstance(state.get("deviceId"), str):
-            raise ValueError("Invalid saved device identity.")
-        for key in ("nonprofits", "sessions"):
-            if not isinstance(state.get(key), list):
-                raise ValueError("Invalid saved " + key)
-        ids = set()
-        for nonprofit in state["nonprofits"]:
-            if not isinstance(nonprofit.get("id"), str) or not isinstance(nonprofit.get("name"), str) or nonprofit["id"] in ids:
-                raise ValueError("Invalid saved nonprofit.")
-            ids.add(nonprofit["id"])
-        sessions = set()
-        active = 0
-        for session in state["sessions"]:
-            for key in ("sessionId", "nonprofitId", "nonprofitName", "startTimeUtc", "notes", "deviceId", "platform", "updatedAtUtc", "syncState"):
-                if not isinstance(session.get(key), str):
-                    raise ValueError("Invalid saved session field: " + key)
-            if session["sessionId"] in sessions or session["nonprofitId"] not in ids:
-                raise ValueError("Invalid saved session identity.")
-            sessions.add(session["sessionId"])
-            start = parse(session["startTimeUtc"])
-            parse(session["updatedAtUtc"])
-            if session.get("endTimeUtc") is None:
-                active += 1
-                if session.get("durationSeconds") is not None:
-                    raise ValueError("Active session has a duration.")
-            else:
-                seconds = (parse(session["endTimeUtc"]) - start).total_seconds()
-                duration = int(seconds)
-                if seconds < 0 or type(session.get("durationSeconds")) is not int or session["durationSeconds"] != duration:
-                    raise ValueError("Invalid saved duration.")
-        if active > 1:
-            raise ValueError("Multiple active sessions in saved file.")
+        if not self.path.exists() and not self.require_existing:
+            self.snapshot = None
+            return {"schemaVersion": 1, "deviceId": str(uuid4()), "nonprofits": [], "sessions": []}
+        raw = self.path.read_bytes()
+        state = decode_data(raw)
+        self.snapshot = raw
         return state
 
     def save(self, state):
+        current = self.path.read_bytes() if self.path.exists() else None
+        if current != self.snapshot:
+            raise ValueError("The data file changed or was removed. Select its data folder again before saving.")
+        raw = json.dumps(state, ensure_ascii=False).encode("utf-8")
+        decode_data(raw)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         name = None
         try:
@@ -83,6 +119,7 @@ class FileStore:
                 stream.flush()
                 os.fsync(stream.fileno())
             os.replace(name, self.path)
+            self.snapshot = raw
         finally:
             if name and os.path.exists(name):
                 os.unlink(name)
@@ -160,3 +197,38 @@ class Tracker:
 def elapsed(seconds):
     seconds = max(0, int(seconds))
     return f"{seconds // 3600:02}:{seconds % 3600 // 60:02}:{seconds % 60:02}"
+
+
+class StorageLocation:
+    def __init__(self, settings=None):
+        root = os.environ.get("XDG_CONFIG_HOME", "")
+        base = Path(root) if root and Path(root).is_absolute() else Path.home() / ".config"
+        self.settings = Path(settings) if settings else base / "nonprofit-hours/location.json"
+
+    def open(self):
+        if not self.settings.exists():
+            return Tracker(FileStore(data_path()))
+        path = json.loads(self.settings.read_text(encoding="utf-8"))["path"]
+        return Tracker(FileStore(path, require_existing=True))
+
+    def select(self, folder, current=None):
+        path = Path(folder).absolute() / "nonprofit-hours.json"
+        if not path.exists() and current is not None:
+            # Initialize the configured folder, keeping the previous file intact.
+            destination = FileStore(path)
+            destination.snapshot = path.read_bytes() if path.exists() else None
+            destination.save(copy.deepcopy(current.state))
+        next_tracker = Tracker(FileStore(path, require_existing=True))
+        self.settings.parent.mkdir(parents=True, exist_ok=True)
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=self.settings.parent, delete=False) as stream:
+                temporary = stream.name
+                json.dump({"path": str(path)}, stream)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, self.settings)
+        finally:
+            if temporary and os.path.exists(temporary):
+                os.unlink(temporary)
+        return next_tracker

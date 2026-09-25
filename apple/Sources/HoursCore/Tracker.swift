@@ -22,6 +22,7 @@ public struct Session: Codable, Identifiable, Sendable {
 }
 
 public struct TrackerState: Codable, Sendable {
+    public var schemaVersion = 1
     public var deviceId = UUID()
     public var nonprofits: [Nonprofit] = []
     public var sessions: [Session] = []
@@ -44,17 +45,36 @@ public enum TrackerError: LocalizedError {
 /// Each change is saved atomically before it becomes visible to the caller.
 public final class Tracker {
     public private(set) var state: TrackerState
-    private let file: URL
-    public init(file: URL) throws {
+    public let file: URL
+    private var snapshot: Data?
+    public init(file: URL, requireExisting: Bool = false) throws {
         self.file = file
         if FileManager.default.fileExists(atPath: file.path) {
-            state = try JSONDecoder().decode(TrackerState.self, from: Data(contentsOf: file))
-        } else { state = TrackerState() }
+            let data = try Data(contentsOf: file)
+            state = try PortableData.decode(data)
+            snapshot = data
+        } else {
+            if requireExisting { throw CocoaError(.fileNoSuchFile) }
+            state = TrackerState()
+        }
     }
     private func save(_ next: TrackerState) throws {
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try JSONEncoder().encode(next).write(to: file, options: .atomic)
+        let current = FileManager.default.fileExists(atPath: file.path) ? try Data(contentsOf: file) : nil
+        guard current == snapshot else { throw PortableData.Error.changed }
+        let data = try PortableData.encode(next)
+        try data.write(to: file, options: .atomic)
+        snapshot = data
         state = next
+    }
+    public func saveAs(_ destination: URL) throws -> Tracker {
+        if destination.standardizedFileURL == file.standardizedFileURL {
+            try save(state)
+            return self
+        }
+        let data = try PortableData.encode(state)
+        try data.write(to: destination, options: .atomic)
+        return try Tracker(file: destination, requireExisting: true)
     }
     @discardableResult public func addNonprofit(_ name: String) throws -> UUID {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)

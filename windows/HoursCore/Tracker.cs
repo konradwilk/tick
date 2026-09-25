@@ -9,6 +9,7 @@ public record Session(Guid SessionId, Guid NonprofitId, string NonprofitName,
     string Notes, Guid DeviceId, string Platform, DateTimeOffset UpdatedAtUtc, string SyncState = "pending");
 public record TrackerState(Guid DeviceId, Nonprofit[] Nonprofits, Session[] Sessions)
 {
+    public int SchemaVersion { get; init; } = 1;
     [JsonIgnore] public Session? Active => Sessions.FirstOrDefault(s => s.EndTimeUtc == null);
     public static TrackerState Empty() => new(Guid.NewGuid(), [], []);
 }
@@ -61,20 +62,59 @@ public sealed class Tracker
 }
 public sealed class FileStore(string path)
 {
-    private static readonly JsonSerializerOptions Options = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
-    public TrackerState Load() => File.Exists(path)
-        ? JsonSerializer.Deserialize<TrackerState>(File.ReadAllText(path), Options) ?? throw new InvalidDataException("Saved hours are empty.")
-        : TrackerState.Empty();
+    private byte[]? snapshot;
+    public string PathName => path;
+    public TrackerState Load(bool requireExisting = false)
+    {
+        if (!File.Exists(path) && !requireExisting) { snapshot = null; return TrackerState.Empty(); }
+        var bytes = File.ReadAllBytes(path);
+        var state = PortableData.Decode(bytes);
+        snapshot = bytes;
+        return state;
+    }
     public void Save(TrackerState state)
+    {
+        var current = File.Exists(path) ? File.ReadAllBytes(path) : null;
+        if (!(current == null && snapshot == null) && (current == null || snapshot == null || !current.SequenceEqual(snapshot)))
+            throw new IOException("The data file changed or was removed. Select its data folder again before saving.");
+        var bytes = PortableData.Encode(state);
+        WriteAtomically(path, bytes);
+        snapshot = bytes;
+    }
+    public static void WriteAtomically(string path, byte[] bytes)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         var temporary = path + "." + Guid.NewGuid() + ".tmp";
         try
         {
             using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-            { JsonSerializer.Serialize(stream, state, Options); stream.Flush(true); }
+            { stream.Write(bytes); stream.Flush(true); }
             File.Move(temporary, path, true);
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
+    }
+}
+
+public sealed class StorageLocation(string settingsPath, string defaultPath)
+{
+    public string CurrentPath { get; private set; } = defaultPath;
+    public Tracker Open()
+    {
+        var selected = File.Exists(settingsPath);
+        var path = selected ? JsonSerializer.Deserialize<string>(File.ReadAllText(settingsPath)) ?? throw new InvalidDataException("Invalid location setting.") : defaultPath;
+        var store = new FileStore(path);
+        var tracker = new Tracker(store.Load(selected), store.Save);
+        CurrentPath = path;
+        return tracker;
+    }
+    public Tracker Select(string folder, TrackerState? copy = null)
+    {
+        var path = Path.Combine(folder, "nonprofit-hours.json");
+        if (!File.Exists(path) && copy != null) FileStore.WriteAtomically(path, PortableData.Encode(copy));
+        var store = new FileStore(path);
+        var next = new Tracker(store.Load(true), store.Save);
+        FileStore.WriteAtomically(settingsPath, JsonSerializer.SerializeToUtf8Bytes(path));
+        CurrentPath = path;
+        return next;
     }
 }
