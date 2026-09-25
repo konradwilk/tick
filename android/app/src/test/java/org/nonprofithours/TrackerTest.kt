@@ -6,6 +6,27 @@ import kotlinx.serialization.json.Json
 import java.time.Instant
 
 class TrackerTest {
+    @Test fun editNotesPersistsWithoutChangingHours() {
+        val tracker = Tracker(TrackerState()) {}
+        val id = tracker.addNonprofit("Kitchen")
+        tracker.start(id, "Original", Instant.EPOCH)
+        tracker.stop(Instant.EPOCH.plusSeconds(3600))
+        val original = tracker.state.sessions.single().copy(syncState = "synced")
+        var saved = ""
+        val editor = Tracker(tracker.state.copy(sessions = listOf(original))) { saved = Json.encodeToString(it) }
+        val editedAt = Instant.EPOCH.plusSeconds(7200)
+        for (notes in listOf("Meals, \"served\"\nCleanup 🍲", "")) {
+            editor.updateNotes(original.sessionId, notes, editedAt)
+            val restored = Json.decodeFromString<TrackerState>(saved)
+            assertEquals(original.copy(notes = notes, updatedAtUtc = editedAt.toString(), syncState = "pending"), restored.sessions.single())
+            assertTrue(editor.csv().contains("\"" + notes.replace("\"", "\"\"") + "\""))
+        }
+        val before = editor.state
+        val failing = Tracker(before) { error("Disk full") }
+        assertThrows(IllegalStateException::class.java) { failing.updateNotes(original.sessionId, "Unsaved") }
+        assertThrows(IllegalArgumentException::class.java) { failing.updateNotes("missing", "Unsaved") }
+        assertEquals(before, failing.state)
+    }
     @Test fun restartStopAndDuplicateStart() {
         var saved = ""
         val tracker = Tracker(TrackerState()) { saved = Json.encodeToString(it) }

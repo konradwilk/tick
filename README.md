@@ -13,6 +13,13 @@ Native time-tracking apps for Android, iPhone, macOS, Windows, and Linux with CS
 - Duplicate-safe synchronization across devices
 
 ## Native clients
+
+In session history, choose **Edit notes** on a completed session in Windows,
+macOS, Android, or Linux. **Save** persists the edited notes and includes them in
+future CSV exports; **Cancel** discards the draft. Times and recorded hours stay
+unchanged. If saving fails, the editor keeps your draft available to retry.
+The shared Apple core also supports note updates for iOS; this checkout does not
+include the iOS screen sources.
 - Android: Kotlin + Jetpack Compose
 - iPhone: Swift + SwiftUI
 - macOS: Swift + SwiftUI

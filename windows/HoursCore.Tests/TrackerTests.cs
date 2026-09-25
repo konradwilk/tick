@@ -3,6 +3,41 @@ using Xunit;
 namespace HoursCore.Tests;
 public class TrackerTests
 {
+    [Theory]
+    [InlineData("Updated work, \"details\"\nSecond line")]
+    [InlineData("")]
+    public void EditedNotesPersistWithoutChangingRecordedHours(string notes)
+    {
+        var tracker = new Tracker(TrackerState.Empty(), _ => { });
+        var id = tracker.AddNonprofit("Kitchen");
+        tracker.Start(id, "Original", DateTimeOffset.UnixEpoch);
+        tracker.Stop(DateTimeOffset.UnixEpoch.AddHours(1));
+        var original = tracker.State.Sessions.Single() with { SyncState = "synced" };
+        TrackerState? saved = null;
+        tracker = new Tracker(tracker.State with { Sessions = [original] }, state => saved = state);
+        var editedAt = DateTimeOffset.UnixEpoch.AddDays(1);
+
+        tracker.UpdateNotes(original.SessionId, notes, editedAt);
+
+        var restored = PortableData.Decode(PortableData.Encode(saved!));
+        Assert.Equal(original with { Notes = notes, UpdatedAtUtc = editedAt, SyncState = "pending" }, restored.Sessions.Single());
+        Assert.Equal(restored.Sessions, tracker.State.Sessions);
+        Assert.Contains("\"" + notes.Replace("\"", "\"\"") + "\"", tracker.Csv());
+    }
+    [Fact] public void FailedNoteEditPreservesOriginalSession()
+    {
+        var tracker = new Tracker(TrackerState.Empty(), _ => { });
+        var id = tracker.AddNonprofit("Kitchen");
+        tracker.Start(id, "Original", DateTimeOffset.UnixEpoch);
+        tracker.Stop(DateTimeOffset.UnixEpoch.AddHours(1));
+        var original = tracker.State;
+        tracker = new Tracker(original, _ => throw new IOException("Disk full"));
+
+        Assert.Throws<IOException>(() => tracker.UpdateNotes(original.Sessions.Single().SessionId, "Edited"));
+        Assert.Same(original, tracker.State);
+        Assert.Throws<InvalidOperationException>(() => tracker.UpdateNotes(Guid.NewGuid(), "Edited"));
+        Assert.Same(original, tracker.State);
+    }
     [Fact] public void RestartRetainsActiveSession()
     {
         var directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());

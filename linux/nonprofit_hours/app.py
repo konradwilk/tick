@@ -133,7 +133,48 @@ class HoursWindow(Gtk.ApplicationWindow):
             date = parse(session["startTimeUtc"]).astimezone().strftime("%Y-%m-%d %H:%M")
             label = Gtk.Label(label=f"{session['nonprofitName']} — {date}\n{duration}\n{session['notes']}", xalign=0, wrap=True, selectable=True)
             self.history.append(label)
+            if session.get("endTimeUtc"):
+                edit = Gtk.Button(label="Edit notes", halign=Gtk.Align.START)
+                edit.connect("clicked", lambda _, selected=session: self.edit_notes(selected))
+                self.history.append(edit)
         self.update_clock()
+
+    def edit_notes(self, session):
+        dialog = Gtk.Dialog(title="Edit session notes", transient_for=self, modal=True)
+        dialog.set_default_size(440, 300)
+        dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        dialog.add_button("Save", Gtk.ResponseType.ACCEPT)
+        content = dialog.get_content_area()
+        content.set_spacing(12)
+        for side in ("top", "bottom", "start", "end"):
+            getattr(content, "set_margin_" + side)(16)
+        date = parse(session["startTimeUtc"]).astimezone().strftime("%Y-%m-%d %H:%M")
+        content.append(Gtk.Label(label=f"{session['nonprofitName']} — {date}", xalign=0, wrap=True))
+        content.append(Gtk.Label(label="What did you work on?", xalign=0))
+        editor = Gtk.TextView(wrap_mode=Gtk.WrapMode.WORD_CHAR)
+        buffer = editor.get_buffer()
+        buffer.set_text(session["notes"])
+        scroll = Gtk.ScrolledWindow(vexpand=True, min_content_height=120)
+        scroll.set_child(editor)
+        content.append(scroll)
+        error = Gtk.Label(xalign=0, wrap=True)
+        error.add_css_class("error")
+        content.append(error)
+
+        def respond(_, response):
+            if response == Gtk.ResponseType.ACCEPT:
+                try:
+                    self.tracker.update_notes(session["sessionId"], buffer.get_text(*buffer.get_bounds(), True))
+                    self.refresh()
+                    self.error.set_text("")
+                except Exception as problem:
+                    error.set_text("Could not save notes. " + str(problem))
+                    return
+            dialog.destroy()
+
+        dialog.connect("response", respond)
+        dialog.present()
+        return dialog
 
     def update_clock(self):
         active = self.tracker.active if self.tracker else None

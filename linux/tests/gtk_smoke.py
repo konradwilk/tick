@@ -33,6 +33,20 @@ with tempfile.TemporaryDirectory() as directory:
     assert restored.tracker.active is None
     assert restored.toggle.get_label() == "Start"
     assert restored.export.get_sensitive()
+    session = restored.tracker.state["sessions"][0]
+    dialog = restored.edit_notes(session)
+    content = dialog.get_content_area()
+    scroll = content.get_first_child().get_next_sibling().get_next_sibling()
+    buffer = scroll.get_child().get_buffer()
+    buffer.set_text("Updated dinner service\nCleanup")
+    dialog.response(Gtk.ResponseType.ACCEPT)
+    assert restored.tracker.state["sessions"][0]["notes"] == "Updated dinner service\nCleanup"
+    assert restored.tracker.state["sessions"][0]["durationSeconds"] == session["durationSeconds"]
+    dialog = restored.edit_notes(restored.tracker.state["sessions"][0])
+    scroll = dialog.get_content_area().get_first_child().get_next_sibling().get_next_sibling()
+    scroll.get_child().get_buffer().set_text("Discard this")
+    dialog.response(Gtk.ResponseType.CANCEL)
+    assert restored.tracker.state["sessions"][0]["notes"] == "Updated dinner service\nCleanup"
     restored.on_close()
     restored.destroy()
 print("GTK smoke test passed")

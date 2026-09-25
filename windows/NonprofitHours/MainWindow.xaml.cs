@@ -1,6 +1,7 @@
 using HoursCore;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Windows.Storage.Pickers;
 namespace NonprofitHours;
@@ -64,8 +65,37 @@ public sealed partial class MainWindow : Window
         Toggle.Background = new SolidColorBrush(active ? Colors.Firebrick : Colors.ForestGreen);
         Total.Text = $"Completed: {state.Sessions.Sum(s => s.DurationSeconds ?? 0) / 3600.0:F2} hours";
         ExportButton.IsEnabled = state.Sessions.Any(s => s.EndTimeUtc != null);
-        History.ItemsSource = state.Sessions.Reverse().Select(s => $"{s.NonprofitName} — {s.StartTimeUtc.ToLocalTime():g}\n{(s.DurationSeconds is long seconds ? Elapsed(seconds) : "In progress")}\n{s.Notes}").ToArray();
+        History.ItemsSource = state.Sessions.Reverse().Select(s => new HistoryEntry(s.SessionId,
+            $"{s.NonprofitName} — {s.StartTimeUtc.ToLocalTime():g}\n{(s.DurationSeconds is long seconds ? Elapsed(seconds) : "In progress")}\n{s.Notes}", s.EndTimeUtc != null)).ToArray();
         UpdateClock();
+    }
+    public record HistoryEntry(Guid SessionId, string Summary, bool CanEdit);
+    private async void EditNotes(object sender, RoutedEventArgs args)
+    {
+        if (tracker == null || sender is not Button { Tag: Guid sessionId }) return;
+        var session = tracker.State.Sessions.FirstOrDefault(s => s.SessionId == sessionId);
+        if (session == null || session.EndTimeUtc == null) return;
+        var editor = new TextBox
+        {
+            Header = "What did you work on?", Text = session.Notes,
+            AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 120
+        };
+        var error = new TextBlock { TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush(Colors.Firebrick) };
+        var content = new StackPanel { Spacing = 12 };
+        content.Children.Add(new TextBlock { Text = $"{session.NonprofitName} — {session.StartTimeUtc.ToLocalTime():g}", TextWrapping = TextWrapping.Wrap });
+        content.Children.Add(editor);
+        content.Children.Add(error);
+        var dialog = new ContentDialog
+        {
+            XamlRoot = Controls.XamlRoot, Title = "Edit session notes", Content = content,
+            PrimaryButtonText = "Save", CloseButtonText = "Cancel"
+        };
+        dialog.PrimaryButtonClick += (_, eventArgs) =>
+        {
+            try { tracker.UpdateNotes(sessionId, editor.Text); ErrorText.Text = ""; Refresh(); }
+            catch (Exception e) { eventArgs.Cancel = true; error.Text = "Could not save notes. " + e.Message; }
+        };
+        await dialog.ShowAsync();
     }
     private static string Elapsed(long seconds) => $"{seconds / 3600:00}:{seconds % 3600 / 60:00}:{seconds % 60:00}";
     private void UpdateClock()

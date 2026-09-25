@@ -162,6 +162,14 @@ class Tracker:
             "platform": "linux", "updatedAtUtc": date, "syncState": "pending"})
         self.commit(state)
 
+    def update_notes(self, session_id, notes, now=None):
+        state = copy.deepcopy(self.state)
+        session = next((s for s in state["sessions"] if s["sessionId"] == session_id), None)
+        if session is None:
+            raise ValueError("The session could not be found.")
+        session.update(notes=notes, updatedAtUtc=timestamp(now), syncState="pending")
+        self.commit(state)
+
     def stop(self, now=None):
         if not self.active:
             raise ValueError("There is no active session.")

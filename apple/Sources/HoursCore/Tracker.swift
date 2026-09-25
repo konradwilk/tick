@@ -31,11 +31,12 @@ public struct TrackerState: Codable, Sendable {
 }
 
 public enum TrackerError: LocalizedError {
-    case activeSession, noActiveSession, invalidNonprofit, clockChanged
+    case activeSession, noActiveSession, invalidNonprofit, clockChanged, missingSession
     public var errorDescription: String? {
         switch self {
         case .activeSession: "Stop the current session first."
         case .noActiveSession: "There is no active session."
+        case .missingSession: "The session could not be found."
         case .invalidNonprofit: "Enter a unique nonprofit name and select it before starting."
         case .clockChanged: "The clock is earlier than the session start. Correct the system clock before stopping."
         }
@@ -99,6 +100,14 @@ public final class Tracker {
         next.sessions[index].endTimeUtc = now
         next.sessions[index].durationSeconds = Int(now.timeIntervalSince(next.sessions[index].startTimeUtc))
         next.sessions[index].updatedAtUtc = now
+        try save(next)
+    }
+    public func updateNotes(sessionId: UUID, notes: String, now: Date = Date()) throws {
+        guard let index = state.sessions.firstIndex(where: { $0.sessionId == sessionId }) else { throw TrackerError.missingSession }
+        var next = state
+        next.sessions[index].notes = notes
+        next.sessions[index].updatedAtUtc = now
+        next.sessions[index].syncState = "pending"
         try save(next)
     }
     public func csv() -> String {

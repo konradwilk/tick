@@ -66,6 +66,9 @@ class MainActivity : ComponentActivity() {
         var menu by remember { mutableStateOf(false) }
         var now by remember { mutableStateOf(Instant.now()) }
         var exportSnapshot by rememberSaveable { mutableStateOf("") }
+        var editingId by rememberSaveable { mutableStateOf<String?>(null) }
+        var editedNotes by rememberSaveable { mutableStateOf("") }
+        var editError by remember { mutableStateOf<String?>(null) }
         fun action(block: () -> Unit) {
             try { block(); state = tracker.state; error = null }
             catch (e: Exception) { error = e.message ?: "Unable to save hours." }
@@ -80,6 +83,29 @@ class MainActivity : ComponentActivity() {
             while (state.active != null) { now = Instant.now(); delay(1000) }
         }
         val active = state.active
+        editingId?.let { sessionId ->
+            AlertDialog(
+                onDismissRequest = { editingId = null },
+                title = { Text("Edit session notes") },
+                text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    state.sessions.find { it.sessionId == sessionId }?.let {
+                        Text("${it.nonprofitName} · ${it.startTimeUtc}")
+                    }
+                    OutlinedTextField(editedNotes, { editedNotes = it }, Modifier.fillMaxWidth(),
+                        label = { Text("What did you work on?") }, minLines = 3, maxLines = 8)
+                    editError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                } },
+                confirmButton = { TextButton(onClick = {
+                    try {
+                        tracker.updateNotes(sessionId, editedNotes)
+                        state = tracker.state
+                        editingId = null
+                        error = null
+                    } catch (e: Exception) { editError = e.message ?: "Could not save notes." }
+                }) { Text("Save") } },
+                dismissButton = { TextButton(onClick = { editingId = null }) { Text("Cancel") } }
+            )
+        }
         LazyColumn(Modifier.fillMaxSize().safeDrawingPadding().imePadding().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item { Text("Nonprofit Hours", style = MaterialTheme.typography.headlineLarge) }
             item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -114,6 +140,11 @@ class MainActivity : ComponentActivity() {
                 Text(session.nonprofitName, style = MaterialTheme.typography.titleMedium)
                 Text("${session.startTimeUtc} · ${session.durationSeconds?.let(::elapsed) ?: "In progress"}")
                 if (session.notes.isNotEmpty()) Text(session.notes)
+                if (session.endTimeUtc != null) TextButton(onClick = {
+                    editedNotes = session.notes
+                    editError = null
+                    editingId = session.sessionId
+                }) { Text("Edit notes") }
             }
         }
     }

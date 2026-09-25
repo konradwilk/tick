@@ -5,6 +5,10 @@ Stop, notes, restart-safe sessions, history, total hours, and CSV export using t
 Windows save picker. Import CSV into Google Sheets with File → Import. Automatic
 sync is not implemented.
 
+In **History**, choose **Edit notes** on a completed session to update what you
+worked on. **Save** persists the notes and updates CSV exports; **Cancel** discards
+the edit. Session times and recorded hours stay unchanged.
+
 ## Build on Windows
 
 Install Visual Studio 2022 with Windows application development tools, .NET 8 SDK,

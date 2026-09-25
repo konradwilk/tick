@@ -18,7 +18,10 @@
     </StackPanel>
     <TextBlock Text="History" FontSize="22" />
     <ItemsControl x:Name="History"><ItemsControl.ItemTemplate><DataTemplate>
-      <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,14" />
+      <StackPanel Spacing="6" Margin="0,0,0,14">
+        <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" />
+        <Button Content="Edit notes" Tag="{Binding SessionId}" IsEnabled="{Binding CanEdit}" Click="EditNotes" />
+      </StackPanel>
     </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
   </StackPanel></ScrollViewer>
 </Window>

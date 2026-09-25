@@ -95,6 +95,7 @@ import HoursCore
 struct TrackerView: View {
     @Bindable var model: AppModel
     @State private var newName = ""
+    @State private var editingSession: Session?
     private var active: Session? { model.state.active }
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -143,9 +144,15 @@ struct TrackerView: View {
                     }
                     Text(session.startTimeUtc.formatted(date: .abbreviated, time: .shortened)).foregroundStyle(.secondary)
                     if !session.notes.isEmpty { Text(session.notes) }
+                    if session.endTimeUtc != nil {
+                        Button("Edit notes") { editingSession = session }
+                    }
                 }.padding(.vertical, 4)
             }
         }.padding(24).frame(minWidth: 560, minHeight: 580)
+        .sheet(item: $editingSession) { session in
+            SessionNotesEditor(session: session, model: model)
+        }
         .alert("Unable to complete action", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
             Button("OK") { model.error = nil }
         } message: { Text(model.error ?? "") }
@@ -156,6 +163,42 @@ struct TrackerView: View {
     private func elapsed(_ seconds: Double) -> String {
         let value = max(0, Int(seconds))
         return String(format: "%02d:%02d:%02d", value / 3600, (value % 3600) / 60, value % 60)
+    }
+}
+
+struct SessionNotesEditor: View {
+    let session: Session
+    let model: AppModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var notes: String
+    @State private var error: String?
+
+    init(session: Session, model: AppModel) {
+        self.session = session
+        self.model = model
+        _notes = State(initialValue: session.notes)
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Edit session notes").font(.title2)
+            Text("\(session.nonprofitName) — \(session.startTimeUtc.formatted(date: .abbreviated, time: .shortened))")
+            Text("What did you work on?")
+            TextEditor(text: $notes).frame(minHeight: 140).accessibilityLabel("Session notes")
+            if let error { Text(error).foregroundStyle(.red) }
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Save") {
+                    do {
+                        guard let tracker = model.tracker else { throw TrackerError.missingSession }
+                        try tracker.updateNotes(sessionId: session.sessionId, notes: notes)
+                        model.state = tracker.state
+                        model.error = nil
+                        dismiss()
+                    } catch { self.error = "Could not save notes. " + error.localizedDescription }
+                }.keyboardShortcut(.defaultAction)
+            }
+        }.padding(24).frame(width: 440)
     }
 }
 

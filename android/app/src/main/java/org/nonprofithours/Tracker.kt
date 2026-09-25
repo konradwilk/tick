@@ -45,6 +45,12 @@ class Tracker(initial: TrackerState, private val save: (TrackerState) -> Unit) {
                 durationSeconds = Duration.between(start, now).seconds, updatedAtUtc = now.toString())
         }))
     }
+    fun updateNotes(sessionId: String, notes: String, now: Instant = Instant.now()) {
+        require(state.sessions.any { it.sessionId == sessionId }) { "The session could not be found." }
+        commit(state.copy(sessions = state.sessions.map {
+            if (it.sessionId != sessionId) it else it.copy(notes = notes, updatedAtUtc = now.toString(), syncState = "pending")
+        }))
+    }
     fun csv(): String {
         fun cell(value: String): String {
             val safe = if (value.trimStart().firstOrNull() in listOf('=', '+', '-', '@')) "'$value" else value

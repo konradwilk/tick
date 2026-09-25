@@ -44,6 +44,13 @@ public sealed class Tracker
         var completed = active with { EndTimeUtc = date, DurationSeconds = (long)(date - active.StartTimeUtc).TotalSeconds, UpdatedAtUtc = date };
         Commit(State with { Sessions = State.Sessions.Select(s => s.SessionId == active.SessionId ? completed : s).ToArray() });
     }
+    public void UpdateNotes(Guid sessionId, string notes, DateTimeOffset? now = null)
+    {
+        var session = State.Sessions.FirstOrDefault(s => s.SessionId == sessionId)
+            ?? throw new InvalidOperationException("The session could not be found.");
+        var updated = session with { Notes = notes, UpdatedAtUtc = (now ?? DateTimeOffset.UtcNow).ToUniversalTime(), SyncState = "pending" };
+        Commit(State with { Sessions = State.Sessions.Select(s => s.SessionId == sessionId ? updated : s).ToArray() });
+    }
     public string Csv()
     {
         static string Cell(string value)

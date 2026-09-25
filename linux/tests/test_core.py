@@ -36,6 +36,26 @@ class TrackerTests(unittest.TestCase):
         self.assertEqual(session["platform"], "linux")
         self.assertEqual(elapsed(session["durationSeconds"]), "27:00:00")
 
+    def test_edit_notes_preserves_hours_and_survives_restart(self):
+        nonprofit = self.tracker.add_nonprofit("Kitchen")
+        self.tracker.start(nonprofit, "Original", self.start)
+        self.tracker.stop(self.start + timedelta(hours=1))
+        original = copy.deepcopy(self.tracker.state["sessions"][0])
+        for notes in ('Meals, "served"\nCleanup 🍲', ''):
+            self.tracker.update_notes(original["sessionId"], notes, self.start)
+            expected = dict(original, notes=notes, updatedAtUtc=original["startTimeUtc"], syncState="pending")
+            self.assertEqual(Tracker(FileStore(self.path)).state["sessions"][0], expected)
+            self.assertEqual(list(csv.DictReader(io.StringIO(self.tracker.csv())))[0]["notes"], notes)
+        before = self.path.read_bytes()
+        state = copy.deepcopy(self.tracker.state)
+        with patch.object(self.store, "save", side_effect=OSError("Read only")):
+            with self.assertRaises(OSError):
+                self.tracker.update_notes(original["sessionId"], "Unsaved")
+        with self.assertRaises(ValueError):
+            self.tracker.update_notes("missing", "Unsaved")
+        self.assertEqual(self.tracker.state, state)
+        self.assertEqual(self.path.read_bytes(), before)
+
     def test_invalid_actions_preserve_state(self):
         with self.assertRaises(ValueError):
             self.tracker.add_nonprofit("  ")

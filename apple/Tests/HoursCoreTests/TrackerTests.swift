@@ -3,6 +3,36 @@ import XCTest
 
 final class TrackerTests: XCTestCase {
     private func location() -> URL { FileManager.default.temporaryDirectory.appending(path: UUID().uuidString + "/sessions.json") }
+    func testEditedNotesPersistWithoutChangingHours() throws {
+        let file = location()
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+        let tracker = try Tracker(file: file)
+        let id = try tracker.addNonprofit("Kitchen")
+        let start = Date(timeIntervalSince1970: 1000)
+        try tracker.start(nonprofitId: id, notes: "Original", now: start)
+        try tracker.stop(now: start.addingTimeInterval(3600))
+        let original = try XCTUnwrap(tracker.state.sessions.first)
+        let editedAt = start.addingTimeInterval(7200)
+        for notes in ["Meals, \"served\"\nCleanup 🍲", ""] {
+            try tracker.updateNotes(sessionId: original.sessionId, notes: notes, now: editedAt)
+            let restored = try XCTUnwrap(Tracker(file: file).state.sessions.first)
+            XCTAssertEqual(restored.notes, notes)
+            XCTAssertEqual(restored.sessionId, original.sessionId)
+            XCTAssertEqual(restored.startTimeUtc, original.startTimeUtc)
+            XCTAssertEqual(restored.endTimeUtc, original.endTimeUtc)
+            XCTAssertEqual(restored.durationSeconds, original.durationSeconds)
+            XCTAssertEqual(restored.updatedAtUtc, editedAt)
+            XCTAssertEqual(restored.syncState, "pending")
+            XCTAssertTrue(tracker.csv().contains("\"" + notes.replacingOccurrences(of: "\"", with: "\"\"") + "\""))
+        }
+        let before = try Data(contentsOf: file)
+        XCTAssertThrowsError(try tracker.updateNotes(sessionId: UUID(), notes: "Missing"))
+        XCTAssertEqual(try Data(contentsOf: file), before)
+        try Data("external change".utf8).write(to: file)
+        XCTAssertThrowsError(try tracker.updateNotes(sessionId: original.sessionId, notes: "Unsaved"))
+        XCTAssertEqual(tracker.state.sessions.first?.notes, "")
+        XCTAssertEqual(try Data(contentsOf: file), Data("external change".utf8))
+    }
     func testRestartPreservesActiveSessionAndNonprofit() throws {
         let file = location()
         defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
