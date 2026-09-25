@@ -25,7 +25,12 @@ public sealed partial class MainWindow : Window
             Notes.Text = tracker.State.Active?.Notes ?? "";
 
         }
-        catch (Exception e) { Controls.IsEnabled = false; ErrorText.Text = "Could not load saved hours. Your file was not changed. " + e.Message; }
+        catch (Exception e)
+        {
+            Nonprofits.IsEnabled = Notes.IsEnabled = NewName.IsEnabled = AddButton.IsEnabled =
+                Toggle.IsEnabled = ExportButton.IsEnabled = false;
+            ErrorText.Text = "Could not load saved hours. Your file was not changed. " + e.Message;
+        }
     }
     private void Perform(Action action)
     {
@@ -47,7 +52,7 @@ public sealed partial class MainWindow : Window
     });
     private void Refresh()
     {
-        Controls.IsEnabled = true;
+        Toggle.IsEnabled = true;
         DataLocation.Text = Path.GetDirectoryName(location.CurrentPath);
         var state = tracker!.State;
         var selected = (Nonprofits.SelectedItem as Nonprofit)?.Id;
