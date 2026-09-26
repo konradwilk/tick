@@ -4,6 +4,70 @@ namespace HoursCore.Tests;
 public class TrackerTests
 {
     [Theory]
+    [InlineData("", "No notes")]
+    [InlineData(" \t\r\n ", "No notes")]
+    [InlineData("Annual meeting\nGoogle Fi", "Annual meeting, Google Fi")]
+    [InlineData("Annual meeting\rGoogle Fi", "Annual meeting, Google Fi")]
+    [InlineData(" Annual meeting\r\n \r\nGoogle Fi ", "Annual meeting, Google Fi")]
+    public void ClipboardNormalizesNotesWithoutChangingStoredText(string notes, string expected)
+    {
+        var tracker = new Tracker(TrackerState.Empty(), _ => { });
+        var id = tracker.AddNonprofit("NEST");
+        tracker.Start(id, notes, DateTimeOffset.UnixEpoch);
+        tracker.Stop(DateTimeOffset.UnixEpoch.AddSeconds(1423));
+        Assert.Equal($"NEST 00:23:43:\n{expected}   00:23:43", tracker.ClipboardText());
+        Assert.Equal(notes, tracker.State.Sessions.Single().Notes);
+    }
+    [Fact] public void ClipboardGroupsTotalsAndListsEachNoteInTimeOrder()
+    {
+        var tracker = new Tracker(TrackerState.Empty(), _ => { });
+        var kitchen = tracker.AddNonprofit("Kitchen");
+        var garden = tracker.AddNonprofit("Garden");
+        var start = DateTimeOffset.UnixEpoch;
+        foreach (var (id, notes, seconds) in new[] { (kitchen, "Meals", 3600), (garden, "Planting", 1800), (kitchen, "Cleanup", 2700) })
+        {
+            tracker.Start(id, notes, start);
+            start = start.AddSeconds(seconds);
+            tracker.Stop(start);
+        }
+        Assert.Equal("Kitchen 01:45:00:\nMeals   01:00:00\nCleanup   00:45:00\n\nGarden 00:30:00:\nPlanting   00:30:00", tracker.ClipboardText());
+    }
+    [Theory]
+    [InlineData(ExportPeriod.Daily, "2024-02-29", "2024-02-29", "2024-03-01")]
+    [InlineData(ExportPeriod.Weekly, "2025-01-01", "2024-12-30", "2025-01-06")]
+    [InlineData(ExportPeriod.Weekly, "2025-01-05", "2024-12-30", "2025-01-06")]
+    [InlineData(ExportPeriod.Monthly, "2024-12-12", "2024-12-01", "2025-01-01")]
+    public void ExportPeriodsUseCalendarBoundaries(ExportPeriod period, string date, string start, string end)
+    {
+        Assert.Equal(new ExportRange(DateOnly.Parse(start), DateOnly.Parse(end)), ExportRange.For(period, DateOnly.Parse(date)));
+    }
+    [Fact] public void CsvAndClipboardUseLocalStartDateAndExcludeActiveSessions()
+    {
+        var tracker = new Tracker(TrackerState.Empty(), _ => { });
+        var id = tracker.AddNonprofit("Kitchen");
+        var start = DateTimeOffset.Parse("2024-12-31T22:00:00Z");
+        tracker.Start(id, "Outside", start.AddSeconds(-1));
+        tracker.Stop(start);
+        tracker.Start(id, "Meals, \"served\"\nCleanup 🍲", start);
+        tracker.Stop(start.AddHours(25));
+        tracker.Start(id, "End boundary", start.AddDays(1));
+        tracker.Stop(start.AddDays(1).AddMinutes(1));
+        tracker.Start(id, "Active", start.AddMinutes(2));
+        var range = ExportRange.For(ExportPeriod.Daily, new DateOnly(2025, 1, 1));
+        var zone = TimeZoneInfo.CreateCustomTimeZone("Test", TimeSpan.FromHours(2), "Test", "Test");
+        Assert.Single(tracker.ExportSessions(range, zone));
+        Assert.Equal("Kitchen 25:00:00:\nMeals, \"served\", Cleanup 🍲   25:00:00", tracker.ClipboardText(range, zone));
+        var csv = tracker.Csv(range, zone);
+        Assert.Contains("Meals, \"\"served\"\"\nCleanup 🍲", csv);
+        Assert.DoesNotContain("Outside", csv);
+        Assert.DoesNotContain("Active", csv);
+        Assert.DoesNotContain("End boundary", csv);
+        Assert.Equal(2, tracker.ExportSessions(ExportRange.For(ExportPeriod.Monthly, new DateOnly(2025, 1, 1)), zone).Length);
+        Assert.Equal(3, tracker.ExportSessions(ExportRange.For(ExportPeriod.Weekly, new DateOnly(2025, 1, 1)), zone).Length);
+        Assert.Empty(tracker.ExportSessions(ExportRange.For(ExportPeriod.Daily, new DateOnly(2025, 1, 3)), zone));
+        Assert.Equal("", tracker.ClipboardText(ExportRange.For(ExportPeriod.Daily, new DateOnly(2025, 1, 3)), zone));
+    }
+    [Theory]
     [InlineData("Updated work, \"details\"\nSecond line")]
     [InlineData("")]
     public void EditedNotesPersistWithoutChangingRecordedHours(string notes)

@@ -21,6 +21,10 @@ import kotlinx.serialization.json.Json
 import java.io.File
 import java.time.Instant
 import java.time.Duration
+import java.time.LocalDate
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -69,6 +73,11 @@ class MainActivity : ComponentActivity() {
         var editingId by rememberSaveable { mutableStateOf<String?>(null) }
         var editedNotes by rememberSaveable { mutableStateOf("") }
         var editError by remember { mutableStateOf<String?>(null) }
+        var reportPeriod by rememberSaveable { mutableStateOf("Monthly") }
+        var reportDate by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
+        var copyStatus by remember { mutableStateOf("") }
+        val reportRange = runCatching { ExportRange.forDate(ExportPeriod.valueOf(reportPeriod), LocalDate.parse(reportDate)) }.getOrNull()
+        val reportCount = reportRange?.let { tracker.exportSessions(it).size } ?: 0
         fun action(block: () -> Unit) {
             try { block(); state = tracker.state; error = null }
             catch (e: Exception) { error = e.message ?: "Unable to save hours." }
@@ -132,7 +141,30 @@ class MainActivity : ComponentActivity() {
                 Text(if (active == null) "Start" else "Stop")
             } }
             item { Text("Completed: %.2f hours".format(state.sessions.sumOf { it.durationSeconds ?: 0 } / 3600.0)) }
-            item { OutlinedButton(onClick = { exportSnapshot = tracker.csv(); export.launch("nonprofit-hours.csv") }, enabled = state.sessions.any { it.endTimeUtc != null }) { Text("Export CSV for Google Sheets") } }
+            item { Text("Export period") }
+            item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ExportPeriod.entries.forEach { period ->
+                    FilterChip(selected = reportPeriod == period.name, onClick = { reportPeriod = period.name; copyStatus = "" }, label = { Text(period.name) })
+                }
+            } }
+            item { OutlinedTextField(reportDate, { reportDate = it; copyStatus = "" }, label = { Text("Date in period (YYYY-MM-DD)") },
+                isError = reportRange == null, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+            item { Text("Completed sessions by local start date. Weeks run Monday–Sunday.") }
+            item { Text(reportRange?.let { "${it.start} – ${it.end.minusDays(1)}: $reportCount completed sessions" } ?: "Enter a valid date in YYYY-MM-DD format.") }
+            item { OutlinedButton(onClick = { action {
+                reportRange?.let { range ->
+                    exportSnapshot = tracker.csv(range)
+                    export.launch("nonprofit-hours-${reportPeriod.lowercase(java.util.Locale.ROOT)}-${range.start}.csv")
+                }
+            } }, enabled = reportCount > 0) { Text("Export CSV for Google Sheets") } }
+            item { OutlinedButton(onClick = { action {
+                reportRange?.let { range ->
+                    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Task durations and notes", tracker.clipboardText(range)))
+                    copyStatus = "Copied durations and notes."
+                }
+            } }, enabled = reportCount > 0) { Text("Copy durations and notes") } }
+            if (copyStatus.isNotEmpty()) item { Text(copyStatus) }
             item { Text("Timing continues when the app is closed. Reopen and press Stop to finish.") }
             error?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error) } }
             items(state.sessions.asReversed(), key = { it.sessionId }) { session ->

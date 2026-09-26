@@ -3,8 +3,8 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, Gio, GLib, Gdk
-from datetime import datetime, timezone
-from .core import FileStore, Tracker, data_path, elapsed, parse, StorageLocation
+from datetime import datetime, timezone, date, timedelta
+from .core import FileStore, Tracker, data_path, elapsed, parse, StorageLocation, period_bounds
 
 
 class HoursWindow(Gtk.ApplicationWindow):
@@ -58,9 +58,26 @@ class HoursWindow(Gtk.ApplicationWindow):
         self.controls.append(self.toggle)
         self.total = Gtk.Label(xalign=0)
         self.controls.append(self.total)
+        self.controls.append(Gtk.Label(label="Export period", xalign=0))
+        self.report_period = Gtk.DropDown(model=Gtk.StringList.new(["Daily", "Weekly", "Monthly"]))
+        self.report_period.set_selected(2)
+        self.report_period.connect("notify::selected", self.update_report)
+        self.controls.append(self.report_period)
+        self.controls.append(Gtk.Label(label="Date in period (YYYY-MM-DD)", xalign=0))
+        self.report_date = Gtk.Entry(text=date.today().isoformat())
+        self.report_date.connect("changed", self.update_report)
+        self.controls.append(self.report_date)
+        self.controls.append(Gtk.Label(label="Completed sessions by local start date. Weeks run Monday–Sunday.", xalign=0, wrap=True))
+        self.report_summary = Gtk.Label(xalign=0, wrap=True)
+        self.controls.append(self.report_summary)
         self.export = Gtk.Button(label="Export CSV for Google Sheets")
         self.export.connect("clicked", self.export_csv)
         self.controls.append(self.export)
+        self.copy = Gtk.Button(label="Copy durations and notes")
+        self.copy.connect("clicked", self.copy_report)
+        self.controls.append(self.copy)
+        self.copy_status = Gtk.Label(xalign=0)
+        self.controls.append(self.copy_status)
         self.controls.append(Gtk.Label(label="Timing continues when the app closes. Reopen and press Stop to finish.", wrap=True, xalign=0))
         box.append(Gtk.Label(label="History", xalign=0))
         self.history = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
@@ -125,7 +142,7 @@ class HoursWindow(Gtk.ApplicationWindow):
         self.toggle.set_sensitive(active or selected is not None)
         seconds = sum(s.get("durationSeconds") or 0 for s in state["sessions"])
         self.total.set_text(f"Completed: {seconds / 3600:.2f} hours")
-        self.export.set_sensitive(any(s.get("endTimeUtc") for s in state["sessions"]))
+        self.update_report()
         while child := self.history.get_first_child():
             self.history.remove(child)
         for session in reversed(state["sessions"]):
@@ -220,14 +237,55 @@ class HoursWindow(Gtk.ApplicationWindow):
         if self.chooser:
             self.chooser.show()
             return
+        try:
+            period, day = self.report_selection()
+            snapshot = self.tracker.csv(period, day)
+            start, _ = period_bounds(period, day)
+        except Exception as error:
+            self.error.set_text(str(error))
+            return
         self.chooser = Gtk.FileChooserNative.new("Export completed hours", self, Gtk.FileChooserAction.SAVE, "Save", "Cancel")
-        self.chooser.set_current_name("nonprofit-hours.csv")
+        self.chooser.set_current_name(f"nonprofit-hours-{period.lower()}-{start.isoformat()}.csv")
         filter_ = Gtk.FileFilter()
         filter_.set_name("CSV files")
         filter_.add_pattern("*.csv")
         self.chooser.add_filter(filter_)
-        self.chooser.connect("response", self.on_export_response, self.tracker.csv())
+        self.chooser.connect("response", self.on_export_response, snapshot)
         self.chooser.show()
+
+    def report_selection(self):
+        try:
+            day = date.fromisoformat(self.report_date.get_text())
+        except ValueError:
+            raise ValueError("Enter a valid date in YYYY-MM-DD format.")
+        return ("Daily", "Weekly", "Monthly")[self.report_period.get_selected()], day
+
+    def update_report(self, *_):
+        if self.tracker is None:
+            return
+        self.copy_status.set_text("")
+        try:
+            period, day = self.report_selection()
+            start, end = period_bounds(period, day)
+            count = len(self.tracker.export_sessions(period, day))
+            self.report_summary.set_text(f"{start} – {end - timedelta(days=1)}: {count} completed sessions")
+            self.export.set_sensitive(count > 0)
+            self.copy.set_sensitive(count > 0)
+        except ValueError as error:
+            self.report_summary.set_text(str(error))
+            self.export.set_sensitive(False)
+            self.copy.set_sensitive(False)
+
+    def copy_report(self, *_):
+        try:
+            period, day = self.report_selection()
+            text = self.tracker.clipboard_text(period, day)
+            if text:
+                self.get_clipboard().set(text)
+                self.copy_status.set_text("Copied durations and notes.")
+                self.error.set_text("")
+        except Exception as error:
+            self.error.set_text("Could not copy. " + str(error))
 
     def on_export_response(self, chooser, response, snapshot):
         try:

@@ -182,15 +182,31 @@ class Tracker:
         session.update(endTimeUtc=date, durationSeconds=int(seconds), updatedAtUtc=date)
         self.commit(state)
 
-    def csv(self):
+    def export_sessions(self, period=None, day=None, zone=None):
+        bounds = period_bounds(period, day) if period else None
+        return sorted((s for s in self.state["sessions"] if s.get("endTimeUtc") is not None
+                       and (bounds is None or bounds[0] <= parse(s["startTimeUtc"]).astimezone(zone).date() < bounds[1])),
+                      key=lambda s: parse(s["startTimeUtc"]))
+
+    def clipboard_text(self, period=None, day=None, zone=None):
+        def notes(value):
+            return ", ".join(line.strip() for line in value.splitlines() if line.strip()) or "No notes"
+
+        groups = {}
+        for session in self.export_sessions(period, day, zone):
+            groups.setdefault(session["nonprofitId"], []).append(session)
+        return "\n\n".join(
+            f"{sessions[0]['nonprofitName']} {elapsed(sum(s['durationSeconds'] for s in sessions))}:\n" +
+            "\n".join(f"{notes(s['notes'])}   {elapsed(s['durationSeconds'])}" for s in sessions)
+            for sessions in groups.values())
+
+    def csv(self, period=None, day=None, zone=None):
         fields = ["sessionId", "nonprofitId", "nonprofitName", "startTimeUtc", "endTimeUtc",
                   "durationSeconds", "hours", "notes", "deviceId", "platform", "updatedAtUtc"]
         output = io.StringIO(newline="")
         writer = csv.writer(output)
         writer.writerow(fields)
-        for session in self.state["sessions"]:
-            if session.get("endTimeUtc") is None:
-                continue
+        for session in self.export_sessions(period, day, zone):
             row = dict(session, hours=session["durationSeconds"] / 3600)
             values = []
             for key in fields:
@@ -200,6 +216,18 @@ class Tracker:
                 values.append(value)
             writer.writerow(values)
         return output.getvalue()
+
+
+def period_bounds(period, day):
+    if period == "Daily":
+        return day, day + timedelta(days=1)
+    if period == "Weekly":
+        start = day - timedelta(days=day.weekday())
+        return start, start + timedelta(days=7)
+    if period == "Monthly":
+        start = day.replace(day=1)
+        return start, (start + timedelta(days=32)).replace(day=1)
+    raise ValueError("Choose Daily, Weekly, or Monthly.")
 
 
 def elapsed(seconds):

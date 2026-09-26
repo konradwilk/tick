@@ -13,7 +13,15 @@
       <TextBlock x:Name="Status" FontSize="22" TextWrapping="Wrap" />
       <Button x:Name="Toggle" Click="ToggleTracking" HorizontalAlignment="Stretch" Foreground="White" FontSize="24" />
       <TextBlock x:Name="Total" />
+      <ComboBox x:Name="ReportPeriod" Header="Export period" SelectedIndex="2" SelectionChanged="ReportChanged">
+        <ComboBoxItem Content="Daily" /><ComboBoxItem Content="Weekly" /><ComboBoxItem Content="Monthly" />
+      </ComboBox>
+      <CalendarDatePicker x:Name="ReportDate" Header="Date in the period" DateChanged="ReportDateChanged" />
+      <TextBlock Text="Completed sessions by local start date. Weeks run Monday–Sunday." TextWrapping="Wrap" />
+      <TextBlock x:Name="ReportSummary" TextWrapping="Wrap" />
       <Button x:Name="ExportButton" Content="Export CSV for Google Sheets" Click="Export" />
+      <Button x:Name="CopyButton" Content="Copy durations and notes" Click="CopyReport" />
+      <TextBlock x:Name="CopyStatus" />
       <TextBlock Text="Closing this window hides it to the system tray. Click the clock icon to reopen, or right-click it to quit. Timing continues until you press Stop." TextWrapping="Wrap" />
     </StackPanel>
     <TextBlock Text="History" FontSize="22" />

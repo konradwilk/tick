@@ -33,6 +33,20 @@ with tempfile.TemporaryDirectory() as directory:
     assert restored.tracker.active is None
     assert restored.toggle.get_label() == "Start"
     assert restored.export.get_sensitive()
+    assert restored.copy.get_sensitive()
+    selected_date = restored.report_date.get_text()
+    restored.report_date.set_text("invalid")
+    assert not restored.export.get_sensitive()
+    assert not restored.copy.get_sensitive()
+    restored.report_date.set_text("1900-01-01")
+    assert not restored.export.get_sensitive()
+    restored.report_date.set_text(selected_date)
+    for index in range(3):
+        restored.report_period.set_selected(index)
+        assert restored.export.get_sensitive()
+        assert restored.copy.get_sensitive()
+    restored.copy_report()
+    assert restored.copy_status.get_text() == "Copied durations and notes."
     session = restored.tracker.state["sessions"][0]
     dialog = restored.edit_notes(session)
     content = dialog.get_content_area()

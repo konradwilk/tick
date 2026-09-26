@@ -3,6 +3,20 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace HoursCore;
+public enum ExportPeriod { Daily, Weekly, Monthly }
+public record ExportRange(DateOnly Start, DateOnly End)
+{
+    public static ExportRange For(ExportPeriod period, DateOnly date)
+    {
+        var start = period switch {
+            ExportPeriod.Daily => date,
+            ExportPeriod.Weekly => date.AddDays(-((int)date.DayOfWeek + 6) % 7),
+            ExportPeriod.Monthly => new DateOnly(date.Year, date.Month, 1),
+            _ => throw new ArgumentOutOfRangeException(nameof(period))
+        };
+        return new(start, period == ExportPeriod.Monthly ? start.AddMonths(1) : start.AddDays(period == ExportPeriod.Weekly ? 7 : 1));
+    }
+}
 public record Nonprofit(Guid Id, string Name);
 public record Session(Guid SessionId, Guid NonprofitId, string NonprofitName,
     DateTimeOffset StartTimeUtc, DateTimeOffset? EndTimeUtc, long? DurationSeconds,
@@ -51,7 +65,27 @@ public sealed class Tracker
         var updated = session with { Notes = notes, UpdatedAtUtc = (now ?? DateTimeOffset.UtcNow).ToUniversalTime(), SyncState = "pending" };
         Commit(State with { Sessions = State.Sessions.Select(s => s.SessionId == sessionId ? updated : s).ToArray() });
     }
-    public string Csv()
+    public Session[] ExportSessions(ExportRange? range = null, TimeZoneInfo? zone = null) => State.Sessions
+        .Where(s => s.EndTimeUtc != null && (range == null || InRange(s, range, zone ?? TimeZoneInfo.Local)))
+        .OrderBy(s => s.StartTimeUtc).ToArray();
+    private static bool InRange(Session session, ExportRange range, TimeZoneInfo zone)
+    {
+        var day = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(session.StartTimeUtc, zone).DateTime);
+        return day >= range.Start && day < range.End;
+    }
+    public string ClipboardText(ExportRange? range = null, TimeZoneInfo? zone = null)
+    {
+        static string Duration(long seconds) => $"{seconds / 3600:00}:{seconds % 3600 / 60:00}:{seconds % 60:00}";
+        static string Notes(string notes)
+        {
+            var lines = notes.Split(new[] { '\r', '\n' }, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            return lines.Length == 0 ? "No notes" : string.Join(", ", lines);
+        }
+        return string.Join("\n\n", ExportSessions(range, zone).GroupBy(s => s.NonprofitId).Select(group =>
+            $"{group.First().NonprofitName} {Duration(group.Sum(s => s.DurationSeconds ?? 0))}:\n" +
+            string.Join("\n", group.Select(s => $"{Notes(s.Notes)}   {Duration(s.DurationSeconds ?? 0)}"))));
+    }
+    public string Csv(ExportRange? range = null, TimeZoneInfo? zone = null)
     {
         static string Cell(string value)
         {
@@ -60,7 +94,7 @@ public sealed class Tracker
         }
         static string Date(DateTimeOffset value) => value.UtcDateTime.ToString("O", CultureInfo.InvariantCulture);
         var rows = new List<string> { "sessionId,nonprofitId,nonprofitName,startTimeUtc,endTimeUtc,durationSeconds,hours,notes,deviceId,platform,updatedAtUtc" };
-        foreach (var s in State.Sessions.Where(s => s.EndTimeUtc != null))
+        foreach (var s in ExportSessions(range, zone))
             rows.Add(string.Join(",", new[] { s.SessionId.ToString(), s.NonprofitId.ToString(), s.NonprofitName,
                 Date(s.StartTimeUtc), Date(s.EndTimeUtc!.Value), s.DurationSeconds!.Value.ToString(CultureInfo.InvariantCulture),
                 (s.DurationSeconds.Value / 3600.0).ToString(CultureInfo.InvariantCulture), s.Notes, s.DeviceId.ToString(), s.Platform, Date(s.UpdatedAtUtc) }.Select(Cell)));

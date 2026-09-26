@@ -14,6 +14,34 @@ Native time-tracking apps for Android, iPhone, macOS, Windows, and Linux with CS
 
 ## Native clients
 
+CSV export in Windows, macOS, Android, and Linux offers **Daily**, **Weekly**, and
+**Monthly** periods. Choose a date within the desired period, check the displayed
+date range and completed-session count, then choose **Export CSV**. The file
+contains individual session records, including durations and notes, and its name
+includes the period and starting date. The default is the current month.
+
+Periods use the device's local timezone; weeks run Monday–Sunday and months use
+calendar boundaries. A completed session belongs to its start date, including its
+full duration if it crosses midnight. Active sessions are excluded. Empty periods
+disable export and copy.
+
+**Copy durations and notes** groups the selected sessions by nonprofit. Each
+heading contains its name and total duration for the selected period, followed
+by each session's notes and duration in chronological order:
+
+```text
+Kitchen 01:45:00:
+Meals   01:00:00
+Cleanup   00:45:00
+```
+
+Durations use `HH:MM:SS`. Empty or whitespace-only notes display as **No notes**.
+Clipboard notes are trimmed and nonempty lines are joined with a comma and one
+space, so each session occupies one line. Saved notes and CSV retain the original text,
+and durations longer than 24 hours are not wrapped. A confirmation appears after
+copying. The shared Apple library supports both operations for iOS, but this
+checkout has no iPhone screen source to connect the controls to.
+
 In session history, choose **Edit notes** on a completed session in Windows,
 macOS, Android, or Linux. **Save** persists the edited notes and includes them in
 future CSV exports; **Cancel** discards the draft. Times and recorded hours stay

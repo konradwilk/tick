@@ -1,5 +1,28 @@
 import Foundation
 
+public enum ExportPeriod: String, CaseIterable, Sendable { case daily = "Daily", weekly = "Weekly", monthly = "Monthly" }
+public struct ExportRange: Sendable {
+    public let start: Date
+    public let end: Date
+    public init(period: ExportPeriod, date: Date, timeZone: TimeZone = .current) {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let day = calendar.startOfDay(for: date)
+        switch period {
+        case .daily:
+            start = day
+            end = calendar.date(byAdding: .day, value: 1, to: day)!
+        case .weekly:
+            let offset = (calendar.component(.weekday, from: day) + 5) % 7
+            start = calendar.date(byAdding: .day, value: -offset, to: day)!
+            end = calendar.date(byAdding: .day, value: 7, to: start)!
+        case .monthly:
+            start = calendar.date(from: calendar.dateComponents([.year, .month], from: day))!
+            end = calendar.date(byAdding: .month, value: 1, to: start)!
+        }
+    }
+}
+
 public struct Nonprofit: Codable, Identifiable, Equatable, Sendable {
     public var id: UUID
     public var name: String
@@ -110,7 +133,33 @@ public final class Tracker {
         next.sessions[index].syncState = "pending"
         try save(next)
     }
-    public func csv() -> String {
+    public func exportSessions(range: ExportRange? = nil) -> [Session] {
+        state.sessions.filter { session in
+            session.endTimeUtc != nil && (range.map { session.startTimeUtc >= $0.start && session.startTimeUtc < $0.end } ?? true)
+        }.sorted { $0.startTimeUtc < $1.startTimeUtc }
+    }
+    public func clipboardText(range: ExportRange? = nil) -> String {
+        func notes(_ value: String) -> String {
+            let lines = value.components(separatedBy: .newlines)
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+            return lines.isEmpty ? "No notes" : lines.joined(separator: ", ")
+        }
+        func duration(_ seconds: Int) -> String {
+            String(format: "%02d:%02d:%02d", seconds / 3600, seconds % 3600 / 60, seconds % 60)
+        }
+        let sessions = exportSessions(range: range)
+        let groups = Dictionary(grouping: sessions, by: \.nonprofitId)
+        var seen = Set<UUID>()
+        return sessions.compactMap { session -> String? in
+            guard seen.insert(session.nonprofitId).inserted else { return nil }
+            let group = groups[session.nonprofitId]!
+            let total = group.reduce(0) { $0 + ($1.durationSeconds ?? 0) }
+            return "\(session.nonprofitName) \(duration(total)):\n" + group.map {
+                "\(notes($0.notes))   \(duration($0.durationSeconds ?? 0))"
+            }.joined(separator: "\n")
+        }.joined(separator: "\n\n")
+    }
+    public func csv(range: ExportRange? = nil) -> String {
         let formatter = ISO8601DateFormatter()
         func cell(_ value: String) -> String {
             // Prevent spreadsheet formulas when user-entered values are imported.
@@ -119,7 +168,7 @@ public final class Tracker {
             return "\"" + safe.replacingOccurrences(of: "\"", with: "\"\"") + "\""
         }
         var rows = ["sessionId,nonprofitId,nonprofitName,startTimeUtc,endTimeUtc,durationSeconds,hours,notes,deviceId,platform,updatedAtUtc"]
-        for s in state.sessions where s.endTimeUtc != nil {
+        for s in exportSessions(range: range) {
             let values = [s.sessionId.uuidString, s.nonprofitId.uuidString, s.nonprofitName, formatter.string(from: s.startTimeUtc), formatter.string(from: s.endTimeUtc!), String(s.durationSeconds ?? 0), String(Double(s.durationSeconds ?? 0) / 3600), s.notes, s.deviceId.uuidString, s.platform, formatter.string(from: s.updatedAtUtc)]
             rows.append(values.map(cell).joined(separator: ","))
         }

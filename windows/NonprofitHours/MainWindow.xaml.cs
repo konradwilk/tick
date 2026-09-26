@@ -15,6 +15,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        ReportDate.Date = DateTimeOffset.Now;
         timer.Tick += (_, _) => UpdateClock();
         timer.Start();
         Closed += (_, _) => timer.Stop();
@@ -29,7 +30,7 @@ public sealed partial class MainWindow : Window
         catch (Exception e)
         {
             Nonprofits.IsEnabled = Notes.IsEnabled = NewName.IsEnabled = AddButton.IsEnabled =
-                Toggle.IsEnabled = ExportButton.IsEnabled = false;
+                Toggle.IsEnabled = ExportButton.IsEnabled = CopyButton.IsEnabled = false;
             ErrorText.Text = "Could not load saved hours. Your file was not changed. " + e.Message;
         }
     }
@@ -64,7 +65,7 @@ public sealed partial class MainWindow : Window
         Toggle.Content = active ? "Stop" : "Start";
         Toggle.Background = new SolidColorBrush(active ? Colors.Firebrick : Colors.ForestGreen);
         Total.Text = $"Completed: {state.Sessions.Sum(s => s.DurationSeconds ?? 0) / 3600.0:F2} hours";
-        ExportButton.IsEnabled = state.Sessions.Any(s => s.EndTimeUtc != null);
+        UpdateReport();
         History.ItemsSource = state.Sessions.Reverse().Select(s => new HistoryEntry(s.SessionId,
             $"{s.NonprofitName} — {s.StartTimeUtc.ToLocalTime():g}\n{(s.DurationSeconds is long seconds ? Elapsed(seconds) : "In progress")}\n{s.Notes}", s.EndTimeUtc != null)).ToArray();
         UpdateClock();
@@ -126,13 +127,43 @@ public sealed partial class MainWindow : Window
     {
         try
         {
-            var picker = new FileSavePicker { SuggestedFileName = "nonprofit-hours" };
+            var range = SelectedRange();
+            var snapshot = tracker!.Csv(range);
+            var picker = new FileSavePicker { SuggestedFileName = $"nonprofit-hours-{((ExportPeriod)ReportPeriod.SelectedIndex).ToString().ToLowerInvariant()}-{range.Start:yyyy-MM-dd}" };
             picker.FileTypeChoices.Add("CSV", new List<string> { ".csv" });
             WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
             var file = await picker.PickSaveFileAsync();
-            if (file != null) await Windows.Storage.FileIO.WriteTextAsync(file, tracker!.Csv());
+            if (file != null) await Windows.Storage.FileIO.WriteTextAsync(file, snapshot);
             ErrorText.Text = "";
         }
         catch (Exception e) { ErrorText.Text = e.Message; }
+    }
+    private ExportRange SelectedRange() => ExportRange.For((ExportPeriod)ReportPeriod.SelectedIndex,
+        DateOnly.FromDateTime((ReportDate.Date ?? DateTimeOffset.Now).DateTime));
+    private void ReportChanged(object sender, SelectionChangedEventArgs args) => UpdateReport();
+    private void ReportDateChanged(CalendarDatePicker sender, CalendarDatePickerDateChangedEventArgs args) => UpdateReport();
+    private void UpdateReport()
+    {
+        if (ReportSummary == null || CopyButton == null || tracker == null) return;
+        var range = SelectedRange();
+        var count = tracker.ExportSessions(range).Length;
+        ReportSummary.Text = $"{range.Start:yyyy-MM-dd} – {range.End.AddDays(-1):yyyy-MM-dd}: {count} completed sessions";
+        ExportButton.IsEnabled = CopyButton.IsEnabled = count > 0;
+        CopyStatus.Text = "";
+    }
+    private void CopyReport(object sender, RoutedEventArgs args)
+    {
+        try
+        {
+            var text = tracker!.ClipboardText(SelectedRange());
+            if (text.Length == 0) return;
+            var data = new Windows.ApplicationModel.DataTransfer.DataPackage();
+            data.SetText(text);
+            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(data);
+            Windows.ApplicationModel.DataTransfer.Clipboard.Flush();
+            CopyStatus.Text = "Copied durations and notes.";
+            ErrorText.Text = "";
+        }
+        catch (Exception e) { ErrorText.Text = "Could not copy. " + e.Message; }
     }
 }

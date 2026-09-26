@@ -3,6 +3,8 @@ package org.nonprofithours
 import kotlinx.serialization.Serializable
 import java.time.Instant
 import java.time.Duration
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.UUID
 
 @Serializable data class Nonprofit(val id: String = UUID.randomUUID().toString(), val name: String)
@@ -18,6 +20,23 @@ import java.util.UUID
     val schemaVersion: Int = 1
 ) { val active: Session? get() = sessions.firstOrNull { it.endTimeUtc == null } }
 
+enum class ExportPeriod { Daily, Weekly, Monthly }
+data class ExportRange(val start: LocalDate, val end: LocalDate) {
+    companion object {
+        fun forDate(period: ExportPeriod, date: LocalDate): ExportRange {
+            val start = when (period) {
+                ExportPeriod.Daily -> date
+                ExportPeriod.Weekly -> date.minusDays((date.dayOfWeek.value - 1).toLong())
+                ExportPeriod.Monthly -> date.withDayOfMonth(1)
+            }
+            return ExportRange(start, when (period) {
+                ExportPeriod.Daily -> start.plusDays(1)
+                ExportPeriod.Weekly -> start.plusDays(7)
+                ExportPeriod.Monthly -> start.plusMonths(1)
+            })
+        }
+    }
+}
 class Tracker(initial: TrackerState, private val save: (TrackerState) -> Unit) {
     var state = initial
         private set
@@ -51,12 +70,27 @@ class Tracker(initial: TrackerState, private val save: (TrackerState) -> Unit) {
             if (it.sessionId != sessionId) it else it.copy(notes = notes, updatedAtUtc = now.toString(), syncState = "pending")
         }))
     }
-    fun csv(): String {
+    fun exportSessions(range: ExportRange? = null, zone: ZoneId = ZoneId.systemDefault()): List<Session> =
+        state.sessions.filter {
+            val day = Instant.parse(it.startTimeUtc).atZone(zone).toLocalDate()
+            it.endTimeUtc != null && (range == null || (!day.isBefore(range.start) && day.isBefore(range.end)))
+        }.sortedBy { Instant.parse(it.startTimeUtc) }
+    fun clipboardText(range: ExportRange? = null, zone: ZoneId = ZoneId.systemDefault()): String {
+        fun notes(value: String) = value.split('\r', '\n').map { it.trim() }.filter { it.isNotEmpty() }
+            .joinToString(", ").ifEmpty { "No notes" }
+        fun duration(seconds: Long) = "%02d:%02d:%02d".format(java.util.Locale.ROOT,
+            seconds / 3600, seconds % 3600 / 60, seconds % 60)
+        return exportSessions(range, zone).groupBy { it.nonprofitId }.values.joinToString("\n\n") { sessions ->
+            "${sessions.first().nonprofitName} ${duration(sessions.sumOf { it.durationSeconds ?: 0 })}:\n" +
+                sessions.joinToString("\n") { "${notes(it.notes)}   ${duration(it.durationSeconds ?: 0)}" }
+        }
+    }
+    fun csv(range: ExportRange? = null, zone: ZoneId = ZoneId.systemDefault()): String {
         fun cell(value: String): String {
             val safe = if (value.trimStart().firstOrNull() in listOf('=', '+', '-', '@')) "'$value" else value
             return "\"${safe.replace("\"", "\"\"")}\""
         }
-        val rows = state.sessions.filter { it.endTimeUtc != null }.map { s ->
+        val rows = exportSessions(range, zone).map { s ->
             listOf(s.sessionId, s.nonprofitId, s.nonprofitName, s.startTimeUtc, s.endTimeUtc.orEmpty(),
                 s.durationSeconds.toString(), ((s.durationSeconds ?: 0) / 3600.0).toString(), s.notes,
                 s.deviceId, s.platform, s.updatedAtUtc).joinToString(",") { cell(it) }

@@ -10,6 +10,11 @@ import HoursCore
     var selected: UUID?
     var notes = ""
     var dataLocation = ""
+    var reportPeriod = ExportPeriod.monthly
+    var reportDate = Date()
+    var copyStatus = ""
+    var reportRange: ExportRange { ExportRange(period: reportPeriod, date: reportDate) }
+    var reportCount: Int { tracker?.exportSessions(range: reportRange).count ?? 0 }
     private let storage = StorageLocation()
     init() {
         do {
@@ -67,13 +72,26 @@ import HoursCore
     }
     func export() {
         guard let tracker else { return }
+        let range = reportRange
+        let snapshot = tracker.csv(range: range)
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.commaSeparatedText]
-        panel.nameFieldStringValue = "nonprofit-hours.csv"
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = "yyyy-MM-dd"
+        panel.nameFieldStringValue = "nonprofit-hours-\(reportPeriod.rawValue.lowercased())-\(formatter.string(from: range.start)).csv"
         if panel.runModal() == .OK, let url = panel.url {
-            do { try tracker.csv().write(to: url, atomically: true, encoding: .utf8) }
+            do { try snapshot.write(to: url, atomically: true, encoding: .utf8) }
             catch { self.error = error.localizedDescription }
         }
+    }
+    func copyReport() {
+        guard let text = tracker?.clipboardText(range: reportRange), !text.isEmpty else { return }
+        NSPasteboard.general.clearContents()
+        if NSPasteboard.general.setString(text, forType: .string) {
+            copyStatus = "Copied durations and notes."
+        } else { error = "Could not copy durations and notes." }
     }
 }
 
@@ -98,6 +116,7 @@ struct TrackerView: View {
     @State private var editingSession: Session?
     private var active: Session? { model.state.active }
     var body: some View {
+        ScrollView {
         VStack(alignment: .leading, spacing: 18) {
             Text("Nonprofit Hours").font(.largeTitle.bold())
             Text("Make your time count.").foregroundStyle(.secondary)
@@ -132,7 +151,19 @@ struct TrackerView: View {
             HStack {
                 Text("Completed: \(Double(model.state.sessions.compactMap(\.durationSeconds).reduce(0, +)) / 3600, specifier: "%.2f") hours").font(.headline)
                 Spacer()
-                Button("Export CSV…") { model.export() }.disabled(!model.state.sessions.contains { $0.endTimeUtc != nil })
+            }
+            HStack {
+                Picker("Export period", selection: $model.reportPeriod) {
+                    ForEach(ExportPeriod.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                }
+                DatePicker("Date in period", selection: $model.reportDate, displayedComponents: .date)
+            }
+            Text("Completed sessions by local start date. Weeks run Monday–Sunday.").font(.caption)
+            Text("\(model.reportRange.start.formatted(date: .abbreviated, time: .omitted)) – \(model.reportRange.end.addingTimeInterval(-1).formatted(date: .abbreviated, time: .omitted)): \(model.reportCount) completed sessions").font(.caption)
+            HStack {
+                Button("Export CSV…") { model.export() }.disabled(model.reportCount == 0)
+                Button("Copy durations and notes") { model.copyReport() }.disabled(model.reportCount == 0)
+                Text(model.copyStatus).font(.caption)
             }
             Text("Import the CSV into Google Sheets using File → Import.").font(.caption).foregroundStyle(.secondary)
             List(model.state.sessions.reversed()) { session in
@@ -148,8 +179,11 @@ struct TrackerView: View {
                         Button("Edit notes") { editingSession = session }
                     }
                 }.padding(.vertical, 4)
-            }
-        }.padding(24).frame(minWidth: 560, minHeight: 580)
+            }.frame(minHeight: 220)
+        }.padding(24)
+        }.frame(minWidth: 560, minHeight: 580)
+        .onChange(of: model.reportPeriod) { model.copyStatus = "" }
+        .onChange(of: model.reportDate) { model.copyStatus = "" }
         .sheet(item: $editingSession) { session in
             SessionNotesEditor(session: session, model: model)
         }

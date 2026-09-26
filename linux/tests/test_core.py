@@ -1,6 +1,6 @@
 import copy
 import csv
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 import io
 import json
 from pathlib import Path
@@ -8,10 +8,58 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from nonprofit_hours.core import FileStore, Tracker, data_path, elapsed
+from nonprofit_hours.core import FileStore, Tracker, data_path, elapsed, period_bounds
 
 
 class TrackerTests(unittest.TestCase):
+    def test_clipboard_normalizes_notes_without_changing_stored_text(self):
+        nonprofit = self.tracker.add_nonprofit("NEST")
+        self.tracker.start(nonprofit, now=self.start)
+        self.tracker.stop(self.start + timedelta(seconds=1423))
+        session_id = self.tracker.state["sessions"][0]["sessionId"]
+        for notes, expected in [("", "No notes"), (" \t\r\n ", "No notes"),
+                                ("Annual meeting\nGoogle Fi", "Annual meeting, Google Fi"),
+                                ("Annual meeting\rGoogle Fi", "Annual meeting, Google Fi"),
+                                (" Annual meeting\r\n \r\nGoogle Fi ", "Annual meeting, Google Fi")]:
+            with self.subTest(notes=notes):
+                self.tracker.update_notes(session_id, notes)
+                self.assertEqual(self.tracker.clipboard_text(), f"NEST 00:23:43:\n{expected}   00:23:43")
+                self.assertEqual(self.tracker.state["sessions"][0]["notes"], notes)
+    def test_clipboard_groups_totals_and_lists_each_note_in_time_order(self):
+        kitchen = self.tracker.add_nonprofit("Kitchen")
+        garden = self.tracker.add_nonprofit("Garden")
+        start = self.start
+        for nonprofit, notes, seconds in [(kitchen, "Meals", 3600), (garden, "Planting", 1800), (kitchen, "Cleanup", 2700)]:
+            self.tracker.start(nonprofit, notes, start)
+            start += timedelta(seconds=seconds)
+            self.tracker.stop(start)
+        self.assertEqual(self.tracker.clipboard_text(),
+                         "Kitchen 01:45:00:\nMeals   01:00:00\nCleanup   00:45:00\n\nGarden 00:30:00:\nPlanting   00:30:00")
+    def test_export_period_boundaries(self):
+        for period, day, start, end in [
+            ("Daily", "2024-02-29", "2024-02-29", "2024-03-01"),
+            ("Weekly", "2025-01-01", "2024-12-30", "2025-01-06"),
+            ("Weekly", "2025-01-05", "2024-12-30", "2025-01-06"),
+            ("Monthly", "2024-12-12", "2024-12-01", "2025-01-01")]:
+            self.assertEqual(period_bounds(period, date.fromisoformat(day)),
+                             (date.fromisoformat(start), date.fromisoformat(end)))
+
+    def test_exports_and_clipboard_use_local_start_dates(self):
+        nonprofit = self.tracker.add_nonprofit("Kitchen")
+        start = datetime(2024, 12, 31, 22, tzinfo=timezone.utc)
+        notes = 'Meals, "served"\nCleanup 🍲'
+        for offset, duration, text in [(-1, 1, "Outside"), (0, 90000, notes), (86400, 60, "End boundary")]:
+            self.tracker.start(nonprofit, text, start + timedelta(seconds=offset))
+            self.tracker.stop(start + timedelta(seconds=offset + duration))
+        self.tracker.start(nonprofit, "Active", start + timedelta(minutes=2))
+        zone = timezone(timedelta(hours=2))
+        day = date(2025, 1, 1)
+        rows = list(csv.DictReader(io.StringIO(self.tracker.csv("Daily", day, zone))))
+        self.assertEqual([row["notes"] for row in rows], [notes])
+        self.assertEqual(self.tracker.clipboard_text("Daily", day, zone), 'Kitchen 25:00:00:\nMeals, "served", Cleanup 🍲   25:00:00')
+        self.assertEqual(self.tracker.clipboard_text("Daily", date(2025, 1, 3), zone), "")
+        self.assertEqual(len(self.tracker.export_sessions("Monthly", day, zone)), 2)
+        self.assertEqual(len(self.tracker.export_sessions("Weekly", day, zone)), 3)
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
