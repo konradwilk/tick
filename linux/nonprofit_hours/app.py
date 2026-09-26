@@ -5,83 +5,19 @@ gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, Gio, GLib, Gdk
 from datetime import datetime, timezone, date, timedelta
 from .core import FileStore, Tracker, data_path, elapsed, parse, StorageLocation, period_bounds
+from .layout import build_layout
 
 
 class HoursWindow(Gtk.ApplicationWindow):
     def __init__(self, application, path=None):
-        super().__init__(application=application, title="Nonprofit Hours", default_width=640, default_height=720)
+        super().__init__(application=application, title="Nonprofit Hours", default_width=1000, default_height=760)
         self.tracker = None
         self.timer = None
         self.chooser = None
         self.selected_id = None
         self.location = StorageLocation()
         self.connect("close-request", self.on_close)
-        scroll = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
-        self.set_child(scroll)
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
-        for side in ("top", "bottom", "start", "end"):
-            getattr(box, "set_margin_" + side)(24)
-        scroll.set_child(box)
-        heading = Gtk.Label(label="Nonprofit Hours", xalign=0)
-        heading.add_css_class("title-1")
-        box.append(heading)
-        self.error = Gtk.Label(xalign=0, wrap=True, selectable=True)
-        self.error.add_css_class("error")
-        box.append(self.error)
-        location_button = Gtk.Button(label="Data location…")
-        location_button.connect("clicked", lambda *_: self.choose_data_location())
-        box.append(location_button)
-        self.location_label = Gtk.Label(xalign=0, wrap=True, selectable=True)
-        box.append(self.location_label)
-        box.append(Gtk.Label(label="All changes are saved in this folder. Use one device at a time.", xalign=0, wrap=True))
-        self.controls = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        box.append(self.controls)
-        add_row = Gtk.Box(spacing=8)
-        self.name = Gtk.Entry(placeholder_text="New nonprofit", hexpand=True)
-        self.name.connect("activate", lambda *_: self.add_nonprofit())
-        self.add = Gtk.Button(label="Add nonprofit")
-        self.add.connect("clicked", lambda *_: self.add_nonprofit())
-        add_row.append(self.name)
-        add_row.append(self.add)
-        self.controls.append(add_row)
-        self.controls.append(Gtk.Label(label="Nonprofit", xalign=0))
-        self.nonprofits = Gtk.DropDown(model=Gtk.StringList.new([]))
-        self.nonprofits.connect("notify::selected", self.on_select)
-        self.controls.append(self.nonprofits)
-        self.notes = Gtk.Entry(placeholder_text="Notes (optional)")
-        self.controls.append(self.notes)
-        self.clock = Gtk.Label(xalign=0, wrap=True)
-        self.clock.add_css_class("title-2")
-        self.controls.append(self.clock)
-        self.toggle = Gtk.Button(label="Start")
-        self.toggle.connect("clicked", lambda *_: self.toggle_tracking())
-        self.controls.append(self.toggle)
-        self.total = Gtk.Label(xalign=0)
-        self.controls.append(self.total)
-        self.controls.append(Gtk.Label(label="Export period", xalign=0))
-        self.report_period = Gtk.DropDown(model=Gtk.StringList.new(["Daily", "Weekly", "Monthly"]))
-        self.report_period.set_selected(2)
-        self.report_period.connect("notify::selected", self.update_report)
-        self.controls.append(self.report_period)
-        self.controls.append(Gtk.Label(label="Date in period (YYYY-MM-DD)", xalign=0))
-        self.report_date = Gtk.Entry(text=date.today().isoformat())
-        self.report_date.connect("changed", self.update_report)
-        self.controls.append(self.report_date)
-        self.controls.append(Gtk.Label(label="Completed sessions by local start date. Weeks run Monday–Sunday.", xalign=0, wrap=True))
-        self.report_summary = Gtk.Label(xalign=0, wrap=True)
-        self.controls.append(self.report_summary)
-        self.export = Gtk.Button(label="Export CSV for Google Sheets")
-        self.export.connect("clicked", self.export_csv)
-        self.controls.append(self.export)
-        self.copy = Gtk.Button(label="Copy durations and notes")
-        self.copy.connect("clicked", self.copy_report)
-        self.controls.append(self.copy)
-        self.copy_status = Gtk.Label(xalign=0)
-        self.controls.append(self.copy_status)
-        self.controls.append(Gtk.Label(label="Timing continues when the app closes. Reopen and press Stop to finish.", wrap=True, xalign=0))
-        box.append(Gtk.Label(label="History", xalign=0))
-        self.history = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        box.append(self.history)
+        build_layout(self)
         try:
             self.tracker = Tracker(FileStore(path)) if path else self.location.open()
             active = self.tracker.active
@@ -91,6 +27,8 @@ class HoursWindow(Gtk.ApplicationWindow):
             self.timer = GLib.timeout_add_seconds(1, self.update_clock)
         except Exception as error:
             self.controls.set_sensitive(False)
+            self.name.set_sensitive(False)
+            self.add.set_sensitive(False)
             self.error.set_text("Could not load saved hours. Your file was not changed. " + str(error))
 
     def perform(self, operation):
@@ -127,6 +65,7 @@ class HoursWindow(Gtk.ApplicationWindow):
         self.controls.set_sensitive(True)
         self.location_label.set_text(str(self.tracker.store.path.parent))
         state = self.tracker.state
+        self.first_run.set_visible(not state["nonprofits"])
         selected = self.selected_id
         nonprofits = state["nonprofits"]
         self.nonprofits.set_model(Gtk.StringList.new([n["name"] for n in nonprofits]))
@@ -145,6 +84,8 @@ class HoursWindow(Gtk.ApplicationWindow):
         self.update_report()
         while child := self.history.get_first_child():
             self.history.remove(child)
+        if not state["sessions"]:
+            self.history.append(Gtk.Label(label="Sessions will appear here.", xalign=0))
         for session in reversed(state["sessions"]):
             duration = elapsed(session["durationSeconds"]) if session.get("endTimeUtc") else "In progress"
             date = parse(session["startTimeUtc"]).astimezone().strftime("%Y-%m-%d %H:%M")
@@ -269,10 +210,12 @@ class HoursWindow(Gtk.ApplicationWindow):
             start, end = period_bounds(period, day)
             count = len(self.tracker.export_sessions(period, day))
             self.report_summary.set_text(f"{start} – {end - timedelta(days=1)}: {count} completed sessions")
+            self.report_preview.set_text(self.tracker.clipboard_text(period, day) or "No completed sessions in this period.")
             self.export.set_sensitive(count > 0)
             self.copy.set_sensitive(count > 0)
         except ValueError as error:
             self.report_summary.set_text(str(error))
+            self.report_preview.set_text("")
             self.export.set_sensitive(False)
             self.copy.set_sensitive(False)
 
@@ -302,6 +245,9 @@ class HoursWindow(Gtk.ApplicationWindow):
             self.chooser = None
 
     def on_close(self, *_):
+        if self.layout_tick:
+            self.remove_tick_callback(self.layout_tick)
+            self.layout_tick = None
         if self.timer:
             GLib.source_remove(self.timer)
             self.timer = None

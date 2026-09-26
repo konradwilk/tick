@@ -1,26 +1,20 @@
 package org.nonprofithours
 
 import android.os.Bundle
-import android.util.AtomicFile
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import java.io.File
 import java.time.Instant
-import java.time.Duration
 import java.time.LocalDate
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -47,27 +41,26 @@ class MainActivity : ComponentActivity() {
             }
             Surface(Modifier.fillMaxSize()) {
                 Column(Modifier.safeDrawingPadding()) {
-                    OutlinedButton(onClick = { chooseFolder.launch(null) }, modifier = Modifier.padding(horizontal = 20.dp)) { Text("Data location…") }
-                    Text(location, Modifier.padding(horizontal = 20.dp), style = MaterialTheme.typography.bodySmall)
-                    Text("All changes are saved here. Use one device at a time.", Modifier.padding(horizontal = 20.dp), style = MaterialTheme.typography.bodySmall)
                     storageError?.let { Text(it, Modifier.padding(20.dp), color = MaterialTheme.colorScheme.error) }
                     Box(Modifier.weight(1f)) {
                         val current = tracker
-                        if (current != null) key(current) { TrackerScreen(current) }
-                        else Text("Choose a folder containing your data to resume. The original file was not changed.", Modifier.padding(20.dp))
+                        if (current != null) key(current) { TrackerScreen(current, location) { chooseFolder.launch(null) } }
+                        else Column(Modifier.padding(20.dp)) {
+                            Text("Choose a folder containing your data to resume. The original file was not changed.")
+                            OutlinedButton(onClick = { chooseFolder.launch(null) }) { Text("Data location…") }
+                        }
                     }
                 }
             }
         } }
     }
 
-    @Composable private fun TrackerScreen(tracker: Tracker) {
+    @Composable private fun TrackerScreen(tracker: Tracker, location: String, chooseFolder: () -> Unit) {
         var state by remember { mutableStateOf(tracker.state) }
         var selected by rememberSaveable { mutableStateOf(state.active?.nonprofitId ?: state.nonprofits.firstOrNull()?.id) }
         var notes by rememberSaveable { mutableStateOf(state.active?.notes.orEmpty()) }
         var name by rememberSaveable { mutableStateOf("") }
         var error by remember { mutableStateOf<String?>(null) }
-        var menu by remember { mutableStateOf(false) }
         var now by remember { mutableStateOf(Instant.now()) }
         var exportSnapshot by rememberSaveable { mutableStateOf("") }
         var editingId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -76,6 +69,7 @@ class MainActivity : ComponentActivity() {
         var reportPeriod by rememberSaveable { mutableStateOf("Monthly") }
         var reportDate by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
         var copyStatus by remember { mutableStateOf("") }
+        var settings by remember { mutableStateOf(false) }
         val reportRange = runCatching { ExportRange.forDate(ExportPeriod.valueOf(reportPeriod), LocalDate.parse(reportDate)) }.getOrNull()
         val reportCount = reportRange?.let { tracker.exportSessions(it).size } ?: 0
         fun action(block: () -> Unit) {
@@ -92,6 +86,18 @@ class MainActivity : ComponentActivity() {
             while (state.active != null) { now = Instant.now(); delay(1000) }
         }
         val active = state.active
+        if (settings) AlertDialog(
+            onDismissRequest = { settings = false }, title = { Text("Settings") },
+            text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(name, { name = it }, label = { Text("New nonprofit") }, enabled = active == null)
+                Button(onClick = { action { selected = tracker.addNonprofit(name); name = "" } }, enabled = active == null && name.isNotBlank()) { Text("Add nonprofit") }
+                OutlinedButton(onClick = chooseFolder) { Text("Data location…") }
+                Text(location, style = MaterialTheme.typography.bodySmall)
+                Text("All changes are saved here. Use one device at a time.", style = MaterialTheme.typography.bodySmall)
+                Text("Timing continues when the app closes. Reopen and press Stop to finish.", style = MaterialTheme.typography.bodySmall)
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            } }, confirmButton = { TextButton(onClick = { settings = false }) { Text("Done") } }
+        )
         editingId?.let { sessionId ->
             AlertDialog(
                 onDismissRequest = { editingId = null },
@@ -115,70 +121,46 @@ class MainActivity : ComponentActivity() {
                 dismissButton = { TextButton(onClick = { editingId = null }) { Text("Cancel") } }
             )
         }
-        LazyColumn(Modifier.fillMaxSize().safeDrawingPadding().imePadding().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            item { Text("Nonprofit Hours", style = MaterialTheme.typography.headlineLarge) }
-            item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(name, { name = it }, Modifier.weight(1f), label = { Text("New nonprofit") }, enabled = active == null)
-                Button(onClick = { action { selected = tracker.addNonprofit(name); name = "" } }, enabled = active == null && name.isNotBlank()) { Text("Add") }
-            } }
-            item { Box {
-                OutlinedButton(onClick = { menu = true }, enabled = active == null) {
-                    Text(state.nonprofits.find { it.id == selected }?.name ?: "Choose a nonprofit")
-                }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    state.nonprofits.forEach { nonprofit -> DropdownMenuItem(text = { Text(nonprofit.name) }, onClick = { selected = nonprofit.id; menu = false }) }
-                }
-            } }
-            item { OutlinedTextField(notes, { notes = it }, Modifier.fillMaxWidth(), label = { Text("Notes (optional)") }, enabled = active == null) }
-            item {
-                val seconds = active?.let { Duration.between(Instant.parse(it.startTimeUtc), now).seconds.coerceAtLeast(0) } ?: 0
-                Text(if (active == null) "Ready when you are" else "${active.nonprofitName}: ${elapsed(seconds)}", style = MaterialTheme.typography.headlineSmall)
-            }
-            item { Button(onClick = { action {
-                if (active != null) { tracker.stop(); notes = "" } else selected?.let { tracker.start(it, notes) }
-            } }, modifier = Modifier.fillMaxWidth(), enabled = active != null || selected != null,
-                colors = ButtonDefaults.buttonColors(containerColor = if (active == null) Color(0xFF16733B) else Color(0xFFB3261E))) {
-                Text(if (active == null) "Start" else "Stop")
-            } }
-            item { Text("Completed: %.2f hours".format(state.sessions.sumOf { it.durationSeconds ?: 0 } / 3600.0)) }
-            item { Text("Export period") }
-            item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ExportPeriod.entries.forEach { period ->
-                    FilterChip(selected = reportPeriod == period.name, onClick = { reportPeriod = period.name; copyStatus = "" }, label = { Text(period.name) })
-                }
-            } }
-            item { OutlinedTextField(reportDate, { reportDate = it; copyStatus = "" }, label = { Text("Date in period (YYYY-MM-DD)") },
-                isError = reportRange == null, singleLine = true, modifier = Modifier.fillMaxWidth()) }
-            item { Text("Completed sessions by local start date. Weeks run Monday–Sunday.") }
-            item { Text(reportRange?.let { "${it.start} – ${it.end.minusDays(1)}: $reportCount completed sessions" } ?: "Enter a valid date in YYYY-MM-DD format.") }
-            item { OutlinedButton(onClick = { action {
-                reportRange?.let { range ->
+        val history: @Composable () -> Unit = {
+            HistoryPanel(state) { session -> editedNotes = session.notes; editError = null; editingId = session.sessionId }
+        }
+        val report: @Composable () -> Unit = {
+            ReportPanel(reportPeriod, reportDate, reportRange, reportCount,
+                reportRange?.let { tracker.clipboardText(it) }.orEmpty(), copyStatus,
+                { reportPeriod = it; copyStatus = "" }, { reportDate = it; copyStatus = "" },
+                onExport = { action { reportRange?.let { range ->
                     exportSnapshot = tracker.csv(range)
                     export.launch("nonprofit-hours-${reportPeriod.lowercase(java.util.Locale.ROOT)}-${range.start}.csv")
-                }
-            } }, enabled = reportCount > 0) { Text("Export CSV for Google Sheets") } }
-            item { OutlinedButton(onClick = { action {
-                reportRange?.let { range ->
+                } } },
+                onCopy = { action { reportRange?.let { range ->
                     val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     clipboard.setPrimaryClip(ClipData.newPlainText("Task durations and notes", tracker.clipboardText(range)))
                     copyStatus = "Copied durations and notes."
+                } } })
+        }
+        Column(Modifier.fillMaxSize().imePadding().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Nonprofit Hours", style = MaterialTheme.typography.titleLarge)
+                TextButton(onClick = { settings = true }) { Text("Settings") }
+            }
+            CapturePanel(state, selected, notes, now, { selected = it }, { notes = it },
+                onToggle = { action { if (active != null) { tracker.stop(); notes = "" } else selected?.let { tracker.start(it, notes) } } },
+                onSettings = { settings = true })
+            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            HorizontalDivider()
+            BoxWithConstraints(Modifier.weight(1f)) {
+                if (maxWidth >= 800.dp) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) { history() }
+                        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) { report() }
+                    }
+                } else {
+                    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+                        history()
+                        report()
+                    }
                 }
-            } }, enabled = reportCount > 0) { Text("Copy durations and notes") } }
-            if (copyStatus.isNotEmpty()) item { Text(copyStatus) }
-            item { Text("Timing continues when the app is closed. Reopen and press Stop to finish.") }
-            error?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error) } }
-            items(state.sessions.asReversed(), key = { it.sessionId }) { session ->
-                HorizontalDivider()
-                Text(session.nonprofitName, style = MaterialTheme.typography.titleMedium)
-                Text("${session.startTimeUtc} · ${session.durationSeconds?.let(::elapsed) ?: "In progress"}")
-                if (session.notes.isNotEmpty()) Text(session.notes)
-                if (session.endTimeUtc != null) TextButton(onClick = {
-                    editedNotes = session.notes
-                    editError = null
-                    editingId = session.sessionId
-                }) { Text("Edit notes") }
             }
         }
     }
 }
-private fun elapsed(seconds: Long) = "%02d:%02d:%02d".format(seconds / 3600, seconds % 3600 / 60, seconds % 60)

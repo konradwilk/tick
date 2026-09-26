@@ -5,17 +5,19 @@
  objectVersion = 56;
  objects = {
   A00000000000000000000001 = {isa = PBXProject; attributes = {LastUpgradeCheck = 1600;}; buildConfigurationList = A00000000000000000000010; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; knownRegions = (en, Base); mainGroup = A00000000000000000000002; productRefGroup = A00000000000000000000003; projectDirPath = ""; projectRoot = ""; targets = (A00000000000000000000004);};
-  A00000000000000000000002 = {isa = PBXGroup; children = (A00000000000000000000020, A00000000000000000000021, A00000000000000000000022, A00000000000000000000023, A00000000000000000000003); sourceTree = "<group>";};
+  A00000000000000000000002 = {isa = PBXGroup; children = (A00000000000000000000020, A00000000000000000000021, A00000000000000000000022, A00000000000000000000023, A00000000000000000000024, A00000000000000000000003); sourceTree = "<group>";};
   A00000000000000000000003 = {isa = PBXGroup; children = (A00000000000000000000005); name = Products; sourceTree = "<group>";};
   A00000000000000000000004 = {isa = PBXNativeTarget; buildConfigurationList = A00000000000000000000011; buildPhases = (A00000000000000000000006, A00000000000000000000007, A00000000000000000000008); buildRules = (); dependencies = (); name = NonprofitHours; productName = NonprofitHours; productReference = A00000000000000000000005; productType = "com.apple.product-type.application";};
   A00000000000000000000005 = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NonprofitHours.app; sourceTree = BUILT_PRODUCTS_DIR;};
-  A00000000000000000000006 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000030, A00000000000000000000031, A00000000000000000000032, A00000000000000000000033); runOnlyForDeploymentPostprocessing = 0;};
+  A00000000000000000000006 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000030, A00000000000000000000031, A00000000000000000000032, A00000000000000000000033, A00000000000000000000034); runOnlyForDeploymentPostprocessing = 0;};
   A00000000000000000000007 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0;};
   A00000000000000000000008 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0;};
   A00000000000000000000020 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NonprofitHoursApp.swift; sourceTree = "<group>";};
   A00000000000000000000021 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Sources/HoursCore/Tracker.swift; sourceTree = "<group>";};
   A00000000000000000000022 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Sources/HoursCore/PortableData.swift; sourceTree = "<group>";};
   A00000000000000000000023 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Sources/HoursCore/StorageLocation.swift; sourceTree = "<group>";};
+  A00000000000000000000024 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneTrackerView.swift; sourceTree = "<group>";};
+  A00000000000000000000034 = {isa = PBXBuildFile; fileRef = A00000000000000000000024;};
   A00000000000000000000030 = {isa = PBXBuildFile; fileRef = A00000000000000000000020;};
   A00000000000000000000031 = {isa = PBXBuildFile; fileRef = A00000000000000000000021;};
   A00000000000000000000032 = {isa = PBXBuildFile; fileRef = A00000000000000000000022;};

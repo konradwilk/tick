@@ -1,35 +1,42 @@
 <Window x:Class="NonprofitHours.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Nonprofit Hours">
-  <ScrollViewer><StackPanel Padding="24" Spacing="14" MaxWidth="800" HorizontalAlignment="Stretch">
-    <TextBlock Text="Nonprofit Hours" FontSize="30" FontWeight="Bold" />
-    <TextBlock x:Name="ErrorText" Foreground="Firebrick" TextWrapping="Wrap" />
-    <Button Content="Data location…" Click="ChooseDataLocation" />
-    <TextBlock x:Name="DataLocation" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
-    <TextBlock Text="All changes are saved in this folder. Use one device at a time." TextWrapping="Wrap" />
-    <StackPanel x:Name="Controls" Spacing="14">
-      <TextBox x:Name="NewName" Header="New nonprofit" />
-      <Button x:Name="AddButton" Content="Add nonprofit" Click="AddNonprofit" />
-      <ComboBox x:Name="Nonprofits" Header="Nonprofit" DisplayMemberPath="Name" HorizontalAlignment="Stretch" />
-      <TextBox x:Name="Notes" Header="Notes (optional)" />
-      <TextBlock x:Name="Status" FontSize="22" TextWrapping="Wrap" />
-      <Button x:Name="Toggle" Click="ToggleTracking" HorizontalAlignment="Stretch" Foreground="White" FontSize="24" />
-      <TextBlock x:Name="Total" />
-      <ComboBox x:Name="ReportPeriod" Header="Export period" SelectedIndex="2" SelectionChanged="ReportChanged">
-        <ComboBoxItem Content="Daily" /><ComboBoxItem Content="Weekly" /><ComboBoxItem Content="Monthly" />
-      </ComboBox>
-      <CalendarDatePicker x:Name="ReportDate" Header="Date in the period" DateChanged="ReportDateChanged" />
-      <TextBlock Text="Completed sessions by local start date. Weeks run Monday–Sunday." TextWrapping="Wrap" />
-      <TextBlock x:Name="ReportSummary" TextWrapping="Wrap" />
-      <Button x:Name="ExportButton" Content="Export CSV for Google Sheets" Click="Export" />
-      <Button x:Name="CopyButton" Content="Copy durations and notes" Click="CopyReport" />
-      <TextBlock x:Name="CopyStatus" />
-      <TextBlock Text="Closing this window hides it to the system tray. Click the clock icon to reopen, or right-click it to quit. Timing continues until you press Stop." TextWrapping="Wrap" />
-    </StackPanel>
-    <TextBlock Text="History" FontSize="22" />
-    <ItemsControl x:Name="History"><ItemsControl.ItemTemplate><DataTemplate>
-      <StackPanel Spacing="6" Margin="0,0,0,14">
-        <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" />
-        <Button Content="Edit notes" Tag="{Binding SessionId}" IsEnabled="{Binding CanEdit}" Click="EditNotes" />
-      </StackPanel>
-    </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
-  </StackPanel></ScrollViewer>
-</Window>
+<Grid Padding="24" RowSpacing="18" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+<Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+<Grid><TextBlock Text="Nonprofit Hours" FontSize="24" FontWeight="SemiBold"/><Button Content="Settings" Click="ShowSettings" HorizontalAlignment="Right"/></Grid>
+<StackPanel x:Name="Controls" Grid.Row="1" Spacing="12">
+<Grid x:Name="CaptureRow" ColumnSpacing="18" RowSpacing="10" SizeChanged="CaptureResized">
+<Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+<ComboBox x:Name="Nonprofits" Header="Nonprofit" DisplayMemberPath="Name" HorizontalAlignment="Stretch" SelectionChanged="NonprofitChanged"/>
+<Button x:Name="Toggle" Grid.Column="1" Click="ToggleTracking" VerticalAlignment="Bottom" HorizontalAlignment="Stretch" MinWidth="160" Foreground="White" FontSize="22"/>
+</Grid>
+<TextBlock x:Name="Status" FontSize="22" TextWrapping="Wrap"/>
+<TextBox x:Name="Notes" Header="Notes (optional)" PlaceholderText="What are you working on?"/>
+<TextBlock x:Name="FirstRun" Text="Add your first nonprofit in Settings to begin." Visibility="Collapsed" TextWrapping="Wrap"/>
+</StackPanel>
+<ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled"><StackPanel Spacing="18">
+<TextBlock x:Name="ErrorText" Foreground="Firebrick" TextWrapping="Wrap"/>
+<Border x:Name="SettingsPanel" Visibility="Collapsed" Padding="18" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"><StackPanel Spacing="12">
+<TextBlock Text="Settings" FontSize="20" FontWeight="SemiBold"/>
+<TextBox x:Name="NewName" Header="New nonprofit"/><Button x:Name="AddButton" Content="Add nonprofit" Click="AddNonprofit"/>
+<Button Content="Data location…" Click="ChooseDataLocation"/><TextBlock x:Name="DataLocation" TextWrapping="Wrap" IsTextSelectionEnabled="True"/>
+<TextBlock Text="All changes are saved in this folder. Use one device at a time." TextWrapping="Wrap"/>
+<TextBlock Text="Closing this window hides it to the system tray. Timing continues until you press Stop." TextWrapping="Wrap"/>
+<Button Content="Done" Click="ShowSettings"/>
+</StackPanel></Border>
+<Grid x:Name="Workspace" ColumnSpacing="24" RowSpacing="18" SizeChanged="WorkspaceResized">
+<Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition x:Name="ReportColumn" Width="*"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+<StackPanel Spacing="12"><TextBlock Text="History" FontSize="22" FontWeight="SemiBold"/><TextBlock x:Name="Total"/>
+<TextBlock x:Name="EmptyHistory" Text="Sessions will appear here." Visibility="Collapsed" TextWrapping="Wrap"/>
+<ItemsControl x:Name="History"><ItemsControl.ItemTemplate><DataTemplate><Border Padding="14" Margin="0,0,0,10" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8"><StackPanel Spacing="8">
+<TextBlock Text="{Binding Summary}" TextWrapping="Wrap"/><Button Content="Edit notes" Tag="{Binding SessionId}" IsEnabled="{Binding CanEdit}" Click="EditNotes"/>
+</StackPanel></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></StackPanel>
+<Border x:Name="ReportPanel" Grid.Column="1" Padding="18" VerticalAlignment="Top" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8"><StackPanel Spacing="12">
+<TextBlock Text="Export &amp; copy" FontSize="22" FontWeight="SemiBold"/>
+<ComboBox x:Name="ReportPeriod" Header="Period" SelectedIndex="2" SelectionChanged="ReportChanged" HorizontalAlignment="Stretch"><ComboBoxItem Content="Daily"/><ComboBoxItem Content="Weekly"/><ComboBoxItem Content="Monthly"/></ComboBox>
+<CalendarDatePicker x:Name="ReportDate" Header="Date in the period" DateChanged="ReportDateChanged" HorizontalAlignment="Stretch"/>
+<TextBlock x:Name="ReportSummary" TextWrapping="Wrap"/><TextBlock Text="Completed sessions by local start date. Weeks run Monday–Sunday." TextWrapping="Wrap" FontSize="12"/>
+<TextBlock Text="Summary preview" FontWeight="SemiBold"/><TextBlock x:Name="ReportPreview" TextWrapping="Wrap" IsTextSelectionEnabled="True" FontFamily="Consolas"/>
+<Button x:Name="ExportButton" Content="Export CSV" Click="Export" HorizontalAlignment="Stretch"/><Button x:Name="CopyButton" Content="Copy summary" Click="CopyReport" HorizontalAlignment="Stretch"/><TextBlock x:Name="CopyStatus" TextWrapping="Wrap"/>
+</StackPanel></Border>
+</Grid>
+</StackPanel></ScrollViewer>
+</Grid></Window>

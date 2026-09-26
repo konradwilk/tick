@@ -15,6 +15,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        AppWindow.Resize(new Windows.Graphics.SizeInt32(1100, 800));
         ReportDate.Date = DateTimeOffset.Now;
         timer.Tick += (_, _) => UpdateClock();
         timer.Start();
@@ -57,6 +58,8 @@ public sealed partial class MainWindow : Window
         Toggle.IsEnabled = true;
         DataLocation.Text = Path.GetDirectoryName(location.CurrentPath);
         var state = tracker!.State;
+        FirstRun.Visibility = state.Nonprofits.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        EmptyHistory.Visibility = state.Sessions.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
         var selected = (Nonprofits.SelectedItem as Nonprofit)?.Id;
         Nonprofits.ItemsSource = state.Nonprofits;
         Nonprofits.SelectedItem = state.Nonprofits.FirstOrDefault(n => n.Id == selected);
@@ -141,6 +144,10 @@ public sealed partial class MainWindow : Window
     private ExportRange SelectedRange() => ExportRange.For((ExportPeriod)ReportPeriod.SelectedIndex,
         DateOnly.FromDateTime((ReportDate.Date ?? DateTimeOffset.Now).DateTime));
     private void ReportChanged(object sender, SelectionChangedEventArgs args) => UpdateReport();
+    private void NonprofitChanged(object sender, SelectionChangedEventArgs args)
+    {
+        if (Toggle != null) Toggle.IsEnabled = tracker?.State.Active != null || Nonprofits.SelectedItem != null;
+    }
     private void ReportDateChanged(CalendarDatePicker sender, CalendarDatePickerDateChangedEventArgs args) => UpdateReport();
     private void UpdateReport()
     {
@@ -148,6 +155,7 @@ public sealed partial class MainWindow : Window
         var range = SelectedRange();
         var count = tracker.ExportSessions(range).Length;
         ReportSummary.Text = $"{range.Start:yyyy-MM-dd} – {range.End.AddDays(-1):yyyy-MM-dd}: {count} completed sessions";
+        ReportPreview.Text = count == 0 ? "No completed sessions in this period." : tracker.ClipboardText(range);
         ExportButton.IsEnabled = CopyButton.IsEnabled = count > 0;
         CopyStatus.Text = "";
     }
@@ -165,5 +173,23 @@ public sealed partial class MainWindow : Window
             ErrorText.Text = "";
         }
         catch (Exception e) { ErrorText.Text = "Could not copy. " + e.Message; }
+    }
+    private void ShowSettings(object sender, RoutedEventArgs args) => SettingsPanel.Visibility =
+        SettingsPanel.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
+    private void WorkspaceResized(object sender, SizeChangedEventArgs args)
+    {
+        if (ReportPanel == null) return;
+        var narrow = args.NewSize.Width < 760;
+        Grid.SetColumn(ReportPanel, narrow ? 0 : 1);
+        Grid.SetRow(ReportPanel, narrow ? 1 : 0);
+        ReportColumn.Width = narrow ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
+    }
+    private void CaptureResized(object sender, SizeChangedEventArgs args)
+    {
+        if (Toggle == null) return;
+        var narrow = args.NewSize.Width < 500;
+        Grid.SetColumn(Toggle, narrow ? 0 : 1);
+        Grid.SetRow(Toggle, narrow ? 1 : 0);
+        Grid.SetColumnSpan(Toggle, narrow ? 2 : 1);
     }
 }

@@ -99,7 +99,7 @@ import HoursCore
     @State private var model = AppModel()
     var body: some Scene {
         Window("Nonprofit Hours", id: "main") { TrackerView(model: model) }
-            .defaultSize(width: 720, height: 640)
+            .defaultSize(width: 1000, height: 760)
         MenuBarExtra {
             MenuBarTrackerView(model: model)
         } label: {
@@ -107,96 +107,6 @@ import HoursCore
                   systemImage: model.state.active == nil ? "clock" : "record.circle.fill")
         }
         .menuBarExtraStyle(.window)
-    }
-}
-
-struct TrackerView: View {
-    @Bindable var model: AppModel
-    @State private var newName = ""
-    @State private var editingSession: Session?
-    private var active: Session? { model.state.active }
-    var body: some View {
-        ScrollView {
-        VStack(alignment: .leading, spacing: 18) {
-            Text("Nonprofit Hours").font(.largeTitle.bold())
-            Text("Make your time count.").foregroundStyle(.secondary)
-            Button("Data location…") { model.chooseDataLocation() }
-            Text(model.dataLocation).font(.caption).textSelection(.enabled)
-            Text("All changes are saved in this folder. Use one device at a time.").font(.caption).foregroundStyle(.secondary)
-            HStack {
-                TextField("Add a nonprofit", text: $newName)
-                    .onSubmit { addNonprofit() }
-                Button("Add", action: addNonprofit).disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-            .disabled(active != nil || model.tracker == nil)
-            Picker("Nonprofit", selection: $model.selected) {
-                Text("Choose a nonprofit").tag(nil as UUID?)
-                ForEach(model.state.nonprofits) { Text($0.name).tag(Optional($0.id)) }
-            }.disabled(active != nil)
-            TextField("Notes (optional)", text: $model.notes).disabled(active != nil)
-            if let active {
-                Text("Tracking for \(active.nonprofitName)").font(.headline)
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text(elapsed(context.date.timeIntervalSince(active.startTimeUtc)))
-                        .font(.system(size: 44, weight: .medium, design: .monospaced))
-                }
-            } else { Text("Ready when you are").font(.headline) }
-            Button {
-                model.toggleTracking()
-            } label: {
-                Text(active == nil ? "Start" : "Stop").font(.title2.bold()).frame(maxWidth: .infinity).padding(10)
-            }
-            .buttonStyle(.borderedProminent).tint(active == nil ? .green : .red)
-            .disabled(model.tracker == nil || (active == nil && model.selected == nil))
-            HStack {
-                Text("Completed: \(Double(model.state.sessions.compactMap(\.durationSeconds).reduce(0, +)) / 3600, specifier: "%.2f") hours").font(.headline)
-                Spacer()
-            }
-            HStack {
-                Picker("Export period", selection: $model.reportPeriod) {
-                    ForEach(ExportPeriod.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                }
-                DatePicker("Date in period", selection: $model.reportDate, displayedComponents: .date)
-            }
-            Text("Completed sessions by local start date. Weeks run Monday–Sunday.").font(.caption)
-            Text("\(model.reportRange.start.formatted(date: .abbreviated, time: .omitted)) – \(model.reportRange.end.addingTimeInterval(-1).formatted(date: .abbreviated, time: .omitted)): \(model.reportCount) completed sessions").font(.caption)
-            HStack {
-                Button("Export CSV…") { model.export() }.disabled(model.reportCount == 0)
-                Button("Copy durations and notes") { model.copyReport() }.disabled(model.reportCount == 0)
-                Text(model.copyStatus).font(.caption)
-            }
-            Text("Import the CSV into Google Sheets using File → Import.").font(.caption).foregroundStyle(.secondary)
-            List(model.state.sessions.reversed()) { session in
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(session.nonprofitName).bold()
-                        Spacer()
-                        Text(session.durationSeconds.map { elapsed(Double($0)) } ?? "In progress")
-                    }
-                    Text(session.startTimeUtc.formatted(date: .abbreviated, time: .shortened)).foregroundStyle(.secondary)
-                    if !session.notes.isEmpty { Text(session.notes) }
-                    if session.endTimeUtc != nil {
-                        Button("Edit notes") { editingSession = session }
-                    }
-                }.padding(.vertical, 4)
-            }.frame(minHeight: 220)
-        }.padding(24)
-        }.frame(minWidth: 560, minHeight: 580)
-        .onChange(of: model.reportPeriod) { model.copyStatus = "" }
-        .onChange(of: model.reportDate) { model.copyStatus = "" }
-        .sheet(item: $editingSession) { session in
-            SessionNotesEditor(session: session, model: model)
-        }
-        .alert("Unable to complete action", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
-            Button("OK") { model.error = nil }
-        } message: { Text(model.error ?? "") }
-    }
-    private func addNonprofit() {
-        model.perform { model.selected = try $0.addNonprofit(newName); newName = "" }
-    }
-    private func elapsed(_ seconds: Double) -> String {
-        let value = max(0, Int(seconds))
-        return String(format: "%02d:%02d:%02d", value / 3600, (value % 3600) / 60, value % 60)
     }
 }
 

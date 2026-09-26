@@ -14,6 +14,12 @@ Native time-tracking apps for Android, iPhone, macOS, Windows, and Linux with CS
 
 ## Native clients
 
+The main screen puts nonprofit selection and Start/Stop first, followed by notes.
+History and **Export & copy** sit side by side in wide windows and stack on
+phones or narrow windows. Capture stays visible while the workspace scrolls.
+The report panel previews the exact summary produced by **Copy summary**.
+Use **Settings** for adding nonprofits and choosing the data folder.
+
 CSV export in Windows, macOS, iOS, Android, and Linux offers **Daily**, **Weekly**, and
 **Monthly** periods. Choose a date within the desired period, check the displayed
 date range and completed-session count, then choose **Export CSV**. The file
@@ -29,7 +35,7 @@ calendar boundaries. A completed session belongs to its start date, including it
 full duration if it crosses midnight. Active sessions are excluded. Empty periods
 disable export and copy.
 
-**Copy durations and notes** groups the selected sessions by nonprofit. Each
+**Copy summary** groups the selected sessions by nonprofit. Each
 heading contains its name and total duration for the selected period, followed
 by each session's notes and duration in chronological order:
 

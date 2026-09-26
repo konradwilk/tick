@@ -15,9 +15,12 @@ with tempfile.TemporaryDirectory() as directory:
     window.present()
     assert window.error.get_text() == ""
     assert not window.toggle.get_sensitive()
+    assert not window.settings_panel.get_reveal_child()
+    assert window.first_run.get_visible()
     window.name.set_text("Community Kitchen")
     window.add_nonprofit()
     assert window.selected_id is not None
+    assert not window.first_run.get_visible()
     window.notes.set_text("Dinner service")
     window.toggle_tracking()
     assert window.tracker.active is not None
@@ -34,6 +37,7 @@ with tempfile.TemporaryDirectory() as directory:
     assert restored.toggle.get_label() == "Start"
     assert restored.export.get_sensitive()
     assert restored.copy.get_sensitive()
+    assert restored.report_preview.get_text() == restored.tracker.clipboard_text(*restored.report_selection())
     selected_date = restored.report_date.get_text()
     restored.report_date.set_text("invalid")
     assert not restored.export.get_sensitive()
@@ -55,6 +59,7 @@ with tempfile.TemporaryDirectory() as directory:
     buffer.set_text("Updated dinner service\nCleanup")
     dialog.response(Gtk.ResponseType.ACCEPT)
     assert restored.tracker.state["sessions"][0]["notes"] == "Updated dinner service\nCleanup"
+    assert "Updated dinner service, Cleanup" in restored.report_preview.get_text()
     assert restored.tracker.state["sessions"][0]["durationSeconds"] == session["durationSeconds"]
     dialog = restored.edit_notes(restored.tracker.state["sessions"][0])
     scroll = dialog.get_content_area().get_first_child().get_next_sibling().get_next_sibling()

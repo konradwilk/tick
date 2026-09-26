@@ -1,0 +1,85 @@
+package org.nonprofithours
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.dp
+import java.time.Instant
+import java.time.Duration
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+
+@Composable internal fun CapturePanel(state: TrackerState, selected: String?, notes: String, now: Instant,
+    onSelect: (String) -> Unit, onNotes: (String) -> Unit, onToggle: () -> Unit, onSettings: () -> Unit) {
+    var menu by remember { mutableStateOf(false) }
+    val active = state.active
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box {
+            OutlinedButton(onClick = { menu = true }, enabled = active == null, modifier = Modifier.fillMaxWidth()) {
+                Text("Nonprofit: " + (state.nonprofits.find { it.id == selected }?.name ?: "Choose a nonprofit"))
+            }
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                state.nonprofits.forEach { nonprofit ->
+                    DropdownMenuItem(text = { Text(nonprofit.name) }, onClick = { onSelect(nonprofit.id); menu = false })
+                }
+            }
+        }
+        Button(onClick = onToggle, enabled = active != null || selected != null, modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = if (active == null) Color(0xFF176C45) else Color(0xFFB3261E))) {
+            Text(if (active == null) "Start" else "Stop", style = MaterialTheme.typography.titleLarge)
+        }
+        Text(active?.let { "${it.nonprofitName}: ${displayDuration(Duration.between(Instant.parse(it.startTimeUtc), now).seconds.coerceAtLeast(0))}" }
+            ?: "Ready when you are", style = MaterialTheme.typography.titleMedium)
+        OutlinedTextField(notes, onNotes, Modifier.fillMaxWidth(), label = { Text("What are you working on? (optional)") }, enabled = active == null, singleLine = true)
+        if (state.nonprofits.isEmpty()) TextButton(onClick = onSettings) { Text("Add your first nonprofit in Settings") }
+    }
+}
+
+@Composable internal fun HistoryPanel(state: TrackerState, onEdit: (Session) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("History", style = MaterialTheme.typography.headlineSmall)
+        Text("Completed: %.2f hours".format(state.sessions.sumOf { it.durationSeconds ?: 0 } / 3600.0))
+        if (state.sessions.isEmpty()) Text("Sessions will appear here.")
+        state.sessions.asReversed().forEach { session ->
+            OutlinedCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(session.nonprofitName, style = MaterialTheme.typography.titleMedium)
+                    Text(Instant.parse(session.startTimeUtc).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("MMM d, yyyy HH:mm")), style = MaterialTheme.typography.bodySmall)
+                    Text(session.durationSeconds?.let(::displayDuration) ?: "In progress")
+                    Text(session.notes.ifBlank { "No notes" })
+                    if (session.endTimeUtc != null) TextButton(onClick = { onEdit(session) }) { Text("Edit notes") }
+                }
+            }
+        }
+    }
+}
+
+@Composable internal fun ReportPanel(period: String, date: String, range: ExportRange?, count: Int,
+    preview: String, status: String, onPeriod: (String) -> Unit, onDate: (String) -> Unit,
+    onExport: () -> Unit, onCopy: () -> Unit) {
+    OutlinedCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Export & copy", style = MaterialTheme.typography.headlineSmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                ExportPeriod.entries.forEach { choice ->
+                    FilterChip(selected = period == choice.name, onClick = { onPeriod(choice.name) }, label = { Text(choice.name) })
+                }
+            }
+            OutlinedTextField(date, onDate, label = { Text("Date in period (YYYY-MM-DD)") },
+                isError = range == null, singleLine = true, modifier = Modifier.fillMaxWidth())
+            Text(range?.let { "${it.start} – ${it.end.minusDays(1)}: $count completed sessions" } ?: "Enter a valid date in YYYY-MM-DD format.")
+            Text("Completed sessions by local start date. Weeks run Monday–Sunday.", style = MaterialTheme.typography.bodySmall)
+            Text("Summary preview", style = MaterialTheme.typography.titleMedium)
+            SelectionContainer { Text(preview.ifEmpty { "No completed sessions in this period." }, fontFamily = FontFamily.Monospace) }
+            OutlinedButton(onClick = onExport, enabled = count > 0, modifier = Modifier.fillMaxWidth()) { Text("Export CSV") }
+            OutlinedButton(onClick = onCopy, enabled = count > 0, modifier = Modifier.fillMaxWidth()) { Text("Copy summary") }
+            if (status.isNotEmpty()) Text(status, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+private fun displayDuration(seconds: Long) = "%02d:%02d:%02d".format(seconds / 3600, seconds % 3600 / 60, seconds % 60)
