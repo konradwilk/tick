@@ -93,11 +93,11 @@ public sealed class Tracker
             return "\"" + value.Replace("\"", "\"\"") + "\"";
         }
         static string Date(DateTimeOffset value) => value.UtcDateTime.ToString("O", CultureInfo.InvariantCulture);
-        var rows = new List<string> { "sessionId,nonprofitId,nonprofitName,startTimeUtc,endTimeUtc,durationSeconds,hours,notes,deviceId,platform,updatedAtUtc" };
+        var rows = new List<string> { "nonprofitName,startTimeUtc,endTimeUtc,durationSeconds,hours,notes,deviceId,platform" };
         foreach (var s in ExportSessions(range, zone))
-            rows.Add(string.Join(",", new[] { s.SessionId.ToString(), s.NonprofitId.ToString(), s.NonprofitName,
+            rows.Add(string.Join(",", new[] { s.NonprofitName,
                 Date(s.StartTimeUtc), Date(s.EndTimeUtc!.Value), s.DurationSeconds!.Value.ToString(CultureInfo.InvariantCulture),
-                (s.DurationSeconds.Value / 3600.0).ToString(CultureInfo.InvariantCulture), s.Notes, s.DeviceId.ToString(), s.Platform, Date(s.UpdatedAtUtc) }.Select(Cell)));
+                (s.DurationSeconds.Value / 3600.0).ToString(CultureInfo.InvariantCulture), s.Notes, s.DeviceId.ToString(), s.Platform }.Select(Cell)));
         return string.Join("\r\n", rows) + "\r\n";
     }
 }

@@ -201,8 +201,8 @@ class Tracker:
             for sessions in groups.values())
 
     def csv(self, period=None, day=None, zone=None):
-        fields = ["sessionId", "nonprofitId", "nonprofitName", "startTimeUtc", "endTimeUtc",
-                  "durationSeconds", "hours", "notes", "deviceId", "platform", "updatedAtUtc"]
+        fields = ["nonprofitName", "startTimeUtc", "endTimeUtc",
+                  "durationSeconds", "hours", "notes", "deviceId", "platform"]
         output = io.StringIO(newline="")
         writer = csv.writer(output)
         writer.writerow(fields)

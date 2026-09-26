@@ -91,10 +91,10 @@ class Tracker(initial: TrackerState, private val save: (TrackerState) -> Unit) {
             return "\"${safe.replace("\"", "\"\"")}\""
         }
         val rows = exportSessions(range, zone).map { s ->
-            listOf(s.sessionId, s.nonprofitId, s.nonprofitName, s.startTimeUtc, s.endTimeUtc.orEmpty(),
+            listOf(s.nonprofitName, s.startTimeUtc, s.endTimeUtc.orEmpty(),
                 s.durationSeconds.toString(), ((s.durationSeconds ?: 0) / 3600.0).toString(), s.notes,
-                s.deviceId, s.platform, s.updatedAtUtc).joinToString(",") { cell(it) }
+                s.deviceId, s.platform).joinToString(",") { cell(it) }
         }
-        return (listOf("sessionId,nonprofitId,nonprofitName,startTimeUtc,endTimeUtc,durationSeconds,hours,notes,deviceId,platform,updatedAtUtc") + rows).joinToString("\r\n") + "\r\n"
+        return (listOf("nonprofitName,startTimeUtc,endTimeUtc,durationSeconds,hours,notes,deviceId,platform") + rows).joinToString("\r\n") + "\r\n"
     }
 }

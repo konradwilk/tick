@@ -167,9 +167,9 @@ public final class Tracker {
             let safe = ["=", "+", "-", "@"].contains(where: { trimmed.hasPrefix($0) }) ? "'" + value : value
             return "\"" + safe.replacingOccurrences(of: "\"", with: "\"\"") + "\""
         }
-        var rows = ["sessionId,nonprofitId,nonprofitName,startTimeUtc,endTimeUtc,durationSeconds,hours,notes,deviceId,platform,updatedAtUtc"]
+        var rows = ["nonprofitName,startTimeUtc,endTimeUtc,durationSeconds,hours,notes,deviceId,platform"]
         for s in exportSessions(range: range) {
-            let values = [s.sessionId.uuidString, s.nonprofitId.uuidString, s.nonprofitName, formatter.string(from: s.startTimeUtc), formatter.string(from: s.endTimeUtc!), String(s.durationSeconds ?? 0), String(Double(s.durationSeconds ?? 0) / 3600), s.notes, s.deviceId.uuidString, s.platform, formatter.string(from: s.updatedAtUtc)]
+            let values = [s.nonprofitName, formatter.string(from: s.startTimeUtc), formatter.string(from: s.endTimeUtc!), String(s.durationSeconds ?? 0), String(Double(s.durationSeconds ?? 0) / 3600), s.notes, s.deviceId.uuidString, s.platform]
             rows.append(values.map(cell).joined(separator: ","))
         }
         return rows.joined(separator: "\r\n") + "\r\n"
