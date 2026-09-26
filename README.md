@@ -14,11 +14,15 @@ Native time-tracking apps for Android, iPhone, macOS, Windows, and Linux with CS
 
 ## Native clients
 
-CSV export in Windows, macOS, Android, and Linux offers **Daily**, **Weekly**, and
+CSV export in Windows, macOS, iOS, Android, and Linux offers **Daily**, **Weekly**, and
 **Monthly** periods. Choose a date within the desired period, check the displayed
 date range and completed-session count, then choose **Export CSV**. The file
 contains individual session records, including durations and notes, and its name
 includes the period and starting date. The default is the current month.
+
+All clients use these CSV columns, in order: `nonprofitName`, `startTimeUtc`,
+`endTimeUtc`, `durationSeconds`, `hours`, `notes`, `deviceId`, `platform`.
+The exports omit `sessionId`, `nonprofitId`, and `updatedAtUtc`.
 
 Periods use the device's local timezone; weeks run Monday–Sunday and months use
 calendar boundaries. A completed session belongs to its start date, including its
@@ -39,15 +43,16 @@ Durations use `HH:MM:SS`. Empty or whitespace-only notes display as **No notes**
 Clipboard notes are trimmed and nonempty lines are joined with a comma and one
 space, so each session occupies one line. Saved notes and CSV retain the original text,
 and durations longer than 24 hours are not wrapped. A confirmation appears after
-copying. The shared Apple library supports both operations for iOS, but this
-checkout has no iPhone screen source to connect the controls to.
+copying. iOS and macOS compile the same tracking and export implementation.
 
 In session history, choose **Edit notes** on a completed session in Windows,
-macOS, Android, or Linux. **Save** persists the edited notes and includes them in
+macOS, iOS, Android, or Linux. **Save** persists the edited notes and includes them in
 future CSV exports; **Cancel** discards the draft. Times and recorded hours stay
 unchanged. If saving fails, the editor keeps your draft available to retry.
-The shared Apple core also supports note updates for iOS; this checkout does not
-include the iOS screen sources.
+See [iPhone and iPad setup](apple/iOS/README.md) for the Xcode project and build
+instructions. Apple and Android builds require their native development tools;
+the newly added iOS UI and storage implementations still need native verification.
+
 - Android: Kotlin + Jetpack Compose
 - iPhone: Swift + SwiftUI
 - macOS: Swift + SwiftUI

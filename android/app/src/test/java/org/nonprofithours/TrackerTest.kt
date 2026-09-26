@@ -107,6 +107,9 @@ class TrackerTest {
         assertThrows(IllegalArgumentException::class.java) { tracker.stop(Instant.EPOCH.minusSeconds(1)) }
         assertNotNull(tracker.state.active)
         tracker.stop(Instant.EPOCH.plusSeconds(60))
+        assertEquals("nonprofitName,startTimeUtc,endTimeUtc,durationSeconds,hours,notes,deviceId,platform", tracker.csv().substringBefore("\r\n"))
+        assertFalse(tracker.csv().contains(id))
+        assertFalse(tracker.csv().contains(tracker.state.sessions.single().sessionId))
         assertTrue(tracker.csv().contains("\"'=SUM(1,2)\""))
         assertTrue(tracker.csv().contains("\"A, \"\"quote\"\"\nline\""))
     }

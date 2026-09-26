@@ -164,6 +164,8 @@ class TrackerTests(unittest.TestCase):
         self.tracker.stop(self.start + timedelta(hours=1))
         rows = list(csv.DictReader(io.StringIO(self.tracker.csv())))
         self.assertEqual(rows[0]["nonprofitName"], "'=SUM(1,2)")
+        self.assertEqual(list(rows[0]), ["nonprofitName", "startTimeUtc", "endTimeUtc", "durationSeconds", "hours", "notes", "deviceId", "platform"])
+        self.assertNotIn(None, rows[0])
         self.assertEqual(rows[0]["notes"], 'A, "quote"\nand a newline')
         self.assertEqual(rows[0]["hours"], "1.0")
         self.assertEqual(rows[0]["startTimeUtc"], "2026-01-01T00:00:00Z")
