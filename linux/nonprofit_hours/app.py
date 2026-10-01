@@ -94,7 +94,13 @@ class HoursWindow(Gtk.ApplicationWindow):
             if session.get("endTimeUtc"):
                 edit = Gtk.Button(label="Edit notes", halign=Gtk.Align.START)
                 edit.connect("clicked", lambda _, selected=session: self.edit_notes(selected))
-                self.history.append(edit)
+                actions = Gtk.Box(spacing=8)
+                actions.append(edit)
+                if session.get("durationSeconds") is not None and 0 <= session["durationSeconds"] < 60:
+                    delete = Gtk.Button(label="Delete")
+                    delete.connect("clicked", lambda _, selected=session: self.perform(lambda: self.tracker.delete_session(selected["sessionId"])))
+                    actions.append(delete)
+                self.history.append(actions)
         self.update_clock()
 
     def add_manual_session(self):

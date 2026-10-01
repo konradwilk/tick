@@ -12,6 +12,30 @@ from nonprofit_hours.core import FileStore, Tracker, data_path, elapsed, period_
 
 
 class TrackerTests(unittest.TestCase):
+    def test_delete_only_short_completed_sessions(self):
+        nonprofit = self.tracker.add_nonprofit("Kitchen")
+        for seconds in (0, 59, 60):
+            self.tracker.start(nonprofit, "Short", self.start)
+            session_id = self.tracker.active["sessionId"]
+            with self.assertRaises(ValueError):
+                self.tracker.delete_session(session_id)
+            self.tracker.stop(self.start + timedelta(seconds=seconds))
+            original = copy.deepcopy(self.tracker.state)
+            if seconds < 60:
+                with patch.object(self.tracker.store, "save", side_effect=OSError("Disk full")):
+                    with self.assertRaises(OSError):
+                        self.tracker.delete_session(session_id)
+                self.assertEqual(original, self.tracker.state)
+                self.tracker.delete_session(session_id)
+                self.assertEqual([], Tracker(FileStore(self.path)).state["sessions"])
+                self.assertEqual("", self.tracker.clipboard_text())
+                self.assertNotIn("Short", self.tracker.csv())
+            else:
+                with self.assertRaises(ValueError):
+                    self.tracker.delete_session(session_id)
+        with self.assertRaises(ValueError):
+            self.tracker.delete_session("missing")
+
     def test_manual_session_persists_exports_and_preserves_timer(self):
         nonprofit = self.tracker.add_nonprofit("Kitchen")
         self.tracker.start(nonprofit, "Active", self.start)

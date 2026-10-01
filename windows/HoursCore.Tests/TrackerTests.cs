@@ -3,6 +3,30 @@ using Xunit;
 namespace HoursCore.Tests;
 public class TrackerTests
 {
+    [Theory]
+    [InlineData(0)] [InlineData(59)] [InlineData(60)]
+    public void DeleteOnlyShortCompletedSessions(int seconds)
+    {
+        var tracker = new Tracker(TrackerState.Empty(), _ => { });
+        var id = tracker.AddNonprofit("Kitchen");
+        tracker.Start(id, "Short", DateTimeOffset.UnixEpoch);
+        var sessionId = tracker.State.Active!.SessionId;
+        Assert.Throws<InvalidOperationException>(() => tracker.DeleteSession(sessionId));
+        tracker.Stop(DateTimeOffset.UnixEpoch.AddSeconds(seconds));
+        var original = tracker.State;
+        var failing = new Tracker(original, _ => throw new IOException("Disk full"));
+        if (seconds < 60)
+        {
+            Assert.Throws<IOException>(() => failing.DeleteSession(sessionId));
+            Assert.Same(original, failing.State);
+            tracker.DeleteSession(sessionId);
+            Assert.Empty(PortableData.Decode(PortableData.Encode(tracker.State)).Sessions);
+            Assert.Equal("", tracker.ClipboardText());
+            Assert.DoesNotContain("Short", tracker.Csv());
+        }
+        else Assert.Throws<InvalidOperationException>(() => tracker.DeleteSession(sessionId));
+        Assert.Throws<InvalidOperationException>(() => tracker.DeleteSession(Guid.NewGuid()));
+    }
     [Fact] public void ManualSessionPersistsAndExportsWithoutStoppingTimer()
     {
         var tracker = new Tracker(TrackerState.Empty(), _ => { });

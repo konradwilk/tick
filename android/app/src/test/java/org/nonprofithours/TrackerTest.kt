@@ -8,6 +8,29 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 class TrackerTest {
+    @Test fun deleteOnlyShortCompletedSessions() {
+        val tracker = Tracker(TrackerState()) {}
+        val id = tracker.addNonprofit("Kitchen")
+        for (seconds in listOf(0L, 59L, 60L)) {
+            tracker.start(id, "Short", Instant.EPOCH)
+            val sessionId = tracker.state.active!!.sessionId
+            try { tracker.deleteSession(sessionId); fail("Active session") } catch (_: IllegalArgumentException) {}
+            tracker.stop(Instant.EPOCH.plusSeconds(seconds))
+            val original = tracker.state
+            if (seconds < 60) {
+                val failing = Tracker(original) { throw java.io.IOException("Disk full") }
+                try { failing.deleteSession(sessionId); fail("Save failure") } catch (_: java.io.IOException) {}
+                assertEquals(original, failing.state)
+                tracker.deleteSession(sessionId)
+                assertTrue(PortableData.decode(PortableData.encode(tracker.state)).sessions.isEmpty())
+                assertEquals("", tracker.clipboardText())
+                assertFalse(tracker.csv().contains("Short"))
+            } else {
+                try { tracker.deleteSession(sessionId); fail("One minute") } catch (_: IllegalArgumentException) {}
+            }
+        }
+        try { tracker.deleteSession("missing"); fail("Missing session") } catch (_: IllegalArgumentException) {}
+    }
     @Test fun manualSessionPersistsAndPreservesTimer() {
         val tracker = Tracker(TrackerState()) {}
         val id = tracker.addNonprofit("Kitchen")

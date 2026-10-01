@@ -68,7 +68,14 @@ struct TrackerView: View {
                         Text(session.startTimeUtc.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
                         Text(session.durationSeconds.map { elapsed(Double($0)) } ?? "In progress").monospacedDigit()
                         Text(session.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "No notes" : session.notes)
-                        if session.endTimeUtc != nil { Button("Edit notes") { editingSession = session } }
+                        if session.endTimeUtc != nil {
+                            HStack {
+                                Button("Edit notes") { editingSession = session }
+                                if let seconds = session.durationSeconds, seconds >= 0, seconds < 60 {
+                                    Button("Delete", role: .destructive) { model.perform { try $0.deleteSession(sessionId: session.sessionId) } }
+                                }
+                            }
+                        }
                     }.frame(maxWidth: .infinity, alignment: .leading)
                 }
             }

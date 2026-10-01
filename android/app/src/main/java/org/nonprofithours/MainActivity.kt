@@ -169,7 +169,7 @@ class MainActivity : ComponentActivity() {
             )
         }
         val history: @Composable () -> Unit = {
-            HistoryPanel(state) { session -> editedNotes = session.notes; editError = null; editingId = session.sessionId }
+            HistoryPanel(state, onDelete = { session -> action { tracker.deleteSession(session.sessionId); copyStatus = "" } }) { session -> editedNotes = session.notes; editError = null; editingId = session.sessionId }
         }
         val report: @Composable () -> Unit = {
             ReportPanel(reportPeriod, reportDate, reportRange, reportCount,

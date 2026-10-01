@@ -179,6 +179,16 @@ class Tracker:
             "platform": "linux", "updatedAtUtc": timestamp(now), "syncState": "pending"})
         self.commit(state)
 
+    def delete_session(self, session_id):
+        session = next((s for s in self.state["sessions"] if s["sessionId"] == session_id), None)
+        if session is None:
+            raise ValueError("The session could not be found.")
+        if session["endTimeUtc"] is None or session["durationSeconds"] is None or not 0 <= session["durationSeconds"] < 60:
+            raise ValueError("Only completed sessions under one minute can be deleted.")
+        state = copy.deepcopy(self.state)
+        state["sessions"] = [s for s in state["sessions"] if s["sessionId"] != session_id]
+        self.commit(state)
+
     def update_notes(self, session_id, notes, now=None):
         state = copy.deepcopy(self.state)
         session = next((s for s in state["sessions"] if s["sessionId"] == session_id), None)

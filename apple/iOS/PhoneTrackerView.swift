@@ -88,7 +88,14 @@ import UIKit
                         Text(session.startTimeUtc.formatted(date: .abbreviated, time: .shortened)).font(.caption)
                         Text(session.durationSeconds.map(duration) ?? "In progress").monospacedDigit()
                         Text(session.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "No notes" : session.notes)
-                        if session.endTimeUtc != nil { Button("Edit notes") { editing = session } }
+                        if session.endTimeUtc != nil {
+                            HStack {
+                                Button("Edit notes") { editing = session }
+                                if let seconds = session.durationSeconds, seconds >= 0, seconds < 60 {
+                                    Button("Delete", role: .destructive) { model.perform { try $0.deleteSession(sessionId: session.sessionId); copyStatus = "" } }
+                                }
+                            }
+                        }
                     }.frame(maxWidth: .infinity, alignment: .leading)
                 }
             }

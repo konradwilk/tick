@@ -54,12 +54,13 @@ public struct TrackerState: Codable, Sendable {
 }
 
 public enum TrackerError: LocalizedError {
-    case activeSession, noActiveSession, invalidNonprofit, clockChanged, missingSession, missingActivity, invalidInterval
+    case activeSession, noActiveSession, invalidNonprofit, clockChanged, missingSession, missingActivity, invalidInterval, cannotDelete
     public var errorDescription: String? {
         switch self {
         case .activeSession: "Stop the current session first."
         case .noActiveSession: "There is no active session."
         case .missingSession: "The session could not be found."
+        case .cannotDelete: "Only completed sessions under one minute can be deleted."
         case .missingActivity: "Enter what you worked on."
         case .invalidInterval: "End must be after start."
         case .invalidNonprofit: "Enter a unique nonprofit name and select it before starting."
@@ -135,6 +136,13 @@ public final class Tracker {
         next.sessions.append(Session(sessionId: UUID(), nonprofitId: nonprofit.id, nonprofitName: nonprofit.name,
             startTimeUtc: start, endTimeUtc: end, durationSeconds: Int(end.timeIntervalSince(start)), notes: notes,
             deviceId: state.deviceId, platform: platform, updatedAtUtc: now, syncState: "pending"))
+        try save(next)
+    }
+    public func deleteSession(sessionId: UUID) throws {
+        guard let session = state.sessions.first(where: { $0.sessionId == sessionId }) else { throw TrackerError.missingSession }
+        guard session.endTimeUtc != nil, let seconds = session.durationSeconds, seconds >= 0, seconds < 60 else { throw TrackerError.cannotDelete }
+        var next = state
+        next.sessions.removeAll { $0.sessionId == sessionId }
         try save(next)
     }
     public func updateNotes(sessionId: UUID, notes: String, now: Date = Date()) throws {

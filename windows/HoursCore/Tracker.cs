@@ -67,6 +67,13 @@ public sealed class Tracker
             (long)(end - start).TotalSeconds, notes, State.DeviceId, "windows", (now ?? DateTimeOffset.UtcNow).ToUniversalTime());
         Commit(State with { Sessions = [..State.Sessions, session] });
     }
+    public void DeleteSession(Guid sessionId)
+    {
+        var session = State.Sessions.FirstOrDefault(s => s.SessionId == sessionId) ?? throw new InvalidOperationException("The session could not be found.");
+        if (session.EndTimeUtc == null || session.DurationSeconds is not (>= 0 and < 60))
+            throw new InvalidOperationException("Only completed sessions under one minute can be deleted.");
+        Commit(State with { Sessions = State.Sessions.Where(s => s.SessionId != sessionId).ToArray() });
+    }
     public void UpdateNotes(Guid sessionId, string notes, DateTimeOffset? now = null)
     {
         var session = State.Sessions.FirstOrDefault(s => s.SessionId == sessionId)

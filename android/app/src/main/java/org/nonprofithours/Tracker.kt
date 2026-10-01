@@ -73,6 +73,11 @@ class Tracker(initial: TrackerState, private val save: (TrackerState) -> Unit) {
             notes = notes, deviceId = state.deviceId, updatedAtUtc = now.toString())
         commit(state.copy(sessions = state.sessions + session))
     }
+    fun deleteSession(sessionId: String) {
+        val session = requireNotNull(state.sessions.find { it.sessionId == sessionId }) { "The session could not be found." }
+        require(session.endTimeUtc != null && session.durationSeconds != null && session.durationSeconds in 0L..59L) { "Only completed sessions under one minute can be deleted." }
+        commit(state.copy(sessions = state.sessions.filter { it.sessionId != sessionId }))
+    }
     fun updateNotes(sessionId: String, notes: String, now: Instant = Instant.now()) {
         require(state.sessions.any { it.sessionId == sessionId }) { "The session could not be found." }
         commit(state.copy(sessions = state.sessions.map {

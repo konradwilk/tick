@@ -2,6 +2,26 @@ import XCTest
 @testable import HoursCore
 
 final class TrackerTests: XCTestCase {
+    func testDeleteOnlyShortCompletedSessions() throws {
+        let file = location()
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+        let tracker = try Tracker(file: file)
+        let id = try tracker.addNonprofit("Kitchen")
+        let start = Date(timeIntervalSince1970: 0)
+        for seconds in [0, 59, 60] {
+            try tracker.start(nonprofitId: id, notes: "Short", now: start)
+            let sessionId = try XCTUnwrap(tracker.state.active?.sessionId)
+            XCTAssertThrowsError(try tracker.deleteSession(sessionId: sessionId))
+            try tracker.stop(now: start.addingTimeInterval(Double(seconds)))
+            if seconds < 60 {
+                try tracker.deleteSession(sessionId: sessionId)
+                XCTAssertTrue(try Tracker(file: file).state.sessions.isEmpty)
+                XCTAssertEqual(tracker.clipboardText(), "")
+                XCTAssertFalse(tracker.csv().contains("Short"))
+            } else { XCTAssertThrowsError(try tracker.deleteSession(sessionId: sessionId)) }
+        }
+        XCTAssertThrowsError(try tracker.deleteSession(sessionId: UUID()))
+    }
     func testManualSessionPersistsWithoutStoppingTimer() throws {
         let file = location()
         defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }

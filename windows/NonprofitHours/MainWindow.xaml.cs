@@ -70,10 +70,15 @@ public sealed partial class MainWindow : Window
         Total.Text = $"Completed: {state.Sessions.Sum(s => s.DurationSeconds ?? 0) / 3600.0:F2} hours";
         UpdateReport();
         History.ItemsSource = state.Sessions.Reverse().Select(s => new HistoryEntry(s.SessionId,
-            $"{s.NonprofitName} — {s.StartTimeUtc.ToLocalTime():g}\n{(s.DurationSeconds is long seconds ? Elapsed(seconds) : "In progress")}\n{s.Notes}", s.EndTimeUtc != null)).ToArray();
+            $"{s.NonprofitName} — {s.StartTimeUtc.ToLocalTime():g}\n{(s.DurationSeconds is long seconds ? Elapsed(seconds) : "In progress")}\n{s.Notes}", s.EndTimeUtc != null,
+            s.EndTimeUtc != null && s.DurationSeconds is >= 0 and < 60 ? Visibility.Visible : Visibility.Collapsed)).ToArray();
         UpdateClock();
     }
-    public record HistoryEntry(Guid SessionId, string Summary, bool CanEdit);
+    public record HistoryEntry(Guid SessionId, string Summary, bool CanEdit, Visibility DeleteVisibility);
+    private void DeleteSession(object sender, RoutedEventArgs args)
+    {
+        if (tracker != null && sender is Button { Tag: Guid id }) Perform(() => tracker.DeleteSession(id));
+    }
     private async void AddManualSession(object sender, RoutedEventArgs args)
     {
         if (tracker == null) return;

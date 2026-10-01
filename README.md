@@ -62,7 +62,12 @@ and durations longer than 24 hours are not wrapped. A confirmation appears after
 copying. iOS and macOS compile the same tracking and export implementation.
 
 In session history, choose **Edit notes** on a completed session in Windows,
-macOS, iOS, Android, or Linux. **Save** persists the edited notes and includes them in
+macOS, iOS, Android, or Linux. Completed sessions under one minute also show
+**Delete** beside **Edit notes**; deleting removes them from history, totals,
+and future exports and summaries. Sessions lasting exactly one minute or longer
+and active sessions cannot be deleted.
+
+In the notes editor, **Save** persists the edited notes and includes them in
 future CSV exports; **Cancel** discards the draft. Times and recorded hours stay
 unchanged. If saving fails, the editor keeps your draft available to retry.
 See [iPhone and iPad setup](apple/iOS/README.md) for the Xcode project and build
