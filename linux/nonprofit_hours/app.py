@@ -122,13 +122,36 @@ class HoursWindow(Gtk.ApplicationWindow):
             content.append(Gtk.Label(label="Add a nonprofit in Settings first.", xalign=0))
         entries = []
         now = datetime.now().replace(second=0, microsecond=0)
+        start = now - timedelta(hours=1)
         for label, text in [("What did you work on?", ""),
-                            ("Started (YYYY-MM-DD HH:MM)", (now - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M")),
-                            ("Ended (YYYY-MM-DD HH:MM)", now.strftime("%Y-%m-%d %H:%M"))]:
+                            ("Started (YYYY-MM-DD HH:MM)", start.strftime("%Y-%m-%d %H:%M")),
+                            ("Ended (YYYY-MM-DD HH:MM)", (start + timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M"))]:
             content.append(Gtk.Label(label=label, xalign=0))
             entry = Gtk.Entry(text=text)
             entries.append(entry)
             content.append(entry)
+        end_edited = False
+        updating_end = False
+
+        def end_changed(_):
+            nonlocal end_edited
+            if not updating_end:
+                end_edited = True
+
+        def start_changed(entry):
+            nonlocal updating_end
+            if end_edited:
+                return
+            try:
+                suggested = datetime.strptime(entry.get_text(), "%Y-%m-%d %H:%M") + timedelta(minutes=15)
+            except ValueError:
+                return
+            updating_end = True
+            entries[2].set_text(suggested.strftime("%Y-%m-%d %H:%M"))
+            updating_end = False
+
+        entries[1].connect("changed", start_changed)
+        entries[2].connect("changed", end_changed)
         content.append(Gtk.Label(label="Times use your local timezone (24-hour).", xalign=0))
         error = Gtk.Label(xalign=0, wrap=True)
         content.append(error)

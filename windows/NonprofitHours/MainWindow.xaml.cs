@@ -86,12 +86,27 @@ public sealed partial class MainWindow : Window
             SelectedItem = Nonprofits.SelectedItem ?? tracker.State.Nonprofits.FirstOrDefault(), HorizontalAlignment = HorizontalAlignment.Stretch };
         var activity = new TextBox { Header = "What did you work on?", AcceptsReturn = true, TextWrapping = TextWrapping.Wrap };
         var current = DateTime.Now;
-        var end = current.Date.AddHours(current.Hour).AddMinutes(current.Minute);
-        var start = end.AddHours(-1);
+        var start = current.Date.AddHours(current.Hour).AddMinutes(current.Minute).AddHours(-1);
+        var end = start.AddMinutes(15);
         var startDate = new CalendarDatePicker { Header = "Start date", Date = start };
         var startTime = new TimePicker { Header = "Start time", Time = start.TimeOfDay };
         var endDate = new CalendarDatePicker { Header = "End date", Date = end };
         var endTime = new TimePicker { Header = "End time", Time = end.TimeOfDay };
+        var endEdited = false;
+        var updatingEnd = false;
+        void UpdateDefaultEnd()
+        {
+            if (endEdited || startDate.Date == null || startTime.SelectedTime == null) return;
+            var suggested = (startDate.Date.Value.Date + startTime.Time).AddMinutes(15);
+            updatingEnd = true;
+            endDate.Date = suggested;
+            endTime.Time = suggested.TimeOfDay;
+            updatingEnd = false;
+        }
+        startDate.DateChanged += (_, _) => UpdateDefaultEnd();
+        startTime.TimeChanged += (_, _) => UpdateDefaultEnd();
+        endDate.DateChanged += (_, _) => { if (!updatingEnd) endEdited = true; };
+        endTime.TimeChanged += (_, _) => { if (!updatingEnd) endEdited = true; };
         var error = new TextBlock { TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush(Colors.Firebrick) };
         var content = new StackPanel { Spacing = 12 };
         foreach (var control in new UIElement[] { nonprofit, activity, new TextBlock { Text = "Times use your local timezone." }, startDate, startTime, endDate, endTime, error }) content.Children.Add(control);

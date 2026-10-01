@@ -23,7 +23,9 @@ Use **Settings** for adding nonprofits and choosing the data folder.
 In all five apps, choose **Settings → Add session by hand** to record completed
 work. Select a nonprofit, describe what you worked on, and enter the start and end
 dates and times in your local timezone. Add the nonprofit in Settings first if
-needed. The end must be after the start. Saving adds the session to history,
+needed. The end defaults to 15 minutes after the start and follows start changes
+until you edit the end yourself, moving to the next day when needed. The end must
+be after the start. Saving adds the session to history,
 totals, CSV exports, and summaries; a running timer continues unchanged.
 
 CSV export in Windows, macOS, iOS, Android, and Linux offers **Daily**, **Weekly**, and

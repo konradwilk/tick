@@ -78,7 +78,8 @@ class MainActivity : ComponentActivity() {
         var manualNotes by rememberSaveable { mutableStateOf("") }
         val manualFormat = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm").withResolverStyle(java.time.format.ResolverStyle.STRICT)
         var manualStart by rememberSaveable { mutableStateOf(LocalDateTime.now().minusHours(1).format(manualFormat)) }
-        var manualEnd by rememberSaveable { mutableStateOf(LocalDateTime.now().format(manualFormat)) }
+        var manualEnd by rememberSaveable { mutableStateOf(LocalDateTime.parse(manualStart, manualFormat).plusMinutes(15).format(manualFormat)) }
+        var manualEndEdited by rememberSaveable { mutableStateOf(false) }
         var manualError by remember { mutableStateOf<String?>(null) }
         val reportRange = runCatching { ExportRange.forDate(ExportPeriod.valueOf(reportPeriod), LocalDate.parse(reportDate)) }.getOrNull()
         val reportCount = reportRange?.let { tracker.exportSessions(it).size } ?: 0
@@ -122,8 +123,12 @@ class MainActivity : ComponentActivity() {
                 if (state.nonprofits.isEmpty()) Text("Add a nonprofit in Settings first.")
                 OutlinedTextField(manualNotes, { manualNotes = it }, label = { Text("What did you work on?") }, minLines = 2)
                 Text("Local dates and times: YYYY-MM-DD HH:mm (24-hour)")
-                OutlinedTextField(manualStart, { manualStart = it }, label = { Text("Started") }, singleLine = true)
-                OutlinedTextField(manualEnd, { manualEnd = it }, label = { Text("Ended") }, singleLine = true)
+                OutlinedTextField(manualStart, {
+                    manualStart = it
+                    if (!manualEndEdited) runCatching { LocalDateTime.parse(it, manualFormat).plusMinutes(15).format(manualFormat) }
+                        .onSuccess { suggested -> manualEnd = suggested }
+                }, label = { Text("Started") }, singleLine = true)
+                OutlinedTextField(manualEnd, { manualEnd = it; manualEndEdited = true }, label = { Text("Ended") }, singleLine = true)
                 manualError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             } },
             confirmButton = { TextButton(onClick = {

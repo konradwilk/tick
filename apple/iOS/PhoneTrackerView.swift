@@ -10,6 +10,8 @@ import UIKit
     @State private var manualNotes = ""
     @State private var manualStart = Date().addingTimeInterval(-3600)
     @State private var manualEnd = Date()
+    @State private var manualDatesInitialized = false
+    @State private var manualEndEdited = false
     @State private var manualStatus = ""
     @State private var period = ExportPeriod.monthly
     @State private var date = Date()
@@ -141,8 +143,13 @@ import UIKit
                     ForEach(model.state.nonprofits) { Text($0.name).tag(Optional($0.id)) }
                 }
                 TextField("What did you work on?", text: $manualNotes, axis: .vertical)
-                DatePicker("Started", selection: $manualStart, displayedComponents: [.date, .hourAndMinute])
-                DatePicker("Ended", selection: $manualEnd, displayedComponents: [.date, .hourAndMinute])
+                DatePicker("Started", selection: Binding(get: { manualStart }, set: {
+                    manualStart = $0
+                    if !manualEndEdited { manualEnd = $0.addingTimeInterval(900) }
+                }), displayedComponents: [.date, .hourAndMinute])
+                DatePicker("Ended", selection: Binding(get: { manualEnd }, set: {
+                    manualEnd = $0; manualEndEdited = true
+                }), displayedComponents: [.date, .hourAndMinute])
                 Text("Times use your local timezone.").font(.caption)
                 Button("Save session") {
                     model.perform { tracker in
@@ -158,6 +165,12 @@ import UIKit
                 if !manualStatus.isEmpty { Text(manualStatus).font(.caption) }
             }.padding(.top, 8)
         }.disabled(model.tracker == nil)
+            .onAppear {
+                if !manualDatesInitialized {
+                    manualEnd = manualStart.addingTimeInterval(900)
+                    manualDatesInitialized = true
+                }
+            }
     }
     private var settingsView: some View {
         NavigationStack {
