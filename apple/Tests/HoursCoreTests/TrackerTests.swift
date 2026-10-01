@@ -35,28 +35,32 @@ final class TrackerTests: XCTestCase {
         try tracker.start(nonprofitId: id, now: Date(timeIntervalSince1970: 0))
         try tracker.stop(now: Date(timeIntervalSince1970: 1423))
         let sessionId = try XCTUnwrap(tracker.state.sessions.first?.sessionId)
-        for (notes, expected) in [("", "No notes"), (" \t\r\n ", "No notes"),
-            ("Annual meeting\nGoogle Fi", "Annual meeting, Google Fi"),
-            ("Annual meeting\rGoogle Fi", "Annual meeting, Google Fi"),
-            (" Annual meeting\r\n \r\nGoogle Fi ", "Annual meeting, Google Fi")] {
+        for (notes, expected) in [("", "No notes   00:23:43"), (" \t\r\n ", "No notes   00:23:43"),
+            ("Annual meeting, Google Fi,Cooking,Etc", "Annual meeting   00:05:56\nCooking   00:05:56\nEtc   00:05:55\nGoogle Fi   00:05:56"),
+            ("Meals,, Meals, ", "Meals   00:23:43"), (", ,", "No notes   00:23:43"),
+            ("Annual meeting\nGoogle Fi", "Annual meeting   00:11:52\nGoogle Fi   00:11:51"),
+            ("Annual meeting\rGoogle Fi", "Annual meeting   00:11:52\nGoogle Fi   00:11:51"),
+            (" Annual meeting\r\n \r\nGoogle Fi ", "Annual meeting   00:11:52\nGoogle Fi   00:11:51")] {
             try tracker.updateNotes(sessionId: sessionId, notes: notes)
-            XCTAssertEqual(tracker.clipboardText(), "NEST 00:23:43:\n\(expected)   00:23:43")
+            XCTAssertEqual(tracker.clipboardText(), "NEST 00:23:43:\n\(expected)")
             XCTAssertEqual(tracker.state.sessions.first?.notes, notes)
         }
     }
-    func testClipboardGroupsTotalsAndListsEachNoteInTimeOrder() throws {
+    func testClipboardCombinesDescriptionsAndSortsAlphabetically() throws {
         let file = location()
         defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
         let tracker = try Tracker(file: file)
         let kitchen = try tracker.addNonprofit("Kitchen")
         let garden = try tracker.addNonprofit("Garden")
         var start = Date(timeIntervalSince1970: 0)
-        for (id, notes, seconds) in [(kitchen, "Meals", 3600.0), (garden, "Planting", 1800.0), (kitchen, "Cleanup", 2700.0)] {
+        for (id, notes, seconds) in [(kitchen, "Meals", 3600.0), (garden, "Planting", 1800.0), (kitchen, "Cleanup", 2700.0), (kitchen, " Cleanup ", 60.0), (kitchen, "", 1.0), (kitchen, " \n ", 2.0), (garden, "Cleanup", 120.0)] {
             try tracker.start(nonprofitId: id, notes: notes, now: start)
             start = start.addingTimeInterval(seconds)
             try tracker.stop(now: start)
         }
-        XCTAssertEqual(tracker.clipboardText(), "Kitchen 01:45:00:\nMeals   01:00:00\nCleanup   00:45:00\n\nGarden 00:30:00:\nPlanting   00:30:00")
+        XCTAssertEqual(tracker.clipboardText(), "Kitchen 01:46:03:\nCleanup   00:46:00\nMeals   01:00:00\nNo notes   00:00:03\n\nGarden 00:32:00:\nCleanup   00:02:00\nPlanting   00:30:00")
+        XCTAssertEqual(tracker.exportSessions().count, 7)
+        XCTAssertTrue(tracker.csv().contains(" Cleanup "))
     }
     func testPeriodExportsAndClipboard() throws {
         let file = location()
@@ -76,7 +80,7 @@ final class TrackerTests: XCTestCase {
         let zone = try XCTUnwrap(TimeZone(secondsFromGMT: 7200))
         let range = ExportRange(period: .daily, date: start, timeZone: zone)
         XCTAssertEqual(tracker.exportSessions(range: range).count, 1)
-        XCTAssertEqual(tracker.clipboardText(range: range), "Kitchen 25:00:00:\nMeals, \"served\", Cleanup 🍲   25:00:00")
+        XCTAssertEqual(tracker.clipboardText(range: range), "Kitchen 25:00:00:\n\"served\"   08:20:00\nCleanup 🍲   08:20:00\nMeals   08:20:00")
         XCTAssertFalse(tracker.csv(range: range).contains("Outside"))
         XCTAssertFalse(tracker.csv(range: range).contains("End boundary"))
         XCTAssertFalse(tracker.csv(range: range).contains("Active"))

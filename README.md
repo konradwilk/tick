@@ -43,17 +43,21 @@ disable export and copy.
 
 **Copy summary** groups the selected sessions by nonprofit. Each
 heading contains its name and total duration for the selected period, followed
-by each session's notes and duration in chronological order:
+by descriptions in alphabetical order. Sessions with the same displayed
+description are combined into one entry with their durations added together:
 
 ```text
 Kitchen 01:45:00:
-Meals   01:00:00
 Cleanup   00:45:00
+Meals   01:00:00
 ```
 
 Durations use `HH:MM:SS`. Empty or whitespace-only notes display as **No notes**.
-Clipboard notes are trimmed and nonempty lines are joined with a comma and one
-space, so each session occupies one line. Saved notes and CSV retain the original text,
+Clipboard notes are split into activities at commas and line breaks, with whitespace
+trimmed and empty activities ignored. Each session's seconds are divided equally
+among its activities; leftover seconds go to the first activities in their original
+order so the total stays exact. Shares are then combined by description. Matching is case-sensitive; alphabetical
+sorting ignores case. Saved notes and CSV retain the original text and individual sessions,
 and durations longer than 24 hours are not wrapped. A confirmation appears after
 copying. iOS and macOS compile the same tracking and export implementation.
 

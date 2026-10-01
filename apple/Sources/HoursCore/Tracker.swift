@@ -151,10 +151,10 @@ public final class Tracker {
         }.sorted { $0.startTimeUtc < $1.startTimeUtc }
     }
     public func clipboardText(range: ExportRange? = nil) -> String {
-        func notes(_ value: String) -> String {
-            let lines = value.components(separatedBy: .newlines)
+        func activities(_ value: String) -> [String] {
+            let lines = value.components(separatedBy: CharacterSet.newlines.union(CharacterSet(charactersIn: ",")))
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
-            return lines.isEmpty ? "No notes" : lines.joined(separator: ", ")
+            return lines.isEmpty ? ["No notes"] : lines
         }
         func duration(_ seconds: Int) -> String {
             String(format: "%02d:%02d:%02d", seconds / 3600, seconds % 3600 / 60, seconds % 60)
@@ -166,8 +166,21 @@ public final class Tracker {
             guard seen.insert(session.nonprofitId).inserted else { return nil }
             let group = groups[session.nonprofitId]!
             let total = group.reduce(0) { $0 + ($1.durationSeconds ?? 0) }
-            return "\(session.nonprofitName) \(duration(total)):\n" + group.map {
-                "\(notes($0.notes))   \(duration($0.durationSeconds ?? 0))"
+            var descriptions: [String: Int] = [:]
+            for entry in group {
+                let names = activities(entry.notes)
+                let seconds = entry.durationSeconds ?? 0
+                for (index, name) in names.enumerated() {
+                    descriptions[name, default: 0] += seconds / names.count + (index < seconds % names.count ? 1 : 0)
+                }
+            }
+            let names = descriptions.keys.sorted {
+                let left = $0.lowercased(), right = $1.lowercased()
+                return left == right ? $0 < $1 : left < right
+            }
+            return "\(session.nonprofitName) \(duration(total)):\n" + names.map { name in
+                let seconds = descriptions[name]!
+                return "\(name)   \(duration(seconds))"
             }.joined(separator: "\n")
         }.joined(separator: "\n\n")
     }

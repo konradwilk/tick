@@ -39,24 +39,28 @@ class TrackerTests(unittest.TestCase):
         self.tracker.start(nonprofit, now=self.start)
         self.tracker.stop(self.start + timedelta(seconds=1423))
         session_id = self.tracker.state["sessions"][0]["sessionId"]
-        for notes, expected in [("", "No notes"), (" \t\r\n ", "No notes"),
-                                ("Annual meeting\nGoogle Fi", "Annual meeting, Google Fi"),
-                                ("Annual meeting\rGoogle Fi", "Annual meeting, Google Fi"),
-                                (" Annual meeting\r\n \r\nGoogle Fi ", "Annual meeting, Google Fi")]:
+        for notes, expected in [("", "No notes   00:23:43"), (" \t\r\n ", "No notes   00:23:43"),
+                                ("Annual meeting, Google Fi,Cooking,Etc", "Annual meeting   00:05:56\nCooking   00:05:56\nEtc   00:05:55\nGoogle Fi   00:05:56"),
+                                ("Meals,, Meals, ", "Meals   00:23:43"), (", ,", "No notes   00:23:43"),
+                                ("Annual meeting\nGoogle Fi", "Annual meeting   00:11:52\nGoogle Fi   00:11:51"),
+                                ("Annual meeting\rGoogle Fi", "Annual meeting   00:11:52\nGoogle Fi   00:11:51"),
+                                (" Annual meeting\r\n \r\nGoogle Fi ", "Annual meeting   00:11:52\nGoogle Fi   00:11:51")]:
             with self.subTest(notes=notes):
                 self.tracker.update_notes(session_id, notes)
-                self.assertEqual(self.tracker.clipboard_text(), f"NEST 00:23:43:\n{expected}   00:23:43")
+                self.assertEqual(self.tracker.clipboard_text(), f"NEST 00:23:43:\n{expected}")
                 self.assertEqual(self.tracker.state["sessions"][0]["notes"], notes)
-    def test_clipboard_groups_totals_and_lists_each_note_in_time_order(self):
+    def test_clipboard_combines_descriptions_and_sorts_alphabetically(self):
         kitchen = self.tracker.add_nonprofit("Kitchen")
         garden = self.tracker.add_nonprofit("Garden")
         start = self.start
-        for nonprofit, notes, seconds in [(kitchen, "Meals", 3600), (garden, "Planting", 1800), (kitchen, "Cleanup", 2700)]:
+        for nonprofit, notes, seconds in [(kitchen, "Meals", 3600), (garden, "Planting", 1800), (kitchen, "Cleanup", 2700), (kitchen, " Cleanup ", 60), (kitchen, "", 1), (kitchen, " \n ", 2), (garden, "Cleanup", 120)]:
             self.tracker.start(nonprofit, notes, start)
             start += timedelta(seconds=seconds)
             self.tracker.stop(start)
         self.assertEqual(self.tracker.clipboard_text(),
-                         "Kitchen 01:45:00:\nMeals   01:00:00\nCleanup   00:45:00\n\nGarden 00:30:00:\nPlanting   00:30:00")
+                         "Kitchen 01:46:03:\nCleanup   00:46:00\nMeals   01:00:00\nNo notes   00:00:03\n\nGarden 00:32:00:\nCleanup   00:02:00\nPlanting   00:30:00")
+        self.assertEqual(len(self.tracker.export_sessions()), 7)
+        self.assertIn(" Cleanup ", self.tracker.csv())
     def test_export_period_boundaries(self):
         for period, day, start, end in [
             ("Daily", "2024-02-29", "2024-02-29", "2024-03-01"),
@@ -78,7 +82,7 @@ class TrackerTests(unittest.TestCase):
         day = date(2025, 1, 1)
         rows = list(csv.DictReader(io.StringIO(self.tracker.csv("Daily", day, zone))))
         self.assertEqual([row["notes"] for row in rows], [notes])
-        self.assertEqual(self.tracker.clipboard_text("Daily", day, zone), 'Kitchen 25:00:00:\nMeals, "served", Cleanup 🍲   25:00:00')
+        self.assertEqual(self.tracker.clipboard_text("Daily", day, zone), 'Kitchen 25:00:00:\n"served"   08:20:00\nCleanup 🍲   08:20:00\nMeals   08:20:00')
         self.assertEqual(self.tracker.clipboard_text("Daily", date(2025, 1, 3), zone), "")
         self.assertEqual(len(self.tracker.export_sessions("Monthly", day, zone)), 2)
         self.assertEqual(len(self.tracker.export_sessions("Weekly", day, zone)), 3)

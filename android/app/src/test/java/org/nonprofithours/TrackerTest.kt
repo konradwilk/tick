@@ -36,29 +36,33 @@ class TrackerTest {
         assertEquals(original, failing.state)
     }
     @Test fun clipboardNormalizesNotesWithoutChangingStoredText() {
-        for ((notes, expected) in listOf("" to "No notes", " \t\r\n " to "No notes",
-            "Annual meeting\nGoogle Fi" to "Annual meeting, Google Fi",
-            "Annual meeting\rGoogle Fi" to "Annual meeting, Google Fi",
-            " Annual meeting\r\n \r\nGoogle Fi " to "Annual meeting, Google Fi")) {
+        for ((notes, expected) in listOf("" to "No notes   00:23:43", " \t\r\n " to "No notes   00:23:43",
+            "Annual meeting, Google Fi,Cooking,Etc" to "Annual meeting   00:05:56\nCooking   00:05:56\nEtc   00:05:55\nGoogle Fi   00:05:56",
+            "Meals,, Meals, " to "Meals   00:23:43", ", ," to "No notes   00:23:43",
+            "Annual meeting\nGoogle Fi" to "Annual meeting   00:11:52\nGoogle Fi   00:11:51",
+            "Annual meeting\rGoogle Fi" to "Annual meeting   00:11:52\nGoogle Fi   00:11:51",
+            " Annual meeting\r\n \r\nGoogle Fi " to "Annual meeting   00:11:52\nGoogle Fi   00:11:51")) {
             val tracker = Tracker(TrackerState()) {}
             val id = tracker.addNonprofit("NEST")
             tracker.start(id, notes, Instant.EPOCH)
             tracker.stop(Instant.EPOCH.plusSeconds(1423))
-            assertEquals("NEST 00:23:43:\n$expected   00:23:43", tracker.clipboardText())
+            assertEquals("NEST 00:23:43:\n$expected", tracker.clipboardText())
             assertEquals(notes, tracker.state.sessions.single().notes)
         }
     }
-    @Test fun clipboardGroupsTotalsAndListsEachNoteInTimeOrder() {
+    @Test fun clipboardCombinesDescriptionsAndSortsAlphabetically() {
         val tracker = Tracker(TrackerState()) {}
         val kitchen = tracker.addNonprofit("Kitchen")
         val garden = tracker.addNonprofit("Garden")
         var start = Instant.EPOCH
-        for ((id, notes, seconds) in listOf(Triple(kitchen, "Meals", 3600L), Triple(garden, "Planting", 1800L), Triple(kitchen, "Cleanup", 2700L))) {
+        for ((id, notes, seconds) in listOf(Triple(kitchen, "Meals", 3600L), Triple(garden, "Planting", 1800L), Triple(kitchen, "Cleanup", 2700L), Triple(kitchen, " Cleanup ", 60L), Triple(kitchen, "", 1L), Triple(kitchen, " \n ", 2L), Triple(garden, "Cleanup", 120L))) {
             tracker.start(id, notes, start)
             start = start.plusSeconds(seconds)
             tracker.stop(start)
         }
-        assertEquals("Kitchen 01:45:00:\nMeals   01:00:00\nCleanup   00:45:00\n\nGarden 00:30:00:\nPlanting   00:30:00", tracker.clipboardText())
+        assertEquals("Kitchen 01:46:03:\nCleanup   00:46:00\nMeals   01:00:00\nNo notes   00:00:03\n\nGarden 00:32:00:\nCleanup   00:02:00\nPlanting   00:30:00", tracker.clipboardText())
+        assertEquals(7, tracker.exportSessions().size)
+        assertTrue(tracker.csv().contains(" Cleanup "))
     }
     @Test fun exportPeriodsAndClipboard() {
         assertEquals(ExportRange(LocalDate.parse("2024-12-30"), LocalDate.parse("2025-01-06")),
@@ -79,7 +83,7 @@ class TrackerTest {
         val range = ExportRange.forDate(ExportPeriod.Daily, LocalDate.parse("2025-01-01"))
         val zone = ZoneId.of("+02:00")
         assertEquals(1, tracker.exportSessions(range, zone).size)
-        assertEquals("Kitchen 25:00:00:\nMeals, \"served\", Cleanup 🍲   25:00:00", tracker.clipboardText(range, zone))
+        assertEquals("Kitchen 25:00:00:\n\"served\"   08:20:00\nCleanup 🍲   08:20:00\nMeals   08:20:00", tracker.clipboardText(range, zone))
         assertFalse(tracker.csv(range, zone).contains("Outside"))
         assertFalse(tracker.csv(range, zone).contains("Active"))
         assertFalse(tracker.csv(range, zone).contains("End boundary"))

@@ -85,13 +85,18 @@ class Tracker(initial: TrackerState, private val save: (TrackerState) -> Unit) {
             it.endTimeUtc != null && (range == null || (!day.isBefore(range.start) && day.isBefore(range.end)))
         }.sortedBy { Instant.parse(it.startTimeUtc) }
     fun clipboardText(range: ExportRange? = null, zone: ZoneId = ZoneId.systemDefault()): String {
-        fun notes(value: String) = value.split('\r', '\n').map { it.trim() }.filter { it.isNotEmpty() }
-            .joinToString(", ").ifEmpty { "No notes" }
+        fun activities(session: Session): List<Pair<String, Long>> {
+            val names = session.notes.split(',', '\r', '\n').map { it.trim() }.filter { it.isNotEmpty() }.ifEmpty { listOf("No notes") }
+            val seconds = session.durationSeconds ?: 0
+            return names.mapIndexed { index, name -> name to (seconds / names.size + if (index < seconds % names.size) 1 else 0) }
+        }
         fun duration(seconds: Long) = "%02d:%02d:%02d".format(java.util.Locale.ROOT,
             seconds / 3600, seconds % 3600 / 60, seconds % 60)
         return exportSessions(range, zone).groupBy { it.nonprofitId }.values.joinToString("\n\n") { sessions ->
             "${sessions.first().nonprofitName} ${duration(sessions.sumOf { it.durationSeconds ?: 0 })}:\n" +
-                sessions.joinToString("\n") { "${notes(it.notes)}   ${duration(it.durationSeconds ?: 0)}" }
+                sessions.flatMap { activities(it) }.groupBy { it.first }.entries
+                    .sortedWith(compareBy<Map.Entry<String, List<Pair<String, Long>>>> { it.key.lowercase(java.util.Locale.ROOT) }.thenBy { it.key })
+                    .joinToString("\n") { "${it.key}   ${duration(it.value.sumOf { s -> s.second })}" }
         }
     }
     fun csv(range: ExportRange? = null, zone: ZoneId = ZoneId.systemDefault()): String {

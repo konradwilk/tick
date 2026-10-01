@@ -206,16 +206,24 @@ class Tracker:
                       key=lambda s: parse(s["startTimeUtc"]))
 
     def clipboard_text(self, period=None, day=None, zone=None):
-        def notes(value):
-            return ", ".join(line.strip() for line in value.splitlines() if line.strip()) or "No notes"
+        def activities(value):
+            return [part.strip() for line in value.splitlines() for part in line.split(",") if part.strip()] or ["No notes"]
 
         groups = {}
         for session in self.export_sessions(period, day, zone):
             groups.setdefault(session["nonprofitId"], []).append(session)
-        return "\n\n".join(
-            f"{sessions[0]['nonprofitName']} {elapsed(sum(s['durationSeconds'] for s in sessions))}:\n" +
-            "\n".join(f"{notes(s['notes'])}   {elapsed(s['durationSeconds'])}" for s in sessions)
-            for sessions in groups.values())
+        summaries = []
+        for sessions in groups.values():
+            descriptions = {}
+            for session in sessions:
+                names = activities(session["notes"])
+                share, remainder = divmod(session["durationSeconds"], len(names))
+                for index, name in enumerate(names):
+                    descriptions[name] = descriptions.get(name, 0) + share + (index < remainder)
+            lines = [f"{name}   {elapsed(descriptions[name])}"
+                     for name in sorted(descriptions, key=lambda name: (name.lower(), name))]
+            summaries.append(f"{sessions[0]['nonprofitName']} {elapsed(sum(s['durationSeconds'] for s in sessions))}:\n" + "\n".join(lines))
+        return "\n\n".join(summaries)
 
     def csv(self, period=None, day=None, zone=None):
         fields = ["nonprofitName", "startTimeUtc", "endTimeUtc",

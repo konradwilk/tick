@@ -30,33 +30,38 @@ public class TrackerTests
         Assert.Same(original, tracker.State);
     }
     [Theory]
-    [InlineData("", "No notes")]
-    [InlineData(" \t\r\n ", "No notes")]
-    [InlineData("Annual meeting\nGoogle Fi", "Annual meeting, Google Fi")]
-    [InlineData("Annual meeting\rGoogle Fi", "Annual meeting, Google Fi")]
-    [InlineData(" Annual meeting\r\n \r\nGoogle Fi ", "Annual meeting, Google Fi")]
+    [InlineData("", "No notes   00:23:43")]
+    [InlineData("Annual meeting, Google Fi,Cooking,Etc", "Annual meeting   00:05:56\nCooking   00:05:56\nEtc   00:05:55\nGoogle Fi   00:05:56")]
+    [InlineData("Meals,, Meals, ", "Meals   00:23:43")]
+    [InlineData(", ,", "No notes   00:23:43")]
+    [InlineData(" \t\r\n ", "No notes   00:23:43")]
+    [InlineData("Annual meeting\nGoogle Fi", "Annual meeting   00:11:52\nGoogle Fi   00:11:51")]
+    [InlineData("Annual meeting\rGoogle Fi", "Annual meeting   00:11:52\nGoogle Fi   00:11:51")]
+    [InlineData(" Annual meeting\r\n \r\nGoogle Fi ", "Annual meeting   00:11:52\nGoogle Fi   00:11:51")]
     public void ClipboardNormalizesNotesWithoutChangingStoredText(string notes, string expected)
     {
         var tracker = new Tracker(TrackerState.Empty(), _ => { });
         var id = tracker.AddNonprofit("NEST");
         tracker.Start(id, notes, DateTimeOffset.UnixEpoch);
         tracker.Stop(DateTimeOffset.UnixEpoch.AddSeconds(1423));
-        Assert.Equal($"NEST 00:23:43:\n{expected}   00:23:43", tracker.ClipboardText());
+        Assert.Equal($"NEST 00:23:43:\n{expected}", tracker.ClipboardText());
         Assert.Equal(notes, tracker.State.Sessions.Single().Notes);
     }
-    [Fact] public void ClipboardGroupsTotalsAndListsEachNoteInTimeOrder()
+    [Fact] public void ClipboardCombinesDescriptionsAndSortsAlphabetically()
     {
         var tracker = new Tracker(TrackerState.Empty(), _ => { });
         var kitchen = tracker.AddNonprofit("Kitchen");
         var garden = tracker.AddNonprofit("Garden");
         var start = DateTimeOffset.UnixEpoch;
-        foreach (var (id, notes, seconds) in new[] { (kitchen, "Meals", 3600), (garden, "Planting", 1800), (kitchen, "Cleanup", 2700) })
+        foreach (var (id, notes, seconds) in new[] { (kitchen, "Meals", 3600), (garden, "Planting", 1800), (kitchen, "Cleanup", 2700), (kitchen, " Cleanup ", 60), (kitchen, "", 1), (kitchen, " \n ", 2), (garden, "Cleanup", 120) })
         {
             tracker.Start(id, notes, start);
             start = start.AddSeconds(seconds);
             tracker.Stop(start);
         }
-        Assert.Equal("Kitchen 01:45:00:\nMeals   01:00:00\nCleanup   00:45:00\n\nGarden 00:30:00:\nPlanting   00:30:00", tracker.ClipboardText());
+        Assert.Equal("Kitchen 01:46:03:\nCleanup   00:46:00\nMeals   01:00:00\nNo notes   00:00:03\n\nGarden 00:32:00:\nCleanup   00:02:00\nPlanting   00:30:00", tracker.ClipboardText());
+        Assert.Equal(7, tracker.ExportSessions().Length);
+        Assert.Contains(" Cleanup ", tracker.Csv());
     }
     [Theory]
     [InlineData(ExportPeriod.Daily, "2024-02-29", "2024-02-29", "2024-03-01")]
@@ -82,7 +87,7 @@ public class TrackerTests
         var range = ExportRange.For(ExportPeriod.Daily, new DateOnly(2025, 1, 1));
         var zone = TimeZoneInfo.CreateCustomTimeZone("Test", TimeSpan.FromHours(2), "Test", "Test");
         Assert.Single(tracker.ExportSessions(range, zone));
-        Assert.Equal("Kitchen 25:00:00:\nMeals, \"served\", Cleanup 🍲   25:00:00", tracker.ClipboardText(range, zone));
+        Assert.Equal("Kitchen 25:00:00:\n\"served\"   08:20:00\nCleanup 🍲   08:20:00\nMeals   08:20:00", tracker.ClipboardText(range, zone));
         var csv = tracker.Csv(range, zone);
         Assert.Contains("Meals, \"\"served\"\"\nCleanup 🍲", csv);
         Assert.DoesNotContain("Outside", csv);

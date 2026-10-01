@@ -85,14 +85,18 @@ public sealed class Tracker
     public string ClipboardText(ExportRange? range = null, TimeZoneInfo? zone = null)
     {
         static string Duration(long seconds) => $"{seconds / 3600:00}:{seconds % 3600 / 60:00}:{seconds % 60:00}";
-        static string Notes(string notes)
+        static IEnumerable<(string Name, long Seconds)> Activities(Session session)
         {
-            var lines = notes.Split(new[] { '\r', '\n' }, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-            return lines.Length == 0 ? "No notes" : string.Join(", ", lines);
+            var names = session.Notes.Split(new[] { ',', '\r', '\n' }, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (names.Length == 0) names = ["No notes"];
+            var seconds = session.DurationSeconds ?? 0;
+            return names.Select((name, index) => (name, seconds / names.Length + (index < seconds % names.Length ? 1 : 0)));
         }
         return string.Join("\n\n", ExportSessions(range, zone).GroupBy(s => s.NonprofitId).Select(group =>
             $"{group.First().NonprofitName} {Duration(group.Sum(s => s.DurationSeconds ?? 0))}:\n" +
-            string.Join("\n", group.Select(s => $"{Notes(s.Notes)}   {Duration(s.DurationSeconds ?? 0)}"))));
+            string.Join("\n", group.SelectMany(Activities).GroupBy(s => s.Name, StringComparer.Ordinal)
+                .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase).ThenBy(g => g.Key, StringComparer.Ordinal)
+                .Select(g => $"{g.Key}   {Duration(g.Sum(s => s.Seconds))}"))));
     }
     public string Csv(ExportRange? range = null, TimeZoneInfo? zone = null)
     {
