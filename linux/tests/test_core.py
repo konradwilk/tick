@@ -12,6 +12,28 @@ from nonprofit_hours.core import FileStore, Tracker, data_path, elapsed, period_
 
 
 class TrackerTests(unittest.TestCase):
+    def test_manual_session_persists_exports_and_preserves_timer(self):
+        nonprofit = self.tracker.add_nonprofit("Kitchen")
+        self.tracker.start(nonprofit, "Active", self.start)
+        active = copy.deepcopy(self.tracker.active)
+        end = self.start + timedelta(hours=2)
+        self.tracker.add_session(nonprofit, "Meals", self.start, end)
+        restored = Tracker(FileStore(self.tracker.store.path))
+        self.assertEqual(restored.state, self.tracker.state)
+        self.assertEqual(self.tracker.active, active)
+        self.assertEqual(self.tracker.export_sessions()[0]["durationSeconds"], 7200)
+        self.assertIn("Meals", self.tracker.csv())
+        self.assertEqual(self.tracker.clipboard_text(), "Kitchen 02:00:00:\nMeals   02:00:00")
+        original = copy.deepcopy(self.tracker.state)
+        for args in [(nonprofit, "Meals", end, self.start), (nonprofit, "Meals", self.start, self.start),
+                     (nonprofit, " ", self.start, end), ("missing", "Meals", self.start, end)]:
+            with self.assertRaises(ValueError):
+                self.tracker.add_session(*args)
+        with patch.object(self.tracker.store, "save", side_effect=OSError("Disk full")):
+            with self.assertRaises(OSError):
+                self.tracker.add_session(nonprofit, "Meals", self.start, end)
+        self.assertEqual(original, self.tracker.state)
+
     def test_clipboard_normalizes_notes_without_changing_stored_text(self):
         nonprofit = self.tracker.add_nonprofit("NEST")
         self.tracker.start(nonprofit, now=self.start)

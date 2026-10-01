@@ -162,6 +162,23 @@ class Tracker:
             "platform": "linux", "updatedAtUtc": date, "syncState": "pending"})
         self.commit(state)
 
+    def add_session(self, nonprofit_id, notes, start, end, now=None):
+        nonprofit = next((n for n in self.state["nonprofits"] if n["id"] == nonprofit_id), None)
+        if nonprofit is None:
+            raise ValueError("Select a nonprofit.")
+        if not notes.strip():
+            raise ValueError("Enter what you worked on.")
+        start_text, end_text = timestamp(start), timestamp(end)
+        seconds = (parse(end_text) - parse(start_text)).total_seconds()
+        if seconds <= 0:
+            raise ValueError("End must be after start.")
+        state = copy.deepcopy(self.state)
+        state["sessions"].append({"sessionId": str(uuid4()), "nonprofitId": nonprofit_id,
+            "nonprofitName": nonprofit["name"], "startTimeUtc": start_text, "endTimeUtc": end_text,
+            "durationSeconds": int(seconds), "notes": notes, "deviceId": state["deviceId"],
+            "platform": "linux", "updatedAtUtc": timestamp(now), "syncState": "pending"})
+        self.commit(state)
+
     def update_notes(self, session_id, notes, now=None):
         state = copy.deepcopy(self.state)
         session = next((s for s in state["sessions"] if s["sessionId"] == session_id), None)

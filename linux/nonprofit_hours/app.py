@@ -97,6 +97,63 @@ class HoursWindow(Gtk.ApplicationWindow):
                 self.history.append(edit)
         self.update_clock()
 
+    def add_manual_session(self):
+        if self.tracker is None:
+            self.error.set_text("Load your data folder first.")
+            return
+        dialog = Gtk.Dialog(title="Add session by hand", transient_for=self, modal=True)
+        dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        dialog.add_button("Save", Gtk.ResponseType.ACCEPT)
+        content = dialog.get_content_area()
+        content.set_spacing(12)
+        for side in ("top", "bottom", "start", "end"):
+            getattr(content, "set_margin_" + side)(16)
+        nonprofits = list(self.tracker.state["nonprofits"])
+        content.append(Gtk.Label(label="Nonprofit", xalign=0))
+        nonprofit = Gtk.DropDown(model=Gtk.StringList.new([n["name"] for n in nonprofits]))
+        content.append(nonprofit)
+        if not nonprofits:
+            content.append(Gtk.Label(label="Add a nonprofit in Settings first.", xalign=0))
+        entries = []
+        now = datetime.now().replace(second=0, microsecond=0)
+        for label, text in [("What did you work on?", ""),
+                            ("Started (YYYY-MM-DD HH:MM)", (now - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M")),
+                            ("Ended (YYYY-MM-DD HH:MM)", now.strftime("%Y-%m-%d %H:%M"))]:
+            content.append(Gtk.Label(label=label, xalign=0))
+            entry = Gtk.Entry(text=text)
+            entries.append(entry)
+            content.append(entry)
+        content.append(Gtk.Label(label="Times use your local timezone (24-hour).", xalign=0))
+        error = Gtk.Label(xalign=0, wrap=True)
+        content.append(error)
+
+        def respond(_, response):
+            if response == Gtk.ResponseType.ACCEPT:
+                try:
+                    index = nonprofit.get_selected()
+                    if index >= len(nonprofits):
+                        raise ValueError("Select a nonprofit.")
+                    def local_time(entry):
+                        try:
+                            value = datetime.strptime(entry.get_text(), "%Y-%m-%d %H:%M")
+                        except ValueError:
+                            raise ValueError("Enter dates and times as YYYY-MM-DD HH:MM.")
+                        # Reject missing/repeated local wall times rather than silently shifting them.
+                        choices = [value.replace(fold=fold).astimezone(timezone.utc) for fold in (0, 1)]
+                        if choices[0] != choices[1] or choices[0].astimezone().replace(tzinfo=None) != value:
+                            raise ValueError("This local time is missing or repeated due to a clock change.")
+                        return choices[0]
+                    self.tracker.add_session(nonprofits[index]["id"], entries[0].get_text(), local_time(entries[1]), local_time(entries[2]))
+                    self.refresh()
+                    self.error.set_text("")
+                except Exception as problem:
+                    error.set_text(str(problem))
+                    return
+            dialog.destroy()
+        dialog.connect("response", respond)
+        dialog.present()
+        return dialog
+
     def edit_notes(self, session):
         dialog = Gtk.Dialog(title="Edit session notes", transient_for=self, modal=True)
         dialog.set_default_size(440, 300)

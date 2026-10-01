@@ -6,6 +6,11 @@ import UIKit
     @Bindable var model: PhoneModel
     @State private var newName = ""
     @State private var settings = false
+    @State private var manualNonprofit: UUID?
+    @State private var manualNotes = ""
+    @State private var manualStart = Date().addingTimeInterval(-3600)
+    @State private var manualEnd = Date()
+    @State private var manualStatus = ""
     @State private var period = ExportPeriod.monthly
     @State private var date = Date()
     @State private var choosingFolder = false
@@ -121,6 +126,32 @@ import UIKit
             }.frame(maxWidth: .infinity, alignment: .leading)
         }
     }
+    private var manualSessionForm: some View {
+        DisclosureGroup("Add session by hand") {
+            VStack(alignment: .leading, spacing: 12) {
+                Picker("Nonprofit", selection: $manualNonprofit) {
+                    Text("Choose a nonprofit").tag(nil as UUID?)
+                    ForEach(model.state.nonprofits) { Text($0.name).tag(Optional($0.id)) }
+                }
+                TextField("What did you work on?", text: $manualNotes, axis: .vertical)
+                DatePicker("Started", selection: $manualStart, displayedComponents: [.date, .hourAndMinute])
+                DatePicker("Ended", selection: $manualEnd, displayedComponents: [.date, .hourAndMinute])
+                Text("Times use your local timezone.").font(.caption)
+                Button("Save session") {
+                    model.perform { tracker in
+                        guard let id = manualNonprofit else { throw TrackerError.invalidNonprofit }
+                        try tracker.addSession(nonprofitId: id, notes: manualNotes, start: manualStart, end: manualEnd, platform: "ios")
+                        manualNotes = ""
+                        manualStatus = "Session saved."
+                    }
+                }.disabled(manualNonprofit == nil || manualNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || manualEnd <= manualStart)
+                if manualEnd <= manualStart { Text("End must be after start.").foregroundStyle(.red) }
+                if model.state.nonprofits.isEmpty { Text("Add a nonprofit in Settings first.").font(.caption) }
+                if let error = model.error { Text(error).foregroundStyle(.red) }
+                if !manualStatus.isEmpty { Text(manualStatus).font(.caption) }
+            }.padding(.top, 8)
+        }.disabled(model.tracker == nil)
+    }
     private var settingsView: some View {
         NavigationStack {
             Form {
@@ -129,6 +160,7 @@ import UIKit
                     Button("Add nonprofit") { model.perform { model.selected = try $0.addNonprofit(newName); newName = "" } }
                         .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }.disabled(model.tracker == nil || model.state.active != nil)
+                Section { manualSessionForm }
                 Section("Data location") {
                     Button("Choose data folder…") { choosingFolder = true }
                     Text(model.location).font(.caption)

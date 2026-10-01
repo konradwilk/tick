@@ -20,6 +20,12 @@ phones or narrow windows. Capture stays visible while the workspace scrolls.
 The report panel previews the exact summary produced by **Copy summary**.
 Use **Settings** for adding nonprofits and choosing the data folder.
 
+In all five apps, choose **Settings → Add session by hand** to record completed
+work. Select a nonprofit, describe what you worked on, and enter the start and end
+dates and times in your local timezone. Add the nonprofit in Settings first if
+needed. The end must be after the start. Saving adds the session to history,
+totals, CSV exports, and summaries; a running timer continues unchanged.
+
 CSV export in Windows, macOS, iOS, Android, and Linux offers **Daily**, **Weekly**, and
 **Monthly** periods. Choose a date within the desired period, check the displayed
 date range and completed-session count, then choose **Export CSV**. The file

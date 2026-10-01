@@ -8,6 +8,33 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 class TrackerTest {
+    @Test fun manualSessionPersistsAndPreservesTimer() {
+        val tracker = Tracker(TrackerState()) {}
+        val id = tracker.addNonprofit("Kitchen")
+        tracker.start(id, "Active", Instant.EPOCH)
+        val active = tracker.state.active
+        val end = Instant.EPOCH.plusSeconds(7200)
+        tracker.addSession(id, "Meals", Instant.EPOCH, end)
+        val restored = PortableData.decode(PortableData.encode(tracker.state))
+        assertEquals(active, restored.active)
+        assertEquals(7200L, tracker.exportSessions().single().durationSeconds)
+        assertTrue(tracker.csv().contains("Meals"))
+        assertEquals("Kitchen 02:00:00:\nMeals   02:00:00", tracker.clipboardText())
+        val original = tracker.state
+        for ((key, notes, start, stop) in listOf(
+            listOf(id, "Meals", end.toString(), Instant.EPOCH.toString()),
+            listOf(id, "Meals", Instant.EPOCH.toString(), Instant.EPOCH.toString()),
+            listOf(id, " ", Instant.EPOCH.toString(), end.toString()),
+            listOf("missing", "Meals", Instant.EPOCH.toString(), end.toString()))) {
+            try { tracker.addSession(key, notes, Instant.parse(start), Instant.parse(stop)); fail("Expected validation error") }
+            catch (_: IllegalArgumentException) {}
+        }
+        assertEquals(original, tracker.state)
+        val failing = Tracker(original) { throw java.io.IOException("Disk full") }
+        try { failing.addSession(id, "Meals", Instant.EPOCH, end); fail("Expected save error") }
+        catch (_: java.io.IOException) {}
+        assertEquals(original, failing.state)
+    }
     @Test fun clipboardNormalizesNotesWithoutChangingStoredText() {
         for ((notes, expected) in listOf("" to "No notes", " \t\r\n " to "No notes",
             "Annual meeting\nGoogle Fi" to "Annual meeting, Google Fi",

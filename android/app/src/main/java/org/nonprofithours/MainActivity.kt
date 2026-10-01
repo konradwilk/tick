@@ -16,6 +16,9 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -70,6 +73,13 @@ class MainActivity : ComponentActivity() {
         var reportDate by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
         var copyStatus by remember { mutableStateOf("") }
         var settings by remember { mutableStateOf(false) }
+        var manual by rememberSaveable { mutableStateOf(false) }
+        var manualId by rememberSaveable { mutableStateOf<String?>(null) }
+        var manualNotes by rememberSaveable { mutableStateOf("") }
+        val manualFormat = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm").withResolverStyle(java.time.format.ResolverStyle.STRICT)
+        var manualStart by rememberSaveable { mutableStateOf(LocalDateTime.now().minusHours(1).format(manualFormat)) }
+        var manualEnd by rememberSaveable { mutableStateOf(LocalDateTime.now().format(manualFormat)) }
+        var manualError by remember { mutableStateOf<String?>(null) }
         val reportRange = runCatching { ExportRange.forDate(ExportPeriod.valueOf(reportPeriod), LocalDate.parse(reportDate)) }.getOrNull()
         val reportCount = reportRange?.let { tracker.exportSessions(it).size } ?: 0
         fun action(block: () -> Unit) {
@@ -92,11 +102,48 @@ class MainActivity : ComponentActivity() {
                 OutlinedTextField(name, { name = it }, label = { Text("New nonprofit") }, enabled = active == null)
                 Button(onClick = { action { selected = tracker.addNonprofit(name); name = "" } }, enabled = active == null && name.isNotBlank()) { Text("Add nonprofit") }
                 OutlinedButton(onClick = chooseFolder) { Text("Data location…") }
+                OutlinedButton(onClick = { settings = false; manual = true; manualError = null }) { Text("Add session by hand…") }
                 Text(location, style = MaterialTheme.typography.bodySmall)
                 Text("All changes are saved here. Use one device at a time.", style = MaterialTheme.typography.bodySmall)
                 Text("Timing continues when the app closes. Reopen and press Stop to finish.", style = MaterialTheme.typography.bodySmall)
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             } }, confirmButton = { TextButton(onClick = { settings = false }) { Text("Done") } }
+        )
+        if (manual) AlertDialog(
+            onDismissRequest = { manual = false }, title = { Text("Add session by hand") },
+            text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Nonprofit")
+                state.nonprofits.forEach { nonprofit ->
+                    Row {
+                        RadioButton(selected = manualId == nonprofit.id, onClick = { manualId = nonprofit.id })
+                        TextButton(onClick = { manualId = nonprofit.id }) { Text(nonprofit.name) }
+                    }
+                }
+                if (state.nonprofits.isEmpty()) Text("Add a nonprofit in Settings first.")
+                OutlinedTextField(manualNotes, { manualNotes = it }, label = { Text("What did you work on?") }, minLines = 2)
+                Text("Local dates and times: YYYY-MM-DD HH:mm (24-hour)")
+                OutlinedTextField(manualStart, { manualStart = it }, label = { Text("Started") }, singleLine = true)
+                OutlinedTextField(manualEnd, { manualEnd = it }, label = { Text("Ended") }, singleLine = true)
+                manualError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            } },
+            confirmButton = { TextButton(onClick = {
+                try {
+                    fun localTime(value: String): Instant {
+                        val local = try { LocalDateTime.parse(value, manualFormat) }
+                            catch (_: Exception) { throw IllegalArgumentException("Enter dates and times as YYYY-MM-DD HH:mm.") }
+                        val offsets = ZoneId.systemDefault().rules.getValidOffsets(local)
+                        require(offsets.size == 1) { "This local time is missing or repeated due to a clock change. Choose an unambiguous time." }
+                        return local.toInstant(offsets.single())
+                    }
+                    tracker.addSession(requireNotNull(manualId) { "Select a nonprofit." }, manualNotes, localTime(manualStart), localTime(manualEnd))
+                    state = tracker.state
+                    manualNotes = ""
+                    manual = false
+                    error = null
+                    copyStatus = ""
+                } catch (e: Exception) { manualError = e.message ?: "Could not save session." }
+            }) { Text("Save") } },
+            dismissButton = { TextButton(onClick = { manual = false }) { Text("Cancel") } }
         )
         editingId?.let { sessionId ->
             AlertDialog(

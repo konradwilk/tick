@@ -58,6 +58,15 @@ public sealed class Tracker
         var completed = active with { EndTimeUtc = date, DurationSeconds = (long)(date - active.StartTimeUtc).TotalSeconds, UpdatedAtUtc = date };
         Commit(State with { Sessions = State.Sessions.Select(s => s.SessionId == active.SessionId ? completed : s).ToArray() });
     }
+    public void AddSession(Guid id, string notes, DateTimeOffset start, DateTimeOffset end, DateTimeOffset? now = null)
+    {
+        var nonprofit = State.Nonprofits.FirstOrDefault(n => n.Id == id) ?? throw new InvalidOperationException("Select a nonprofit.");
+        if (string.IsNullOrWhiteSpace(notes)) throw new InvalidOperationException("Enter what you worked on.");
+        if (end <= start) throw new InvalidOperationException("End must be after start.");
+        var session = new Session(Guid.NewGuid(), id, nonprofit.Name, start.ToUniversalTime(), end.ToUniversalTime(),
+            (long)(end - start).TotalSeconds, notes, State.DeviceId, "windows", (now ?? DateTimeOffset.UtcNow).ToUniversalTime());
+        Commit(State with { Sessions = [..State.Sessions, session] });
+    }
     public void UpdateNotes(Guid sessionId, string notes, DateTimeOffset? now = null)
     {
         var session = State.Sessions.FirstOrDefault(s => s.SessionId == sessionId)

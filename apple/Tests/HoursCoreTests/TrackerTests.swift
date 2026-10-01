@@ -2,6 +2,31 @@ import XCTest
 @testable import HoursCore
 
 final class TrackerTests: XCTestCase {
+    func testManualSessionPersistsWithoutStoppingTimer() throws {
+        let file = location()
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+        let tracker = try Tracker(file: file)
+        let id = try tracker.addNonprofit("Kitchen")
+        let start = Date(timeIntervalSince1970: 0)
+        let end = start.addingTimeInterval(7200)
+        try tracker.start(nonprofitId: id, notes: "Active", now: start)
+        let active = tracker.state.active?.sessionId
+        try tracker.addSession(nonprofitId: id, notes: "Meals", start: start, end: end, platform: "ios")
+        let restored = try Tracker(file: file)
+        XCTAssertEqual(restored.state.active?.sessionId, active)
+        XCTAssertEqual(restored.exportSessions().first?.durationSeconds, 7200)
+        XCTAssertEqual(restored.exportSessions().first?.platform, "ios")
+        XCTAssertTrue(restored.csv().contains("Meals"))
+        XCTAssertEqual(restored.clipboardText(), "Kitchen 02:00:00:\nMeals   02:00:00")
+        XCTAssertThrowsError(try tracker.addSession(nonprofitId: id, notes: "Meals", start: end, end: start))
+        XCTAssertThrowsError(try tracker.addSession(nonprofitId: id, notes: "Meals", start: start, end: start))
+        XCTAssertThrowsError(try tracker.addSession(nonprofitId: id, notes: " ", start: start, end: end))
+        XCTAssertThrowsError(try tracker.addSession(nonprofitId: UUID(), notes: "Meals", start: start, end: end))
+        XCTAssertEqual(tracker.state.sessions.count, 2)
+        try Data("changed".utf8).write(to: file)
+        XCTAssertThrowsError(try tracker.addSession(nonprofitId: id, notes: "Meals", start: start, end: end))
+        XCTAssertEqual(tracker.state.sessions.count, 2)
+    }
     func testClipboardNormalizesNotesWithoutChangingStoredText() throws {
         let file = location()
         defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }

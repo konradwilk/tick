@@ -54,12 +54,14 @@ public struct TrackerState: Codable, Sendable {
 }
 
 public enum TrackerError: LocalizedError {
-    case activeSession, noActiveSession, invalidNonprofit, clockChanged, missingSession
+    case activeSession, noActiveSession, invalidNonprofit, clockChanged, missingSession, missingActivity, invalidInterval
     public var errorDescription: String? {
         switch self {
         case .activeSession: "Stop the current session first."
         case .noActiveSession: "There is no active session."
         case .missingSession: "The session could not be found."
+        case .missingActivity: "Enter what you worked on."
+        case .invalidInterval: "End must be after start."
         case .invalidNonprofit: "Enter a unique nonprofit name and select it before starting."
         case .clockChanged: "The clock is earlier than the session start. Correct the system clock before stopping."
         }
@@ -123,6 +125,16 @@ public final class Tracker {
         next.sessions[index].endTimeUtc = now
         next.sessions[index].durationSeconds = Int(now.timeIntervalSince(next.sessions[index].startTimeUtc))
         next.sessions[index].updatedAtUtc = now
+        try save(next)
+    }
+    public func addSession(nonprofitId: UUID, notes: String, start: Date, end: Date, platform: String = "macos", now: Date = Date()) throws {
+        guard let nonprofit = state.nonprofits.first(where: { $0.id == nonprofitId }) else { throw TrackerError.invalidNonprofit }
+        guard !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw TrackerError.missingActivity }
+        guard end > start else { throw TrackerError.invalidInterval }
+        var next = state
+        next.sessions.append(Session(sessionId: UUID(), nonprofitId: nonprofit.id, nonprofitName: nonprofit.name,
+            startTimeUtc: start, endTimeUtc: end, durationSeconds: Int(end.timeIntervalSince(start)), notes: notes,
+            deviceId: state.deviceId, platform: platform, updatedAtUtc: now, syncState: "pending"))
         try save(next)
     }
     public func updateNotes(sessionId: UUID, notes: String, now: Date = Date()) throws {

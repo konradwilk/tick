@@ -64,6 +64,15 @@ class Tracker(initial: TrackerState, private val save: (TrackerState) -> Unit) {
                 durationSeconds = Duration.between(start, now).seconds, updatedAtUtc = now.toString())
         }))
     }
+    fun addSession(id: String, notes: String, start: Instant, end: Instant, now: Instant = Instant.now()) {
+        val nonprofit = requireNotNull(state.nonprofits.find { it.id == id }) { "Select a nonprofit." }
+        require(notes.isNotBlank()) { "Enter what you worked on." }
+        require(end.isAfter(start)) { "End must be after start." }
+        val session = Session(nonprofitId = id, nonprofitName = nonprofit.name, startTimeUtc = start.toString(),
+            endTimeUtc = end.toString(), durationSeconds = Duration.between(start, end).seconds,
+            notes = notes, deviceId = state.deviceId, updatedAtUtc = now.toString())
+        commit(state.copy(sessions = state.sessions + session))
+    }
     fun updateNotes(sessionId: String, notes: String, now: Instant = Instant.now()) {
         require(state.sessions.any { it.sessionId == sessionId }) { "The session could not be found." }
         commit(state.copy(sessions = state.sessions.map {

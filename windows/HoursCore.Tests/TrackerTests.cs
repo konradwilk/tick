@@ -3,6 +3,32 @@ using Xunit;
 namespace HoursCore.Tests;
 public class TrackerTests
 {
+    [Fact] public void ManualSessionPersistsAndExportsWithoutStoppingTimer()
+    {
+        var tracker = new Tracker(TrackerState.Empty(), _ => { });
+        var id = tracker.AddNonprofit("Kitchen");
+        tracker.Start(id, "Active", DateTimeOffset.UnixEpoch);
+        var active = tracker.State.Active;
+        var start = DateTimeOffset.Parse("2025-01-01T23:00:00-05:00");
+        var end = start.AddHours(2);
+        tracker.AddSession(id, "Meals", start, end);
+        var restored = PortableData.Decode(PortableData.Encode(tracker.State));
+        var manual = restored.Sessions.Single(s => s.EndTimeUtc != null);
+        Assert.Equal(7200L, manual.DurationSeconds);
+        Assert.Equal(start.ToUniversalTime(), manual.StartTimeUtc);
+        Assert.Equal(active, tracker.State.Active);
+        Assert.Contains("Meals", tracker.Csv());
+        Assert.Equal("Kitchen 02:00:00:\nMeals   02:00:00", tracker.ClipboardText());
+        var original = tracker.State;
+        Assert.Throws<InvalidOperationException>(() => tracker.AddSession(id, "Meals", end, start));
+        Assert.Throws<InvalidOperationException>(() => tracker.AddSession(id, "Meals", start, start));
+        Assert.Throws<InvalidOperationException>(() => tracker.AddSession(id, " ", start, end));
+        Assert.Throws<InvalidOperationException>(() => tracker.AddSession(Guid.NewGuid(), "Meals", start, end));
+        Assert.Same(original, tracker.State);
+        tracker = new Tracker(original, _ => throw new IOException("Disk full"));
+        Assert.Throws<IOException>(() => tracker.AddSession(id, "Meals", start, end));
+        Assert.Same(original, tracker.State);
+    }
     [Theory]
     [InlineData("", "No notes")]
     [InlineData(" \t\r\n ", "No notes")]

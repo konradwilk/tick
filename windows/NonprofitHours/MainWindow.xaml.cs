@@ -74,6 +74,45 @@ public sealed partial class MainWindow : Window
         UpdateClock();
     }
     public record HistoryEntry(Guid SessionId, string Summary, bool CanEdit);
+    private async void AddManualSession(object sender, RoutedEventArgs args)
+    {
+        if (tracker == null) return;
+        var nonprofit = new ComboBox { Header = "Nonprofit", DisplayMemberPath = "Name", ItemsSource = tracker.State.Nonprofits,
+            SelectedItem = Nonprofits.SelectedItem ?? tracker.State.Nonprofits.FirstOrDefault(), HorizontalAlignment = HorizontalAlignment.Stretch };
+        var activity = new TextBox { Header = "What did you work on?", AcceptsReturn = true, TextWrapping = TextWrapping.Wrap };
+        var current = DateTime.Now;
+        var end = current.Date.AddHours(current.Hour).AddMinutes(current.Minute);
+        var start = end.AddHours(-1);
+        var startDate = new CalendarDatePicker { Header = "Start date", Date = start };
+        var startTime = new TimePicker { Header = "Start time", Time = start.TimeOfDay };
+        var endDate = new CalendarDatePicker { Header = "End date", Date = end };
+        var endTime = new TimePicker { Header = "End time", Time = end.TimeOfDay };
+        var error = new TextBlock { TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush(Colors.Firebrick) };
+        var content = new StackPanel { Spacing = 12 };
+        foreach (var control in new UIElement[] { nonprofit, activity, new TextBlock { Text = "Times use your local timezone." }, startDate, startTime, endDate, endTime, error }) content.Children.Add(control);
+        var dialog = new ContentDialog { XamlRoot = Controls.XamlRoot, Title = "Add session by hand",
+            Content = new ScrollViewer { Content = content, MaxHeight = 450 }, PrimaryButtonText = "Save", CloseButtonText = "Cancel" };
+        dialog.PrimaryButtonClick += (_, eventArgs) =>
+        {
+            try
+            {
+                if (nonprofit.SelectedItem is not Nonprofit selected) throw new InvalidOperationException("Select a nonprofit. Add one in Settings first if needed.");
+                static DateTimeOffset LocalTime(CalendarDatePicker date, TimePicker time)
+                {
+                    if (date.Date == null || time.SelectedTime == null) throw new InvalidOperationException("Enter both dates and times.");
+                    var value = DateTime.SpecifyKind(date.Date.Value.Date + time.Time, DateTimeKind.Unspecified);
+                    if (TimeZoneInfo.Local.IsInvalidTime(value)) throw new InvalidOperationException("This local time does not exist due to a clock change.");
+                    if (TimeZoneInfo.Local.IsAmbiguousTime(value)) throw new InvalidOperationException("This local time occurs twice due to a clock change. Choose an unambiguous time.");
+                    return new DateTimeOffset(value, TimeZoneInfo.Local.GetUtcOffset(value));
+                }
+                tracker.AddSession(selected.Id, activity.Text, LocalTime(startDate, startTime), LocalTime(endDate, endTime));
+                ErrorText.Text = "";
+                Refresh();
+            }
+            catch (Exception e) { eventArgs.Cancel = true; error.Text = e.Message; }
+        };
+        await dialog.ShowAsync();
+    }
     private async void EditNotes(object sender, RoutedEventArgs args)
     {
         if (tracker == null || sender is not Button { Tag: Guid sessionId }) return;
