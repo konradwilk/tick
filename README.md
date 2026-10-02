@@ -1,6 +1,6 @@
 # Time is Clearly Kept (TICK)
 
-Native time-tracking apps for Android, iPhone, macOS, Windows, and Linux with CSV export for Google Sheets.
+Native time-tracking apps for Android, iPhone, macOS, Windows, and Linux that save data in a local JSON file (`tick.json`), with optional CSV export.
 
 ## Goals
 - One-tap Start / Stop time tracking
@@ -87,9 +87,6 @@ the newly added iOS UI and storage implementations still need native verificatio
 - Windows: C# + WinUI 3
 - Linux: Python + GTK 4 / PyGObject
 
-## Backend
-A small Google Apps Script endpoint will accept completed time sessions and upsert them into a Google Sheet using a globally unique session ID.
-
 ## Session model
 See `docs/session-schema.md`.
 
@@ -98,7 +95,6 @@ See `docs/session-schema.md`.
 - `apple/` shared Swift model/sync code plus iOS and macOS targets
 - `windows/` Windows native app
 - `linux/` Linux GTK native app
-- `backend/` Google Apps Script backend
 - `docs/` architecture and API contract
 
 ## Run the macOS app
@@ -124,8 +120,7 @@ Quitting does not stop an active session. Its start time is saved; reopen the ap
 and press Stop to finish. Data is stored locally in
 `~/Library/Application Support/NonprofitHours/sessions.json`.
 
-Export completed sessions with **Export CSV…** and import the file in Google Sheets
-using File → Import. Automatic Sheets sync is still pending.
+Export completed sessions with **Export CSV…** when you need a separate report.
 The iOS app is in `apple/iOS/`; it uses the same Swift tracking and storage library.
 The app bundle is unsigned and intended for local use.
 
@@ -157,7 +152,7 @@ before distributing either app.
 selection, Start/Stop, notes, restart-safe timing, history, totals, and CSV export.
 Install the system GTK/Python packages, then run `python3 -m tick` from
 `linux/`. Core tests run without GTK; the Native clients workflow also runs a GTK
-smoke test on Ubuntu. Automatic Google Sheets sync remains pending.
+smoke test on Ubuntu.
 
 ## Configure where data is stored
 
