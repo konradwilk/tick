@@ -291,11 +291,11 @@ class StorageLocation:
     def open(self):
         if not self.settings.exists():
             return Tracker(FileStore(data_path()))
-        path = json.loads(self.settings.read_text(encoding="utf-8"))["path"]
+        path = Path(json.loads(self.settings.read_text(encoding="utf-8"))["path"]).parent / "tick.json"
         return Tracker(FileStore(path, require_existing=True))
 
     def select(self, folder, current=None):
-        path = Path(folder).absolute() / "nonprofit-hours.json"
+        path = Path(folder).absolute() / "tick.json"
         if not path.exists() and current is not None:
             # Initialize the configured folder, keeping the previous file intact.
             destination = FileStore(path)

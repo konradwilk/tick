@@ -20,7 +20,7 @@ import HoursCore
         do {
             let folder = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
             let location = try storage.resolve(defaultURL: folder.appending(path: "NonprofitHours/sessions.json"))
-            let file = location.selected ? location.url.appendingPathComponent("nonprofit-hours.json") : location.url
+            let file = location.selected ? location.url.appendingPathComponent("tick.json") : location.url
             dataLocation = file.deletingLastPathComponent().path
             let tracker = try Tracker(file: file, requireExisting: location.selected)
             self.tracker = tracker
@@ -52,7 +52,7 @@ import HoursCore
             guard panel.runModal() == .OK, let folder = panel.url else { return }
             let access = folder.startAccessingSecurityScopedResource()
             defer { if access { folder.stopAccessingSecurityScopedResource() } }
-            let file = folder.appendingPathComponent("nonprofit-hours.json")
+            let file = folder.appendingPathComponent("tick.json")
             let next: Tracker
             if FileManager.default.fileExists(atPath: file.path) {
                 next = try Tracker(file: file, requireExisting: true)

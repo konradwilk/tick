@@ -162,7 +162,7 @@ smoke test on Ubuntu. Automatic Google Sheets sync remains pending.
 ## Configure where data is stored
 
 Use **Data location** to choose a folder. The app remembers it and automatically
-reads and saves `nonprofit-hours.json` there on every launch and change. If the file
+reads and saves `tick.json` there on every launch and change. If the file
 already exists, its data is loaded; otherwise the current data is copied into the
 folder, preserving the original. This is a persistent setting, not an import/export
 step. Select the corresponding shared folder on your other devices.
@@ -176,6 +176,5 @@ finish before switching devices. See [storage behavior and compatibility](docs/d
 ## Naming and compatibility
 
 TICK stands for **Time is Clearly Kept**. Project files, executables, and CSV
-exports use `tick`. Existing application identifiers, saved-data locations, and
-the portable `nonprofit-hours.json` filename are retained so existing installations
-continue to find their data and settings.
+exports use `tick`. Shared data folders use `tick.json`. Application identifiers
+and private/default storage locations remain unchanged.

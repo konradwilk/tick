@@ -7,7 +7,7 @@ use UTC. Active sessions have no end time or duration. UUIDs and session times
 remain in storage even though the CSV report omits sessionId, nonprofitId, and
 updatedAtUtc.
 
-Choose Data location to use `nonprofit-hours.json` in a selected folder. An
+Choose Data location to use `tick.json` in a selected folder. An
 existing file is read before adopting it. A new folder receives a copy of the
 current state. Folder selection is remembered using platform settings (Apple
 security-scoped bookmarks and Android persistable document-tree permissions).

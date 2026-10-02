@@ -92,7 +92,7 @@ class StorageLocation(private val context: Context) {
         val file = findData(tree) ?: run {
             val bytes = PortableData.encode(requireNotNull(current) { "Choose a folder containing saved hours." }.state)
             val parent = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
-            val created = requireNotNull(DocumentsContract.createDocument(context.contentResolver, parent, "application/json", "nonprofit-hours.json")) { "Could not create data file." }
+            val created = requireNotNull(DocumentsContract.createDocument(context.contentResolver, parent, "application/json", "tick.json")) { "Could not create data file." }
             try { writeDocument(created, bytes) }
             catch (error: Exception) {
                 runCatching { DocumentsContract.deleteDocument(context.contentResolver, created) }
@@ -110,7 +110,7 @@ class StorageLocation(private val context: Context) {
         val columns = arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME)
         requireNotNull(context.contentResolver.query(children, columns, null, null, null)) { "Could not read the selected folder." }.use { cursor ->
             while (cursor.moveToNext()) {
-                if (cursor.getString(1) == "nonprofit-hours.json")
+                if (cursor.getString(1) == "tick.json")
                     return DocumentsContract.buildDocumentUriUsingTree(tree, cursor.getString(0))
             }
         }

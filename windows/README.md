@@ -46,7 +46,7 @@ Dependency reference: [Windows App SDK 1.8 release notes](https://learn.microsof
 
 Use **Data location** to choose where the app stores its working data. The selected
 folder is remembered across restarts; every subsequent read/save uses
-`nonprofit-hours.json` there. Existing data in that folder is loaded without being
+`tick.json` there. Existing data in that folder is loaded without being
 overwritten. Otherwise the current data is copied there and the old file is retained.
 The previously documented private/default path applies only until you choose a folder.
 

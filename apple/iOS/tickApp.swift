@@ -20,7 +20,7 @@ import UIKit
         do {
             let base = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
             let saved = try storage.resolve(defaultURL: base.appendingPathComponent("NonprofitHours/sessions.json"))
-            let file = saved.selected ? saved.url.appendingPathComponent("nonprofit-hours.json") : saved.url
+            let file = saved.selected ? saved.url.appendingPathComponent("tick.json") : saved.url
             adopt(try Tracker(file: file, requireExisting: saved.selected))
         } catch { self.error = "Could not load saved hours. " + error.localizedDescription }
     }
@@ -40,7 +40,7 @@ import UIKit
         let access = folder.startAccessingSecurityScopedResource()
         defer { if access { folder.stopAccessingSecurityScopedResource() } }
         do {
-            let file = folder.appendingPathComponent("nonprofit-hours.json")
+            let file = folder.appendingPathComponent("tick.json")
             let next: Tracker
             if FileManager.default.fileExists(atPath: file.path) {
                 next = try Tracker(file: file, requireExisting: true)
