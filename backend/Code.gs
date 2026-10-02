@@ -44,7 +44,7 @@ function getSessionsSheet() {
 
   if (sheet.getLastRow() === 0) {
     sheet.appendRow([
-      'sessionId', 'nonprofitId', 'nonprofitName', 'date', 'startTimeUtc',
+      'sessionId', 'projectId', 'project', 'date', 'startTimeUtc',
       'endTimeUtc', 'durationSeconds', 'hours', 'notes', 'deviceId',
       'platform', 'updatedAtUtc'
     ]);
@@ -56,14 +56,14 @@ function sessionToRow(s) {
   const hours = s.durationSeconds == null ? '' : Number(s.durationSeconds) / 3600;
   const date = s.startTimeUtc ? String(s.startTimeUtc).slice(0, 10) : '';
   return [
-    s.sessionId, s.nonprofitId, s.nonprofitName, date, s.startTimeUtc,
+    s.sessionId, s.projectId, s.project, date, s.startTimeUtc,
     s.endTimeUtc || '', s.durationSeconds == null ? '' : s.durationSeconds,
     hours, s.notes || '', s.deviceId, s.platform, s.updatedAtUtc
   ];
 }
 
 function validateSession(s) {
-  const required = ['sessionId', 'nonprofitId', 'nonprofitName', 'startTimeUtc', 'deviceId', 'platform', 'updatedAtUtc'];
+  const required = ['sessionId', 'projectId', 'project', 'startTimeUtc', 'deviceId', 'platform', 'updatedAtUtc'];
   required.forEach(k => {
     if (!s[k]) throw new Error('Missing required field: ' + k);
   });

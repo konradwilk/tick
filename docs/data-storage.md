@@ -4,7 +4,7 @@ Each client stores UTF-8 JSON with `schemaVersion: 1`, a device UUID, a
 `nonprofits` array (`id`, `name`), and a `sessions` array following
 [the session schema](session-schema.md). Timestamps include a timezone; writers
 use UTC. Active sessions have no end time or duration. UUIDs and session times
-remain in storage even though the CSV report omits sessionId, nonprofitId, and
+remain in storage even though the CSV report omits sessionId, projectId, and
 updatedAtUtc.
 
 Choose Data location to use `tick.json` in a selected folder. An

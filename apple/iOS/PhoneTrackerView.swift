@@ -75,21 +75,21 @@ import UIKit
     }
     private var capture: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Picker("Nonprofit", selection: $model.selected) {
-                Text("Choose a nonprofit").tag(nil as UUID?)
+            Picker("Project", selection: $model.selected) {
+                Text("Choose a project").tag(nil as UUID?)
                 ForEach(model.state.nonprofits) { Text($0.name).tag(Optional($0.id)) }
             }.disabled(model.tracker == nil || model.state.active != nil)
             Button {
                 model.perform { tracker in
                     if model.state.active != nil { try tracker.stop(); model.notes = "" }
-                    else if let id = model.selected { try tracker.start(nonprofitId: id, notes: model.notes, platform: "ios") }
+                    else if let id = model.selected { try tracker.start(projectId: id, notes: model.notes, platform: "ios") }
                 }
             } label: { Text(model.state.active == nil ? "Start" : "Stop").font(.title3.bold()).frame(maxWidth: .infinity).padding(.vertical, 6) }
                 .buttonStyle(.borderedProminent).tint(model.state.active == nil ? .green : .red)
                 .disabled(model.tracker == nil || (model.state.active == nil && model.selected == nil))
             if let active = model.state.active {
                 TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text("\(active.nonprofitName): \(duration(Int(context.date.timeIntervalSince(active.startTimeUtc))))").monospacedDigit()
+                    Text("\(active.project): \(duration(Int(context.date.timeIntervalSince(active.startTimeUtc))))").monospacedDigit()
                 }
             } else { Text("Ready when you are").foregroundStyle(.secondary) }
             TextField("What are you working on? (optional)", text: $model.notes)
@@ -105,7 +105,7 @@ import UIKit
             ForEach(model.state.sessions.reversed()) { session in
                 GroupBox {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(session.nonprofitName).font(.headline)
+                        Text(session.project).font(.headline)
                         Text(session.startTimeUtc.formatted(date: .abbreviated, time: .shortened)).font(.caption)
                         Text(session.durationSeconds.map(duration) ?? "In progress").monospacedDigit()
                         Text(session.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "No notes" : session.notes)
@@ -157,8 +157,8 @@ import UIKit
     private var manualSessionForm: some View {
         DisclosureGroup("Add session by hand") {
             VStack(alignment: .leading, spacing: 12) {
-                Picker("Nonprofit", selection: $manualNonprofit) {
-                    Text("Choose a nonprofit").tag(nil as UUID?)
+                Picker("Project", selection: $manualNonprofit) {
+                    Text("Choose a project").tag(nil as UUID?)
                     ForEach(model.state.nonprofits) { Text($0.name).tag(Optional($0.id)) }
                 }
                 TextField("What did you work on?", text: $manualNotes, axis: .vertical)
@@ -173,7 +173,7 @@ import UIKit
                 Button("Save session") {
                     model.perform { tracker in
                         guard let id = manualNonprofit else { throw TrackerError.invalidNonprofit }
-                        try tracker.addSession(nonprofitId: id, notes: manualNotes, start: manualStart, end: manualEnd, platform: "ios")
+                        try tracker.addSession(projectId: id, notes: manualNotes, start: manualStart, end: manualEnd, platform: "ios")
                         manualNotes = ""
                         manualStatus = "Session saved."
                     }
@@ -195,7 +195,7 @@ import UIKit
         NavigationStack {
             Form {
                 Section("Nonprofits") {
-                    TextField("New nonprofit", text: $newName)
+                    TextField("New project", text: $newName)
                     Button("Add nonprofit") { model.perform { model.selected = try $0.addNonprofit(newName); newName = "" } }
                         .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }.disabled(model.tracker == nil || model.state.active != nil)

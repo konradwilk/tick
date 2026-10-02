@@ -24,7 +24,7 @@ public sealed partial class MainWindow : Window
         {
             tracker = location.Open();
             Refresh();
-            Nonprofits.SelectedItem = tracker.State.Nonprofits.FirstOrDefault(n => n.Id == tracker.State.Active?.NonprofitId) ?? tracker.State.Nonprofits.FirstOrDefault();
+            Nonprofits.SelectedItem = tracker.State.Nonprofits.FirstOrDefault(n => n.Id == tracker.State.Active?.ProjectId) ?? tracker.State.Nonprofits.FirstOrDefault();
             Notes.Text = tracker.State.Active?.Notes ?? "";
 
         }
@@ -61,7 +61,7 @@ public sealed partial class MainWindow : Window
     {
         if (tracker!.State.Active != null) { tracker.Stop(); Notes.Text = ""; }
         else if (Nonprofits.SelectedItem is Nonprofit nonprofit) tracker.Start(nonprofit.Id, Notes.Text);
-        else throw new InvalidOperationException("Select a nonprofit first.");
+        else throw new InvalidOperationException("Select a project first.");
     });
     private void Refresh()
     {
@@ -80,7 +80,7 @@ public sealed partial class MainWindow : Window
         Total.Text = $"Completed: {state.Sessions.Sum(s => s.DurationSeconds ?? 0) / 3600.0:F2} hours";
         UpdateReport();
         History.ItemsSource = state.Sessions.Reverse().Select(s => new HistoryEntry(s.SessionId,
-            $"{s.NonprofitName} — {s.StartTimeUtc.ToLocalTime():g}\n{(s.DurationSeconds is long seconds ? Elapsed(seconds) : "In progress")}\n{s.Notes}", s.EndTimeUtc != null,
+            $"{s.Project} — {s.StartTimeUtc.ToLocalTime():g}\n{(s.DurationSeconds is long seconds ? Elapsed(seconds) : "In progress")}\n{s.Notes}", s.EndTimeUtc != null,
             s.EndTimeUtc != null && s.DurationSeconds is >= 0 and < 60 ? Visibility.Visible : Visibility.Collapsed)).ToArray();
         UpdateClock();
     }
@@ -92,7 +92,7 @@ public sealed partial class MainWindow : Window
     private async void AddManualSession(object sender, RoutedEventArgs args)
     {
         if (tracker == null) return;
-        var nonprofit = new ComboBox { Header = "Nonprofit", DisplayMemberPath = "Name", ItemsSource = tracker.State.Nonprofits,
+        var nonprofit = new ComboBox { Header = "Project", DisplayMemberPath = "Name", ItemsSource = tracker.State.Nonprofits,
             SelectedItem = Nonprofits.SelectedItem ?? tracker.State.Nonprofits.FirstOrDefault(), HorizontalAlignment = HorizontalAlignment.Stretch };
         var activity = new TextBox { Header = "What did you work on?", AcceptsReturn = true, TextWrapping = TextWrapping.Wrap };
         var current = DateTime.Now;
@@ -126,7 +126,7 @@ public sealed partial class MainWindow : Window
         {
             try
             {
-                if (nonprofit.SelectedItem is not Nonprofit selected) throw new InvalidOperationException("Select a nonprofit. Add one in Settings first if needed.");
+                if (nonprofit.SelectedItem is not Nonprofit selected) throw new InvalidOperationException("Select a project. Add one in Settings first if needed.");
                 static DateTimeOffset LocalTime(CalendarDatePicker date, TimePicker time)
                 {
                     if (date.Date == null || time.SelectedTime == null) throw new InvalidOperationException("Enter both dates and times.");
@@ -155,7 +155,7 @@ public sealed partial class MainWindow : Window
         };
         var error = new TextBlock { TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush(Colors.Firebrick) };
         var content = new StackPanel { Spacing = 12 };
-        content.Children.Add(new TextBlock { Text = $"{session.NonprofitName} — {session.StartTimeUtc.ToLocalTime():g}", TextWrapping = TextWrapping.Wrap });
+        content.Children.Add(new TextBlock { Text = $"{session.Project} — {session.StartTimeUtc.ToLocalTime():g}", TextWrapping = TextWrapping.Wrap });
         content.Children.Add(editor);
         content.Children.Add(error);
         var dialog = new ContentDialog
@@ -174,7 +174,7 @@ public sealed partial class MainWindow : Window
     private void UpdateClock()
     {
         var active = tracker?.State.Active;
-        Status.Text = active == null ? "Ready when you are" : $"{active.NonprofitName}: {Elapsed(Math.Max(0, (long)(DateTimeOffset.UtcNow - active.StartTimeUtc).TotalSeconds))}";
+        Status.Text = active == null ? "Ready when you are" : $"{active.Project}: {Elapsed(Math.Max(0, (long)(DateTimeOffset.UtcNow - active.StartTimeUtc).TotalSeconds))}";
     }
     private async void ChooseDataLocation(object sender, RoutedEventArgs args)
     {
@@ -189,7 +189,7 @@ public sealed partial class MainWindow : Window
             var next = location.Select(folder.Path, tracker?.State);
             tracker = next;
             Refresh();
-            Nonprofits.SelectedItem = tracker.State.Nonprofits.FirstOrDefault(n => n.Id == tracker.State.Active?.NonprofitId) ?? tracker.State.Nonprofits.FirstOrDefault();
+            Nonprofits.SelectedItem = tracker.State.Nonprofits.FirstOrDefault(n => n.Id == tracker.State.Active?.ProjectId) ?? tracker.State.Nonprofits.FirstOrDefault();
             Notes.Text = tracker.State.Active?.Notes ?? "";
             ErrorText.Text = "";
         }

@@ -5,8 +5,8 @@ Each completed or in-progress work session uses this logical model:
 ```json
 {
   "sessionId": "uuid",
-  "nonprofitId": "uuid",
-  "nonprofitName": "Somerville Pop Cheer",
+  "projectId": "uuid",
+  "project": "Somerville Pop Cheer",
   "startTimeUtc": "2026-09-11T00:32:00Z",
   "endTimeUtc": "2026-09-11T02:14:00Z",
   "durationSeconds": 6120,

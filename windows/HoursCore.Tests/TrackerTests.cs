@@ -206,7 +206,7 @@ public class TrackerTests
         Assert.Throws<InvalidOperationException>(() => tracker.Stop(DateTimeOffset.UnixEpoch.AddSeconds(-1)));
         Assert.NotNull(tracker.State.Active);
         tracker.Stop(DateTimeOffset.UnixEpoch.AddMinutes(1));
-        Assert.Equal("nonprofitName,startTimeUtc,endTimeUtc,durationSeconds,hours,notes,deviceId,platform", tracker.Csv().Split("\r\n")[0]);
+        Assert.Equal("project,startTimeUtc,endTimeUtc,durationSeconds,hours,notes,deviceId,platform", tracker.Csv().Split("\r\n")[0]);
         Assert.DoesNotContain(id.ToString(), tracker.Csv());
         Assert.DoesNotContain(tracker.State.Sessions.Single().SessionId.ToString(), tracker.Csv());
         Assert.Contains("\"'=SUM(1,2)\"", tracker.Csv());

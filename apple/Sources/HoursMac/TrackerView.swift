@@ -27,8 +27,8 @@ struct TrackerView: View {
                 Button("Choose data folder…") { model.chooseDataLocation() }
             }
             HStack(alignment: .bottom, spacing: 20) {
-                Picker("Nonprofit", selection: $model.selected) {
-                    Text("Choose a nonprofit").tag(nil as UUID?)
+                Picker("Project", selection: $model.selected) {
+                    Text("Choose a project").tag(nil as UUID?)
                     ForEach(model.state.nonprofits) { Text($0.name).tag(Optional($0.id)) }
                 }.disabled(active != nil || model.tracker == nil)
                 Button(action: model.toggleTracking) {
@@ -38,7 +38,7 @@ struct TrackerView: View {
             }
             if let active {
                 TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text("\(active.nonprofitName): \(elapsed(context.date.timeIntervalSince(active.startTimeUtc)))")
+                    Text("\(active.project): \(elapsed(context.date.timeIntervalSince(active.startTimeUtc)))")
                         .font(.title2.monospacedDigit())
                 }
             } else { Text("Ready when you are").foregroundStyle(.secondary) }
@@ -76,7 +76,7 @@ struct TrackerView: View {
             ForEach(model.state.sessions.reversed()) { session in
                 GroupBox {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(session.nonprofitName).font(.headline)
+                        Text(session.project).font(.headline)
                         Text(session.startTimeUtc.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
                         Text(session.durationSeconds.map { elapsed(Double($0)) } ?? "In progress").monospacedDigit()
                         Text(session.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "No notes" : session.notes)
@@ -117,8 +117,8 @@ struct TrackerView: View {
     private var manualSessionForm: some View {
         DisclosureGroup("Add session by hand") {
             VStack(alignment: .leading, spacing: 12) {
-                Picker("Nonprofit", selection: $manualNonprofit) {
-                    Text("Choose a nonprofit").tag(nil as UUID?)
+                Picker("Project", selection: $manualNonprofit) {
+                    Text("Choose a project").tag(nil as UUID?)
                     ForEach(model.state.nonprofits) { Text($0.name).tag(Optional($0.id)) }
                 }
                 TextField("What did you work on?", text: $manualNotes, axis: .vertical)
@@ -133,7 +133,7 @@ struct TrackerView: View {
                 Button("Save session") {
                     model.perform { tracker in
                         guard let id = manualNonprofit else { throw TrackerError.invalidNonprofit }
-                        try tracker.addSession(nonprofitId: id, notes: manualNotes, start: manualStart, end: manualEnd, platform: "macos")
+                        try tracker.addSession(projectId: id, notes: manualNotes, start: manualStart, end: manualEnd, platform: "macos")
                         manualNotes = ""
                         manualStatus = "Session saved."
                     }
@@ -156,7 +156,7 @@ struct TrackerView: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Settings").font(.title2)
             HStack {
-                TextField("New nonprofit", text: $newName)
+                TextField("New project", text: $newName)
                 Button("Add") { model.perform { model.selected = try $0.addNonprofit(newName); newName = "" } }
                     .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }.disabled(active != nil || model.tracker == nil)

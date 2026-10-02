@@ -14,8 +14,8 @@ public class PortableDataTests
           "nonprofits": [{"id": "22222222-2222-2222-2222-222222222222", "name": "Kitchen"}],
           "sessions": [{
             "sessionId": "33333333-3333-3333-3333-333333333333",
-            "nonprofitId": "22222222-2222-2222-2222-222222222222",
-            "nonprofitName": "Kitchen", "startTimeUtc": "2001-01-01T01:00:00+01:00",
+            "projectId": "22222222-2222-2222-2222-222222222222",
+            "project": "Kitchen", "startTimeUtc": "2001-01-01T01:00:00+01:00",
             "endTimeUtc": "2001-01-01T01:01:00+01:00", "durationSeconds": 60,
             "notes": "Meals 🍲", "deviceId": "11111111-1111-1111-1111-111111111111",
             "platform": "linux", "updatedAtUtc": "2001-01-01T00:01:00Z", "syncState": "pending"
@@ -107,7 +107,7 @@ public class PortableDataTests
             case "identity": json["deviceId"] = "bad"; break;
             case "duplicateNonprofit": json["nonprofits"]!.AsArray().Add(json["nonprofits"]![0]!.DeepClone()); break;
             case "duplicateSession": json["sessions"]!.AsArray().Add(session.DeepClone()); break;
-            case "unknownNonprofit": session["nonprofitId"] = Guid.NewGuid().ToString(); break;
+            case "unknownNonprofit": session["projectId"] = Guid.NewGuid().ToString(); break;
             case "duration": session["durationSeconds"] = 12; break;
             case "negativeDuration": session["durationSeconds"] = -1; break;
             case "backwardsTime": session["endTimeUtc"] = "2000-01-01T00:00:00Z"; break;

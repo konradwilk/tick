@@ -31,7 +31,7 @@ import UIKit
         needsDataLocation = false
         tracker = next
         state = next.state
-        selected = state.active?.nonprofitId ?? state.nonprofits.first?.id
+        selected = state.active?.projectId ?? state.nonprofits.first?.id
         notes = state.active?.notes ?? ""
         location = next.file.deletingLastPathComponent().path
     }
@@ -91,7 +91,7 @@ func duration(_ seconds: Int) -> String {
     var body: some View {
         NavigationStack {
             Form {
-                Text(session.nonprofitName)
+                Text(session.project)
                 Text(session.startTimeUtc.formatted(date: .abbreviated, time: .shortened))
                 Section("What did you work on?") {
                     TextEditor(text: $notes).frame(minHeight: 180).accessibilityLabel("Session notes")

@@ -67,7 +67,7 @@ class MainActivity : ComponentActivity() {
 
     @Composable private fun TrackerScreen(tracker: Tracker, location: String, chooseFolder: () -> Unit) {
         var state by remember { mutableStateOf(tracker.state) }
-        var selected by rememberSaveable { mutableStateOf(state.active?.nonprofitId ?: state.nonprofits.firstOrNull()?.id) }
+        var selected by rememberSaveable { mutableStateOf(state.active?.projectId ?: state.nonprofits.firstOrNull()?.id) }
         var notes by rememberSaveable { mutableStateOf(state.active?.notes.orEmpty()) }
         var name by rememberSaveable { mutableStateOf("") }
         var error by remember { mutableStateOf<String?>(null) }
@@ -107,7 +107,7 @@ class MainActivity : ComponentActivity() {
         if (settings) AlertDialog(
             onDismissRequest = { settings = false }, title = { Text("Settings") },
             text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(name, { name = it }, label = { Text("New nonprofit") }, enabled = active == null)
+                OutlinedTextField(name, { name = it }, label = { Text("New project") }, enabled = active == null)
                 Button(onClick = { action { selected = tracker.addNonprofit(name); name = "" } }, enabled = active == null && name.isNotBlank()) { Text("Add nonprofit") }
                 OutlinedButton(onClick = chooseFolder) { Text("Data location…") }
                 OutlinedButton(onClick = { settings = false; manual = true; manualError = null }) { Text("Add session by hand…") }
@@ -120,7 +120,7 @@ class MainActivity : ComponentActivity() {
         if (manual) AlertDialog(
             onDismissRequest = { manual = false }, title = { Text("Add session by hand") },
             text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Nonprofit")
+                Text("Project")
                 state.nonprofits.forEach { nonprofit ->
                     Row {
                         RadioButton(selected = manualId == nonprofit.id, onClick = { manualId = nonprofit.id })
@@ -147,7 +147,7 @@ class MainActivity : ComponentActivity() {
                         require(offsets.size == 1) { "This local time is missing or repeated due to a clock change. Choose an unambiguous time." }
                         return local.toInstant(offsets.single())
                     }
-                    tracker.addSession(requireNotNull(manualId) { "Select a nonprofit." }, manualNotes, localTime(manualStart), localTime(manualEnd))
+                    tracker.addSession(requireNotNull(manualId) { "Select a project." }, manualNotes, localTime(manualStart), localTime(manualEnd))
                     state = tracker.state
                     manualNotes = ""
                     manual = false
@@ -163,7 +163,7 @@ class MainActivity : ComponentActivity() {
                 title = { Text("Edit session notes") },
                 text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     state.sessions.find { it.sessionId == sessionId }?.let {
-                        Text("${it.nonprofitName} · ${it.startTimeUtc}")
+                        Text("${it.project} · ${it.startTimeUtc}")
                     }
                     OutlinedTextField(editedNotes, { editedNotes = it }, Modifier.fillMaxWidth(),
                         label = { Text("What did you work on?") }, minLines = 3, maxLines = 8)

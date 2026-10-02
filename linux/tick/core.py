@@ -54,7 +54,7 @@ def decode_data(raw):
     for nonprofit in state["nonprofits"]:
         nonprofit["id"] = str(UUID(nonprofit["id"]))
     for session in state["sessions"]:
-        for key in ("sessionId", "nonprofitId", "deviceId"):
+        for key in ("sessionId", "projectId", "deviceId"):
             session[key] = str(UUID(session[key]))
         if legacy:
             session.setdefault("platform", "android")
@@ -76,15 +76,15 @@ def decode_data(raw):
     ids = set()
     for nonprofit in state["nonprofits"]:
         if not isinstance(nonprofit.get("id"), str) or not isinstance(nonprofit.get("name"), str) or nonprofit["id"] in ids:
-            raise ValueError("Invalid saved nonprofit.")
+            raise ValueError("Invalid saved project.")
         ids.add(nonprofit["id"])
     sessions = set()
     active = 0
     for session in state["sessions"]:
-        for key in ("sessionId", "nonprofitId", "nonprofitName", "startTimeUtc", "notes", "deviceId", "platform", "updatedAtUtc", "syncState"):
+        for key in ("sessionId", "projectId", "project", "startTimeUtc", "notes", "deviceId", "platform", "updatedAtUtc", "syncState"):
             if not isinstance(session.get(key), str):
                 raise ValueError("Invalid saved session field: " + key)
-        if session["sessionId"] in sessions or session["nonprofitId"] not in ids:
+        if session["sessionId"] in sessions or session["projectId"] not in ids:
             raise ValueError("Invalid saved session identity.")
         sessions.add(session["sessionId"])
         start = parse(session["startTimeUtc"])
@@ -153,31 +153,31 @@ class Tracker:
     def add_nonprofit(self, name):
         name = capitalize_entries(name.strip())
         if not name or any(n["name"].casefold() == name.casefold() for n in self.state["nonprofits"]):
-            raise ValueError("Enter a unique nonprofit name.")
+            raise ValueError("Enter a unique project name.")
         nonprofit = {"id": str(uuid4()), "name": name}
         state = copy.deepcopy(self.state)
         state["nonprofits"].append(nonprofit)
         self.commit(state)
         return nonprofit["id"]
 
-    def start(self, nonprofit_id, notes="", now=None):
+    def start(self, project_id, notes="", now=None):
         if self.active:
             raise ValueError("Stop the current session first.")
-        nonprofit = next((n for n in self.state["nonprofits"] if n["id"] == nonprofit_id), None)
+        nonprofit = next((n for n in self.state["nonprofits"] if n["id"] == project_id), None)
         if nonprofit is None:
-            raise ValueError("Select a nonprofit first.")
+            raise ValueError("Select a project first.")
         date = timestamp(now)
         state = copy.deepcopy(self.state)
-        state["sessions"].append({"sessionId": str(uuid4()), "nonprofitId": nonprofit_id,
-            "nonprofitName": nonprofit["name"], "startTimeUtc": date, "endTimeUtc": None,
+        state["sessions"].append({"sessionId": str(uuid4()), "projectId": project_id,
+            "project": nonprofit["name"], "startTimeUtc": date, "endTimeUtc": None,
             "durationSeconds": None, "notes": capitalize_entries(notes), "deviceId": state["deviceId"],
             "platform": "linux", "updatedAtUtc": date, "syncState": "pending"})
         self.commit(state)
 
-    def add_session(self, nonprofit_id, notes, start, end, now=None):
-        nonprofit = next((n for n in self.state["nonprofits"] if n["id"] == nonprofit_id), None)
+    def add_session(self, project_id, notes, start, end, now=None):
+        nonprofit = next((n for n in self.state["nonprofits"] if n["id"] == project_id), None)
         if nonprofit is None:
-            raise ValueError("Select a nonprofit.")
+            raise ValueError("Select a project.")
         if not notes.strip():
             raise ValueError("Enter what you worked on.")
         start_text, end_text = timestamp(start), timestamp(end)
@@ -185,8 +185,8 @@ class Tracker:
         if seconds <= 0:
             raise ValueError("End must be after start.")
         state = copy.deepcopy(self.state)
-        state["sessions"].append({"sessionId": str(uuid4()), "nonprofitId": nonprofit_id,
-            "nonprofitName": nonprofit["name"], "startTimeUtc": start_text, "endTimeUtc": end_text,
+        state["sessions"].append({"sessionId": str(uuid4()), "projectId": project_id,
+            "project": nonprofit["name"], "startTimeUtc": start_text, "endTimeUtc": end_text,
             "durationSeconds": int(seconds), "notes": capitalize_entries(notes), "deviceId": state["deviceId"],
             "platform": "linux", "updatedAtUtc": timestamp(now), "syncState": "pending"})
         self.commit(state)
@@ -233,7 +233,7 @@ class Tracker:
 
         groups = {}
         for session in self.export_sessions(period, day, zone):
-            groups.setdefault(session["nonprofitId"], []).append(session)
+            groups.setdefault(session["projectId"], []).append(session)
         summaries = []
         for sessions in groups.values():
             descriptions = {}
@@ -244,11 +244,11 @@ class Tracker:
                     descriptions[name] = descriptions.get(name, 0) + share + (index < remainder)
             lines = [f"{name}   {elapsed(descriptions[name])}"
                      for name in sorted(descriptions, key=lambda name: (name.lower(), name))]
-            summaries.append(f"{sessions[0]['nonprofitName']} {elapsed(sum(s['durationSeconds'] for s in sessions))}:\n" + "\n".join(lines))
+            summaries.append(f"{sessions[0]['project']} {elapsed(sum(s['durationSeconds'] for s in sessions))}:\n" + "\n".join(lines))
         return "\n\n".join(summaries)
 
     def csv(self, period=None, day=None, zone=None):
-        fields = ["nonprofitName", "startTimeUtc", "endTimeUtc",
+        fields = ["project", "startTimeUtc", "endTimeUtc",
                   "durationSeconds", "hours", "notes", "deviceId", "platform"]
         output = io.StringIO(newline="")
         writer = csv.writer(output)

@@ -43,12 +43,12 @@ internal object PortableData {
         require(state.schemaVersion == 1) { "Unsupported data file version." }
         UUID.fromString(state.deviceId)
         val nonprofits = state.nonprofits.map { UUID.fromString(it.id) }.toSet()
-        require(nonprofits.size == state.nonprofits.size) { "Duplicate nonprofit identity." }
+        require(nonprofits.size == state.nonprofits.size) { "Duplicate project identity." }
         require(state.sessions.map { UUID.fromString(it.sessionId) }.toSet().size == state.sessions.size) { "Duplicate session identity." }
         require(state.sessions.count { it.endTimeUtc == null } <= 1) { "Multiple active sessions." }
         state.sessions.forEach { session ->
             UUID.fromString(session.deviceId)
-            require(UUID.fromString(session.nonprofitId) in nonprofits) { "Unknown nonprofit." }
+            require(UUID.fromString(session.projectId) in nonprofits) { "Unknown project." }
             require(session.platform in listOf("android", "ios", "macos", "windows", "linux")) { "Invalid platform." }
             require(session.syncState in listOf("pending", "synced", "failed")) { "Invalid sync state." }
             val start = Instant.parse(session.startTimeUtc)

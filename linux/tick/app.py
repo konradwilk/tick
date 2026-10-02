@@ -21,7 +21,7 @@ class HoursWindow(Gtk.ApplicationWindow):
         try:
             self.tracker = Tracker(FileStore(path)) if path else self.location.open()
             active = self.tracker.active
-            self.selected_id = active["nonprofitId"] if active else next((n["id"] for n in self.tracker.state["nonprofits"]), None)
+            self.selected_id = active["projectId"] if active else next((n["id"] for n in self.tracker.state["nonprofits"]), None)
             self.notes.set_text(active["notes"] if active else "")
             self.refresh()
             self.timer = GLib.timeout_add_seconds(1, self.update_clock)
@@ -97,7 +97,7 @@ class HoursWindow(Gtk.ApplicationWindow):
         for session in reversed(state["sessions"]):
             duration = elapsed(session["durationSeconds"]) if session.get("endTimeUtc") else "In progress"
             date = parse(session["startTimeUtc"]).astimezone().strftime("%Y-%m-%d %H:%M")
-            label = Gtk.Label(label=f"{session['nonprofitName']} — {date}\n{duration}\n{session['notes']}", xalign=0, wrap=True, selectable=True)
+            label = Gtk.Label(label=f"{session['project']} — {date}\n{duration}\n{session['notes']}", xalign=0, wrap=True, selectable=True)
             self.history.append(label)
             if session.get("endTimeUtc"):
                 edit = Gtk.Button(label="Edit notes", halign=Gtk.Align.START)
@@ -123,7 +123,7 @@ class HoursWindow(Gtk.ApplicationWindow):
         for side in ("top", "bottom", "start", "end"):
             getattr(content, "set_margin_" + side)(16)
         nonprofits = list(self.tracker.state["nonprofits"])
-        content.append(Gtk.Label(label="Nonprofit", xalign=0))
+        content.append(Gtk.Label(label="Project", xalign=0))
         nonprofit = Gtk.DropDown(model=Gtk.StringList.new([n["name"] for n in nonprofits]))
         content.append(nonprofit)
         if not nonprofits:
@@ -169,7 +169,7 @@ class HoursWindow(Gtk.ApplicationWindow):
                 try:
                     index = nonprofit.get_selected()
                     if index >= len(nonprofits):
-                        raise ValueError("Select a nonprofit.")
+                        raise ValueError("Select a project.")
                     def local_time(entry):
                         try:
                             value = datetime.strptime(entry.get_text(), "%Y-%m-%d %H:%M")
@@ -201,7 +201,7 @@ class HoursWindow(Gtk.ApplicationWindow):
         for side in ("top", "bottom", "start", "end"):
             getattr(content, "set_margin_" + side)(16)
         date = parse(session["startTimeUtc"]).astimezone().strftime("%Y-%m-%d %H:%M")
-        content.append(Gtk.Label(label=f"{session['nonprofitName']} — {date}", xalign=0, wrap=True))
+        content.append(Gtk.Label(label=f"{session['project']} — {date}", xalign=0, wrap=True))
         content.append(Gtk.Label(label="What did you work on?", xalign=0))
         editor = Gtk.TextView(wrap_mode=Gtk.WrapMode.WORD_CHAR)
         buffer = editor.get_buffer()
@@ -232,7 +232,7 @@ class HoursWindow(Gtk.ApplicationWindow):
         active = self.tracker.active if self.tracker else None
         if active:
             seconds = (datetime.now(timezone.utc) - parse(active["startTimeUtc"])).total_seconds()
-            self.clock.set_text(f"{active['nonprofitName']}: {elapsed(seconds)}")
+            self.clock.set_text(f"{active['project']}: {elapsed(seconds)}")
         else:
             self.clock.set_text("Ready when you are")
         return GLib.SOURCE_CONTINUE
@@ -256,7 +256,7 @@ class HoursWindow(Gtk.ApplicationWindow):
                 next_tracker = self.location.select(path, self.tracker)
                 self.tracker = next_tracker
                 active = self.tracker.active
-                self.selected_id = active["nonprofitId"] if active else next((n["id"] for n in self.tracker.state["nonprofits"]), None)
+                self.selected_id = active["projectId"] if active else next((n["id"] for n in self.tracker.state["nonprofits"]), None)
                 self.notes.set_text(active["notes"] if active else "")
                 self.refresh()
                 if self.timer is None:

@@ -9,7 +9,7 @@ It includes Start/Stop tracking, nonprofit creation, persistent data-folder
 selection, history with Edit notes and Save/Cancel, and daily/weekly/monthly CSV
 exports using the system save sheet. Copy durations and notes uses the selected
 period and the same grouped format, No notes placeholder, and comma-space
-separator as the other clients. CSV omits sessionId, nonprofitId, and updatedAtUtc.
+separator as the other clients. CSV omits sessionId, projectId, and updatedAtUtc.
 
 From the repository root on macOS:
 

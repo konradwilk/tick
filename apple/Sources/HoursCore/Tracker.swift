@@ -32,8 +32,8 @@ public struct Nonprofit: Codable, Identifiable, Equatable, Sendable {
 public struct Session: Codable, Identifiable, Sendable {
     public var id: UUID { sessionId }
     public var sessionId: UUID
-    public var nonprofitId: UUID
-    public var nonprofitName: String
+    public var projectId: UUID
+    public var project: String
     public var startTimeUtc: Date
     public var endTimeUtc: Date?
     public var durationSeconds: Int?
@@ -63,7 +63,7 @@ public enum TrackerError: LocalizedError {
         case .cannotDelete: "Only completed sessions under one minute can be deleted."
         case .missingActivity: "Enter what you worked on."
         case .invalidInterval: "End must be after start."
-        case .invalidNonprofit: "Enter a unique nonprofit name and select it before starting."
+        case .invalidNonprofit: "Enter a unique project name and select it before starting."
         case .clockChanged: "The clock is earlier than the session start. Correct the system clock before stopping."
         }
     }
@@ -122,11 +122,11 @@ public final class Tracker {
         try save(next)
         return nonprofit.id
     }
-    public func start(nonprofitId: UUID, notes: String = "", platform: String = "macos", now: Date = Date()) throws {
+    public func start(projectId: UUID, notes: String = "", platform: String = "macos", now: Date = Date()) throws {
         guard state.active == nil else { throw TrackerError.activeSession }
-        guard let nonprofit = state.nonprofits.first(where: { $0.id == nonprofitId }) else { throw TrackerError.invalidNonprofit }
+        guard let nonprofit = state.nonprofits.first(where: { $0.id == projectId }) else { throw TrackerError.invalidNonprofit }
         var next = state
-        next.sessions.append(Session(sessionId: UUID(), nonprofitId: nonprofit.id, nonprofitName: nonprofit.name, startTimeUtc: now, notes: capitalizeEntries(notes), deviceId: state.deviceId, platform: platform, updatedAtUtc: now, syncState: "pending"))
+        next.sessions.append(Session(sessionId: UUID(), projectId: nonprofit.id, project: nonprofit.name, startTimeUtc: now, notes: capitalizeEntries(notes), deviceId: state.deviceId, platform: platform, updatedAtUtc: now, syncState: "pending"))
         try save(next)
     }
     public func stop(now: Date = Date()) throws {
@@ -138,12 +138,12 @@ public final class Tracker {
         next.sessions[index].updatedAtUtc = now
         try save(next)
     }
-    public func addSession(nonprofitId: UUID, notes: String, start: Date, end: Date, platform: String = "macos", now: Date = Date()) throws {
-        guard let nonprofit = state.nonprofits.first(where: { $0.id == nonprofitId }) else { throw TrackerError.invalidNonprofit }
+    public func addSession(projectId: UUID, notes: String, start: Date, end: Date, platform: String = "macos", now: Date = Date()) throws {
+        guard let nonprofit = state.nonprofits.first(where: { $0.id == projectId }) else { throw TrackerError.invalidNonprofit }
         guard !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw TrackerError.missingActivity }
         guard end > start else { throw TrackerError.invalidInterval }
         var next = state
-        next.sessions.append(Session(sessionId: UUID(), nonprofitId: nonprofit.id, nonprofitName: nonprofit.name,
+        next.sessions.append(Session(sessionId: UUID(), projectId: nonprofit.id, project: nonprofit.name,
             startTimeUtc: start, endTimeUtc: end, durationSeconds: Int(end.timeIntervalSince(start)), notes: capitalizeEntries(notes),
             deviceId: state.deviceId, platform: platform, updatedAtUtc: now, syncState: "pending"))
         try save(next)
@@ -178,11 +178,11 @@ public final class Tracker {
             String(format: "%02d:%02d:%02d", seconds / 3600, seconds % 3600 / 60, seconds % 60)
         }
         let sessions = exportSessions(range: range)
-        let groups = Dictionary(grouping: sessions, by: \.nonprofitId)
+        let groups = Dictionary(grouping: sessions, by: \.projectId)
         var seen = Set<UUID>()
         return sessions.compactMap { session -> String? in
-            guard seen.insert(session.nonprofitId).inserted else { return nil }
-            let group = groups[session.nonprofitId]!
+            guard seen.insert(session.projectId).inserted else { return nil }
+            let group = groups[session.projectId]!
             let total = group.reduce(0) { $0 + ($1.durationSeconds ?? 0) }
             var descriptions: [String: Int] = [:]
             for entry in group {
@@ -196,7 +196,7 @@ public final class Tracker {
                 let left = $0.lowercased(), right = $1.lowercased()
                 return left == right ? $0 < $1 : left < right
             }
-            return "\(session.nonprofitName) \(duration(total)):\n" + names.map { name in
+            return "\(session.project) \(duration(total)):\n" + names.map { name in
                 let seconds = descriptions[name]!
                 return "\(name)   \(duration(seconds))"
             }.joined(separator: "\n")
@@ -210,9 +210,9 @@ public final class Tracker {
             let safe = ["=", "+", "-", "@"].contains(where: { trimmed.hasPrefix($0) }) ? "'" + value : value
             return "\"" + safe.replacingOccurrences(of: "\"", with: "\"\"") + "\""
         }
-        var rows = ["nonprofitName,startTimeUtc,endTimeUtc,durationSeconds,hours,notes,deviceId,platform"]
+        var rows = ["project,startTimeUtc,endTimeUtc,durationSeconds,hours,notes,deviceId,platform"]
         for s in exportSessions(range: range) {
-            let values = [s.nonprofitName, formatter.string(from: s.startTimeUtc), formatter.string(from: s.endTimeUtc!), String(s.durationSeconds ?? 0), String(Double(s.durationSeconds ?? 0) / 3600), s.notes, s.deviceId.uuidString, s.platform]
+            let values = [s.project, formatter.string(from: s.startTimeUtc), formatter.string(from: s.endTimeUtc!), String(s.durationSeconds ?? 0), String(Double(s.durationSeconds ?? 0) / 3600), s.notes, s.deviceId.uuidString, s.platform]
             rows.append(values.map(cell).joined(separator: ","))
         }
         return rows.joined(separator: "\r\n") + "\r\n"

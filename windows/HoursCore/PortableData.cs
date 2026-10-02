@@ -33,7 +33,7 @@ public static class PortableData
             var ids = new HashSet<Guid>();
             foreach (var nonprofit in nonprofits)
                 if (!ids.Add(nonprofit.Id))
-                    throw new InvalidDataException("Duplicate nonprofit identity.");
+                    throw new InvalidDataException("Duplicate project identity.");
 
             var sessions = new List<Session>();
             var sessionIds = new HashSet<Guid>();
@@ -42,8 +42,8 @@ public static class PortableData
             {
                 var end = Optional(item, "endTimeUtc");
                 var duration = Optional(item, "durationSeconds");
-                var session = new Session(Id(item, "sessionId"), Id(item, "nonprofitId"),
-                    Text(item, "nonprofitName"), Date(item.GetProperty("startTimeUtc"), legacy),
+                var session = new Session(Id(item, "sessionId"), Id(item, "projectId"),
+                    Text(item, "project"), Date(item.GetProperty("startTimeUtc"), legacy),
                     end is null ? null : Date(end.Value, legacy),
                     duration is null ? null : duration.Value.GetInt64(),
                     Text(item, "notes"), Id(item, "deviceId"),
@@ -51,7 +51,7 @@ public static class PortableData
                     Date(item.GetProperty("updatedAtUtc"), legacy),
                     legacy && !item.TryGetProperty("syncState", out _) ? "pending" : Text(item, "syncState"));
 
-                if (!sessionIds.Add(session.SessionId) || !ids.Contains(session.NonprofitId))
+                if (!sessionIds.Add(session.SessionId) || !ids.Contains(session.ProjectId))
                     throw new InvalidDataException("Invalid saved session identity.");
                 if (session.Platform is not ("android" or "ios" or "macos" or "windows" or "linux") ||
                     session.SyncState is not ("pending" or "synced" or "failed"))

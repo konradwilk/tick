@@ -28,9 +28,9 @@ import HoursCore
             let tracker = try Tracker(file: file, requireExisting: location.selected)
             self.tracker = tracker
             state = tracker.state
-            selected = state.active?.nonprofitId ?? state.nonprofits.first?.id
+            selected = state.active?.projectId ?? state.nonprofits.first?.id
             notes = state.active?.notes ?? ""
-        } catch { self.error = "Could not load saved hours: \(error.localizedDescription). Your saved file has not been changed." }
+        } catch { self.error = "Could not load saved hours: \(error.localizedDescription) Your saved file has not been changed." }
     }
     func perform(_ action: (Tracker) throws -> Void) {
         guard let tracker else { return }
@@ -40,7 +40,7 @@ import HoursCore
     func toggleTracking() {
         perform { tracker in
             if state.active != nil { try tracker.stop(); notes = "" }
-            else if let selected { try tracker.start(nonprofitId: selected, notes: notes) }
+            else if let selected { try tracker.start(projectId: selected, notes: notes) }
         }
     }
     func chooseDataLocation() {
@@ -70,7 +70,7 @@ import HoursCore
             tracker = next
             state = next.state
             dataLocation = folder.path
-            selected = state.active?.nonprofitId ?? state.nonprofits.first?.id
+            selected = state.active?.projectId ?? state.nonprofits.first?.id
             notes = state.active?.notes ?? ""
             error = nil
         } catch { self.error = error.localizedDescription }
@@ -130,7 +130,7 @@ struct SessionNotesEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Edit session notes").font(.title2)
-            Text("\(session.nonprofitName) — \(session.startTimeUtc.formatted(date: .abbreviated, time: .shortened))")
+            Text("\(session.project) — \(session.startTimeUtc.formatted(date: .abbreviated, time: .shortened))")
             Text("What did you work on?")
             TextEditor(text: $notes).frame(minHeight: 140).accessibilityLabel("Session notes")
             if let error { Text(error).foregroundStyle(.red) }
@@ -161,7 +161,7 @@ struct MenuBarTrackerView: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Time is Clearly Kept").font(.headline)
             if let active {
-                Text(active.nonprofitName).font(.subheadline.bold())
+                Text(active.project).font(.subheadline.bold())
                 TimelineView(.periodic(from: .now, by: 1)) { context in
                     let seconds = max(0, Int(context.date.timeIntervalSince(active.startTimeUtc)))
                     Text(String(format: "%02d:%02d:%02d", seconds / 3600, seconds % 3600 / 60, seconds % 60))
@@ -172,8 +172,8 @@ struct MenuBarTrackerView: View {
                 if model.state.nonprofits.isEmpty {
                     Text("Open the main window to add your first nonprofit.").foregroundStyle(.secondary)
                 } else {
-                    Picker("Nonprofit", selection: $model.selected) {
-                        Text("Choose a nonprofit").tag(nil as UUID?)
+                    Picker("Project", selection: $model.selected) {
+                        Text("Choose a project").tag(nil as UUID?)
                         ForEach(model.state.nonprofits) { Text($0.name).tag(Optional($0.id)) }
                     }
                     TextField("Notes (optional)", text: $model.notes)

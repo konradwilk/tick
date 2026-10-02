@@ -141,7 +141,7 @@ class TrackerTests(unittest.TestCase):
         self.assertIsNone(loaded.active)
         session = loaded.state["sessions"][0]
         self.assertEqual(session["durationSeconds"], 27 * 3600)
-        self.assertEqual(session["nonprofitId"], nonprofit)
+        self.assertEqual(session["projectId"], nonprofit)
         self.assertEqual(session["platform"], "linux")
         self.assertEqual(elapsed(session["durationSeconds"]), "27:00:00")
 
@@ -224,8 +224,8 @@ class TrackerTests(unittest.TestCase):
         self.assertEqual(len(list(csv.reader(io.StringIO(self.tracker.csv())))), 1)
         self.tracker.stop(self.start + timedelta(hours=1))
         rows = list(csv.DictReader(io.StringIO(self.tracker.csv())))
-        self.assertEqual(rows[0]["nonprofitName"], "'=SUM(1,2)")
-        self.assertEqual(list(rows[0]), ["nonprofitName", "startTimeUtc", "endTimeUtc", "durationSeconds", "hours", "notes", "deviceId", "platform"])
+        self.assertEqual(rows[0]["project"], "'=SUM(1,2)")
+        self.assertEqual(list(rows[0]), ["project", "startTimeUtc", "endTimeUtc", "durationSeconds", "hours", "notes", "deviceId", "platform"])
         self.assertNotIn(None, rows[0])
         self.assertEqual(rows[0]["notes"], 'A, "Quote"\nAnd a newline')
         self.assertEqual(rows[0]["hours"], "1.0")

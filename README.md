@@ -4,30 +4,28 @@ Native time-tracking apps for Android, iPhone, macOS, Windows, and Linux that sa
 
 ## Goals
 - One-tap Start / Stop time tracking
-- Select the nonprofit for each session
+- Select the project for each session
 - Optional notes
 - Local-first storage and offline support
-- Automatic Google Sheets sync
-- Daily, monthly, per-nonprofit, and overall totals
+- Daily, monthly, per-project, and overall totals
 - Manual correction/history
-- Duplicate-safe synchronization across devices
 
 ## Native clients
 
-New nonprofit names and saved notes capitalize the first letter of each entry.
+New project names and saved notes capitalize the first letter of each entry.
 Commas and line breaks start a new activity; other casing and whitespace are preserved.
 This applies to tracking, manual sessions, and note edits. Existing saved data is
 unchanged until edited.
 
-The main screen puts nonprofit selection and Start/Stop first, followed by notes.
+The main screen puts project selection and Start/Stop first, followed by notes.
 History and **Export & copy** sit side by side in wide windows and stack on
 phones or narrow windows. Capture stays visible while the workspace scrolls.
 The report panel previews the exact summary produced by **Copy summary**.
-Use **Settings** for adding nonprofits and choosing the data folder.
+Use **Settings** for adding project and choosing the data folder.
 
 In all five apps, choose **Settings → Add session by hand** to record completed
-work. Select a nonprofit, describe what you worked on, and enter the start and end
-dates and times in your local timezone. Add the nonprofit in Settings first if
+work. Select a project, describe what you worked on, and enter the start and end
+dates and times in your local timezone. Add the project in Settings first if
 needed. The end defaults to 15 minutes after the start and follows start changes
 until you edit the end yourself, moving to the next day when needed. The end must
 be after the start. Saving adds the session to history,
@@ -39,16 +37,16 @@ date range and completed-session count, then choose **Export CSV**. The file
 contains individual session records, including durations and notes, and its name
 includes the period and starting date. The default is the current month.
 
-All clients use these CSV columns, in order: `nonprofitName`, `startTimeUtc`,
+All clients use these CSV columns, in order: `projectName`, `startTimeUtc`,
 `endTimeUtc`, `durationSeconds`, `hours`, `notes`, `deviceId`, `platform`.
-The exports omit `sessionId`, `nonprofitId`, and `updatedAtUtc`.
+The exports omit `sessionId`, `projectId`, and `updatedAtUtc`.
 
 Periods use the device's local timezone; weeks run Monday–Sunday and months use
 calendar boundaries. A completed session belongs to its start date, including its
 full duration if it crosses midnight. Active sessions are excluded. Empty periods
 disable export and copy.
 
-**Copy summary** groups the selected sessions by nonprofit. Each
+**Copy summary** groups the selected sessions by project. Each
 heading contains its name and total duration for the selected period, followed
 by descriptions in alphabetical order. Sessions with the same displayed
 description are combined into one entry with their durations added together:
@@ -92,7 +90,7 @@ See `docs/session-schema.md`.
 
 ## Repository layout
 - `android/` Android native app
-- `apple/` shared Swift model/sync code plus iOS and macOS targets
+- `apple/` shared Swift model/storage code plus iOS and macOS targets
 - `windows/` Windows native app
 - `linux/` Linux GTK native app
 - `docs/` architecture and API contract
@@ -109,16 +107,15 @@ Open `apple/build/Time is Clearly Kept.app`. Quit any older running copy before 
 the rebuilt app. The build script also accepts Swift build options such as
 `--scratch-path /tmp/tick-build`.
 
-Click the clock in the menu bar at the top of the screen to select a nonprofit,
+Click the clock in the menu bar at the top of the screen to select a project,
 enter optional notes, and use green **Start** / red **Stop**. While tracking, the
 icon becomes a recording symbol and the panel shows elapsed time. The menu bar
-and main window share the same session, nonprofit selection, and draft notes.
+and main window share the same session, project selection, and draft notes.
 Close the main window to keep using the menu bar; choose **Open Time is Clearly Kept**
-to return to history and CSV export. Add your first nonprofit in the main window.
+to return to history and CSV export. Add your first project in the main window.
 
 Quitting does not stop an active session. Its start time is saved; reopen the app
-and press Stop to finish. Data is stored locally in
-`~/Library/Application Support/NonprofitHours/sessions.json`.
+and press Stop to finish. Data is saved in `tick.json` in your chosen folder.
 
 Export completed sessions with **Export CSV…** when you need a separate report.
 The iOS app is in `apple/iOS/`; it uses the same Swift tracking and storage library.
@@ -135,10 +132,10 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-pa
 - [Android build and installation](android/README.md): Kotlin / Jetpack Compose.
 - [Windows build and installation](windows/README.md): C# / WinUI 3.
 
-Both implement the local tracking milestone: nonprofit selection/creation,
+Both implement the local tracking milestone: project selection/creation,
 Start/Stop, notes, persistent sessions, history, totals, and CSV export. They use the
 shared versioned file format in `docs/data-storage.md`; the same data file can
-be used across platforms. Google Sheets automatic sync remains a future milestone.
+be used across platforms.
 
 `.github/workflows/native-clients.yml` builds and tests both platforms and uploads
 an Android debug APK and Windows x64 publish folder. These new platform builds have
@@ -148,7 +145,7 @@ before distributing either app.
 
 ## Linux GTK
 
-[Linux setup and tests](linux/README.md) — native GTK 4 interface with nonprofit
+[Linux setup and tests](linux/README.md) — native GTK 4 interface with project
 selection, Start/Stop, notes, restart-safe timing, history, totals, and CSV export.
 Install the system GTK/Python packages, then run `python3 -m tick` from
 `linux/`. Core tests run without GTK; the Native clients workflow also runs a GTK
@@ -178,4 +175,4 @@ finish before switching devices. See [storage behavior and compatibility](docs/d
 
 TICK stands for **Time is Clearly Kept**. Project files, executables, and CSV
 exports use `tick`. Shared data folders use `tick.json`. Application identifiers
-and private/default storage locations remain unchanged.
+remain unchanged. Data files are named `tick.json`; there is no filename migration.

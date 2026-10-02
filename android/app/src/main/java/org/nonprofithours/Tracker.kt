@@ -9,8 +9,8 @@ import java.util.UUID
 
 @Serializable data class Nonprofit(val id: String = UUID.randomUUID().toString(), val name: String)
 @Serializable data class Session(
-    val sessionId: String = UUID.randomUUID().toString(), val nonprofitId: String,
-    val nonprofitName: String, val startTimeUtc: String, val endTimeUtc: String? = null,
+    val sessionId: String = UUID.randomUUID().toString(), val projectId: String,
+    val project: String, val startTimeUtc: String, val endTimeUtc: String? = null,
     val durationSeconds: Long? = null, val notes: String, val deviceId: String,
     val platform: String = "android", val updatedAtUtc: String, val syncState: String = "pending"
 )
@@ -53,15 +53,15 @@ class Tracker(initial: TrackerState, private val save: (TrackerState) -> Unit) {
     private fun commit(next: TrackerState) { save(next); state = next }
     fun addNonprofit(input: String): String {
         val name = capitalizeEntries(input.trim())
-        require(name.isNotEmpty() && state.nonprofits.none { it.name.equals(name, true) }) { "Enter a unique nonprofit name." }
+        require(name.isNotEmpty() && state.nonprofits.none { it.name.equals(name, true) }) { "Enter a unique project name." }
         val nonprofit = Nonprofit(name = name)
         commit(state.copy(nonprofits = state.nonprofits + nonprofit))
         return nonprofit.id
     }
     fun start(id: String, notes: String = "", now: Instant = Instant.now()) {
         check(state.active == null) { "Stop the current session first." }
-        val nonprofit = requireNotNull(state.nonprofits.find { it.id == id }) { "Select a nonprofit." }
-        val session = Session(nonprofitId = id, nonprofitName = nonprofit.name, startTimeUtc = now.toString(),
+        val nonprofit = requireNotNull(state.nonprofits.find { it.id == id }) { "Select a project." }
+        val session = Session(projectId = id, project = nonprofit.name, startTimeUtc = now.toString(),
             notes = capitalizeEntries(notes), deviceId = state.deviceId, updatedAtUtc = now.toString())
         commit(state.copy(sessions = state.sessions + session))
     }
@@ -75,10 +75,10 @@ class Tracker(initial: TrackerState, private val save: (TrackerState) -> Unit) {
         }))
     }
     fun addSession(id: String, notes: String, start: Instant, end: Instant, now: Instant = Instant.now()) {
-        val nonprofit = requireNotNull(state.nonprofits.find { it.id == id }) { "Select a nonprofit." }
+        val nonprofit = requireNotNull(state.nonprofits.find { it.id == id }) { "Select a project." }
         require(notes.isNotBlank()) { "Enter what you worked on." }
         require(end.isAfter(start)) { "End must be after start." }
-        val session = Session(nonprofitId = id, nonprofitName = nonprofit.name, startTimeUtc = start.toString(),
+        val session = Session(projectId = id, project = nonprofit.name, startTimeUtc = start.toString(),
             endTimeUtc = end.toString(), durationSeconds = Duration.between(start, end).seconds,
             notes = capitalizeEntries(notes), deviceId = state.deviceId, updatedAtUtc = now.toString())
         commit(state.copy(sessions = state.sessions + session))
@@ -107,8 +107,8 @@ class Tracker(initial: TrackerState, private val save: (TrackerState) -> Unit) {
         }
         fun duration(seconds: Long) = "%02d:%02d:%02d".format(java.util.Locale.ROOT,
             seconds / 3600, seconds % 3600 / 60, seconds % 60)
-        return exportSessions(range, zone).groupBy { it.nonprofitId }.values.joinToString("\n\n") { sessions ->
-            "${sessions.first().nonprofitName} ${duration(sessions.sumOf { it.durationSeconds ?: 0 })}:\n" +
+        return exportSessions(range, zone).groupBy { it.projectId }.values.joinToString("\n\n") { sessions ->
+            "${sessions.first().project} ${duration(sessions.sumOf { it.durationSeconds ?: 0 })}:\n" +
                 sessions.flatMap { activities(it) }.groupBy { it.first }.entries
                     .sortedWith(compareBy<Map.Entry<String, List<Pair<String, Long>>>> { it.key.lowercase(java.util.Locale.ROOT) }.thenBy { it.key })
                     .joinToString("\n") { "${it.key}   ${duration(it.value.sumOf { s -> s.second })}" }
@@ -120,10 +120,10 @@ class Tracker(initial: TrackerState, private val save: (TrackerState) -> Unit) {
             return "\"${safe.replace("\"", "\"\"")}\""
         }
         val rows = exportSessions(range, zone).map { s ->
-            listOf(s.nonprofitName, s.startTimeUtc, s.endTimeUtc.orEmpty(),
+            listOf(s.project, s.startTimeUtc, s.endTimeUtc.orEmpty(),
                 s.durationSeconds.toString(), ((s.durationSeconds ?: 0) / 3600.0).toString(), s.notes,
                 s.deviceId, s.platform).joinToString(",") { cell(it) }
         }
-        return (listOf("nonprofitName,startTimeUtc,endTimeUtc,durationSeconds,hours,notes,deviceId,platform") + rows).joinToString("\r\n") + "\r\n"
+        return (listOf("project,startTimeUtc,endTimeUtc,durationSeconds,hours,notes,deviceId,platform") + rows).joinToString("\r\n") + "\r\n"
     }
 }

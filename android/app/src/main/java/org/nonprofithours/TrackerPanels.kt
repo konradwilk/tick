@@ -20,7 +20,7 @@ import java.time.format.DateTimeFormatter
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Box {
             OutlinedButton(onClick = { menu = true }, enabled = active == null, modifier = Modifier.fillMaxWidth()) {
-                Text("Nonprofit: " + (state.nonprofits.find { it.id == selected }?.name ?: "Choose a nonprofit"))
+                Text("Project: " + (state.nonprofits.find { it.id == selected }?.name ?: "Choose a project"))
             }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                 state.nonprofits.forEach { nonprofit ->
@@ -32,7 +32,7 @@ import java.time.format.DateTimeFormatter
             colors = ButtonDefaults.buttonColors(containerColor = if (active == null) Color(0xFF176C45) else Color(0xFFB3261E))) {
             Text(if (active == null) "Start" else "Stop", style = MaterialTheme.typography.titleLarge)
         }
-        Text(active?.let { "${it.nonprofitName}: ${displayDuration(Duration.between(Instant.parse(it.startTimeUtc), now).seconds.coerceAtLeast(0))}" }
+        Text(active?.let { "${it.project}: ${displayDuration(Duration.between(Instant.parse(it.startTimeUtc), now).seconds.coerceAtLeast(0))}" }
             ?: "Ready when you are", style = MaterialTheme.typography.titleMedium)
         OutlinedTextField(notes, onNotes, Modifier.fillMaxWidth(), label = { Text("What are you working on? (optional)") }, enabled = active == null, singleLine = true)
         if (state.nonprofits.isEmpty()) TextButton(onClick = onSettings) { Text("Add your first nonprofit in Settings") }
@@ -47,7 +47,7 @@ import java.time.format.DateTimeFormatter
         state.sessions.asReversed().forEach { session ->
             OutlinedCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(session.nonprofitName, style = MaterialTheme.typography.titleMedium)
+                    Text(session.project, style = MaterialTheme.typography.titleMedium)
                     Text(Instant.parse(session.startTimeUtc).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("MMM d, yyyy HH:mm")), style = MaterialTheme.typography.bodySmall)
                     Text(session.durationSeconds?.let(::displayDuration) ?: "In progress")
                     Text(session.notes.ifBlank { "No notes" })

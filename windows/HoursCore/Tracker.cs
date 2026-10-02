@@ -18,7 +18,7 @@ public record ExportRange(DateOnly Start, DateOnly End)
     }
 }
 public record Nonprofit(Guid Id, string Name);
-public record Session(Guid SessionId, Guid NonprofitId, string NonprofitName,
+public record Session(Guid SessionId, Guid ProjectId, string Project,
     DateTimeOffset StartTimeUtc, DateTimeOffset? EndTimeUtc, long? DurationSeconds,
     string Notes, Guid DeviceId, string Platform, DateTimeOffset UpdatedAtUtc, string SyncState = "pending");
 public record TrackerState(Guid DeviceId, Nonprofit[] Nonprofits, Session[] Sessions)
@@ -49,7 +49,7 @@ public sealed class Tracker
     {
         var name = CapitalizeEntries(input.Trim());
         if (name.Length == 0 || State.Nonprofits.Any(n => n.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
-            throw new InvalidOperationException("Enter a unique nonprofit name.");
+            throw new InvalidOperationException("Enter a unique project name.");
         var nonprofit = new Nonprofit(Guid.NewGuid(), name);
         Commit(State with { Nonprofits = [..State.Nonprofits, nonprofit] });
         return nonprofit.Id;
@@ -57,7 +57,7 @@ public sealed class Tracker
     public void Start(Guid id, string notes = "", DateTimeOffset? now = null)
     {
         if (State.Active != null) throw new InvalidOperationException("Stop the current session first.");
-        var nonprofit = State.Nonprofits.FirstOrDefault(n => n.Id == id) ?? throw new InvalidOperationException("Select a nonprofit.");
+        var nonprofit = State.Nonprofits.FirstOrDefault(n => n.Id == id) ?? throw new InvalidOperationException("Select a project.");
         var date = (now ?? DateTimeOffset.UtcNow).ToUniversalTime();
         var session = new Session(Guid.NewGuid(), id, nonprofit.Name, date, null, null, CapitalizeEntries(notes), State.DeviceId, "windows", date);
         Commit(State with { Sessions = [..State.Sessions, session] });
@@ -72,7 +72,7 @@ public sealed class Tracker
     }
     public void AddSession(Guid id, string notes, DateTimeOffset start, DateTimeOffset end, DateTimeOffset? now = null)
     {
-        var nonprofit = State.Nonprofits.FirstOrDefault(n => n.Id == id) ?? throw new InvalidOperationException("Select a nonprofit.");
+        var nonprofit = State.Nonprofits.FirstOrDefault(n => n.Id == id) ?? throw new InvalidOperationException("Select a project.");
         if (string.IsNullOrWhiteSpace(notes)) throw new InvalidOperationException("Enter what you worked on.");
         if (end <= start) throw new InvalidOperationException("End must be after start.");
         var session = new Session(Guid.NewGuid(), id, nonprofit.Name, start.ToUniversalTime(), end.ToUniversalTime(),
@@ -111,8 +111,8 @@ public sealed class Tracker
             var seconds = session.DurationSeconds ?? 0;
             return names.Select((name, index) => (name, seconds / names.Length + (index < seconds % names.Length ? 1 : 0)));
         }
-        return string.Join("\n\n", ExportSessions(range, zone).GroupBy(s => s.NonprofitId).Select(group =>
-            $"{group.First().NonprofitName} {Duration(group.Sum(s => s.DurationSeconds ?? 0))}:\n" +
+        return string.Join("\n\n", ExportSessions(range, zone).GroupBy(s => s.ProjectId).Select(group =>
+            $"{group.First().Project} {Duration(group.Sum(s => s.DurationSeconds ?? 0))}:\n" +
             string.Join("\n", group.SelectMany(Activities).GroupBy(s => s.Name, StringComparer.Ordinal)
                 .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase).ThenBy(g => g.Key, StringComparer.Ordinal)
                 .Select(g => $"{g.Key}   {Duration(g.Sum(s => s.Seconds))}"))));
@@ -125,9 +125,9 @@ public sealed class Tracker
             return "\"" + value.Replace("\"", "\"\"") + "\"";
         }
         static string Date(DateTimeOffset value) => value.UtcDateTime.ToString("O", CultureInfo.InvariantCulture);
-        var rows = new List<string> { "nonprofitName,startTimeUtc,endTimeUtc,durationSeconds,hours,notes,deviceId,platform" };
+        var rows = new List<string> { "project,startTimeUtc,endTimeUtc,durationSeconds,hours,notes,deviceId,platform" };
         foreach (var s in ExportSessions(range, zone))
-            rows.Add(string.Join(",", new[] { s.NonprofitName,
+            rows.Add(string.Join(",", new[] { s.Project,
                 Date(s.StartTimeUtc), Date(s.EndTimeUtc!.Value), s.DurationSeconds!.Value.ToString(CultureInfo.InvariantCulture),
                 (s.DurationSeconds.Value / 3600.0).ToString(CultureInfo.InvariantCulture), s.Notes, s.DeviceId.ToString(), s.Platform }.Select(Cell)));
         return string.Join("\r\n", rows) + "\r\n";
