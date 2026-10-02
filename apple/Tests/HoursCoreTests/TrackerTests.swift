@@ -2,6 +2,21 @@ import XCTest
 @testable import HoursCore
 
 final class TrackerTests: XCTestCase {
+    func testCapitalizesNewAndEditedActivities() throws {
+        let file = location()
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+        let tracker = try Tracker(file: file)
+        let id = try tracker.addNonprofit("kitchen")
+        XCTAssertEqual(tracker.state.nonprofits.first?.name, "Kitchen")
+        let start = Date(timeIntervalSince1970: 0)
+        try tracker.start(nonprofitId: id, notes: "  emails, google Fi\n990-EZ review", now: start)
+        XCTAssertEqual(tracker.state.active?.notes, "  Emails, Google Fi\n990-EZ review")
+        try tracker.stop(now: start.addingTimeInterval(3600))
+        try tracker.updateNotes(sessionId: tracker.state.sessions[0].sessionId, notes: "collect payments\r\n\"annual meeting\",MN DOT")
+        XCTAssertEqual(tracker.state.sessions[0].notes, "Collect payments\r\n\"Annual meeting\",MN DOT")
+        try tracker.addSession(nonprofitId: id, notes: "cooking,etc", start: start, end: start.addingTimeInterval(900))
+        XCTAssertEqual(tracker.state.sessions.last?.notes, "Cooking,Etc")
+    }
     func testDeleteOnlyShortCompletedSessions() throws {
         let file = location()
         defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
@@ -91,7 +106,7 @@ final class TrackerTests: XCTestCase {
         let start = try XCTUnwrap(formatter.date(from: "2024-12-31T22:00:00Z"))
         try tracker.start(nonprofitId: id, notes: "Outside", now: start.addingTimeInterval(-1))
         try tracker.stop(now: start)
-        let notes = "Meals, \"served\"\nCleanup 🍲"
+        let notes = "Meals, \"Served\"\nCleanup 🍲"
         try tracker.start(nonprofitId: id, notes: notes, now: start)
         try tracker.stop(now: start.addingTimeInterval(90000))
         try tracker.start(nonprofitId: id, notes: "End boundary", now: start.addingTimeInterval(86400))
@@ -100,7 +115,7 @@ final class TrackerTests: XCTestCase {
         let zone = try XCTUnwrap(TimeZone(secondsFromGMT: 7200))
         let range = ExportRange(period: .daily, date: start, timeZone: zone)
         XCTAssertEqual(tracker.exportSessions(range: range).count, 1)
-        XCTAssertEqual(tracker.clipboardText(range: range), "Kitchen 25:00:00:\n\"served\"   08:20:00\nCleanup 🍲   08:20:00\nMeals   08:20:00")
+        XCTAssertEqual(tracker.clipboardText(range: range), "Kitchen 25:00:00:\n\"Served\"   08:20:00\nCleanup 🍲   08:20:00\nMeals   08:20:00")
         XCTAssertFalse(tracker.csv(range: range).contains("Outside"))
         XCTAssertFalse(tracker.csv(range: range).contains("End boundary"))
         XCTAssertFalse(tracker.csv(range: range).contains("Active"))
@@ -125,7 +140,7 @@ final class TrackerTests: XCTestCase {
         try tracker.stop(now: start.addingTimeInterval(3600))
         let original = try XCTUnwrap(tracker.state.sessions.first)
         let editedAt = start.addingTimeInterval(7200)
-        for notes in ["Meals, \"served\"\nCleanup 🍲", ""] {
+        for notes in ["Meals, \"Served\"\nCleanup 🍲", ""] {
             try tracker.updateNotes(sessionId: original.sessionId, notes: notes, now: editedAt)
             let restored = try XCTUnwrap(Tracker(file: file).state.sessions.first)
             XCTAssertEqual(restored.notes, notes)
@@ -167,14 +182,14 @@ final class TrackerTests: XCTestCase {
         let tracker = try Tracker(file: file)
         let id = try tracker.addNonprofit("=SUM(1,2)")
         let start = Date(timeIntervalSince1970: 0)
-        try tracker.start(nonprofitId: id, notes: "A, \"quote\"\nand newline", now: start)
+        try tracker.start(nonprofitId: id, notes: "A, \"Quote\"\nand newline", now: start)
         XCTAssertFalse(tracker.csv().contains("SUM"))
         try tracker.stop(now: start.addingTimeInterval(60))
         XCTAssertEqual(tracker.csv().components(separatedBy: "\r\n").first, "nonprofitName,startTimeUtc,endTimeUtc,durationSeconds,hours,notes,deviceId,platform")
         XCTAssertFalse(tracker.csv().contains(id.uuidString))
         XCTAssertFalse(tracker.csv().contains(try XCTUnwrap(tracker.state.sessions.first?.sessionId).uuidString))
         XCTAssertTrue(tracker.csv().contains("\"'=SUM(1,2)\""))
-        XCTAssertTrue(tracker.csv().contains("\"A, \"\"quote\"\"\nand newline\""))
+        XCTAssertTrue(tracker.csv().contains("\"A, \"\"Quote\"\"\nand newline\""))
         XCTAssertTrue(tracker.csv().contains("1970-01-01T00:01:00Z"))
     }
     func testInvalidActionsAndBackwardClockDoNotChangeSession() throws {

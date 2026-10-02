@@ -29,13 +29,25 @@ public record TrackerState(Guid DeviceId, Nonprofit[] Nonprofits, Session[] Sess
 }
 public sealed class Tracker
 {
+    private static string CapitalizeEntries(string value)
+    {
+        var result = new System.Text.StringBuilder();
+        var first = true;
+        foreach (var character in value)
+        {
+            result.Append(first && char.IsLetter(character) ? char.ToUpperInvariant(character) : character);
+            if (char.IsLetter(character)) first = false;
+            if (character is ',' or '\r' or '\n') first = true;
+        }
+        return result.ToString();
+    }
     public TrackerState State { get; private set; }
     private readonly Action<TrackerState> save;
     public Tracker(TrackerState initial, Action<TrackerState> save) { State = initial; this.save = save; }
     private void Commit(TrackerState next) { save(next); State = next; }
     public Guid AddNonprofit(string input)
     {
-        var name = input.Trim();
+        var name = CapitalizeEntries(input.Trim());
         if (name.Length == 0 || State.Nonprofits.Any(n => n.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
             throw new InvalidOperationException("Enter a unique nonprofit name.");
         var nonprofit = new Nonprofit(Guid.NewGuid(), name);
@@ -47,7 +59,7 @@ public sealed class Tracker
         if (State.Active != null) throw new InvalidOperationException("Stop the current session first.");
         var nonprofit = State.Nonprofits.FirstOrDefault(n => n.Id == id) ?? throw new InvalidOperationException("Select a nonprofit.");
         var date = (now ?? DateTimeOffset.UtcNow).ToUniversalTime();
-        var session = new Session(Guid.NewGuid(), id, nonprofit.Name, date, null, null, notes, State.DeviceId, "windows", date);
+        var session = new Session(Guid.NewGuid(), id, nonprofit.Name, date, null, null, CapitalizeEntries(notes), State.DeviceId, "windows", date);
         Commit(State with { Sessions = [..State.Sessions, session] });
     }
     public void Stop(DateTimeOffset? now = null)
@@ -64,7 +76,7 @@ public sealed class Tracker
         if (string.IsNullOrWhiteSpace(notes)) throw new InvalidOperationException("Enter what you worked on.");
         if (end <= start) throw new InvalidOperationException("End must be after start.");
         var session = new Session(Guid.NewGuid(), id, nonprofit.Name, start.ToUniversalTime(), end.ToUniversalTime(),
-            (long)(end - start).TotalSeconds, notes, State.DeviceId, "windows", (now ?? DateTimeOffset.UtcNow).ToUniversalTime());
+            (long)(end - start).TotalSeconds, CapitalizeEntries(notes), State.DeviceId, "windows", (now ?? DateTimeOffset.UtcNow).ToUniversalTime());
         Commit(State with { Sessions = [..State.Sessions, session] });
     }
     public void DeleteSession(Guid sessionId)
@@ -78,7 +90,7 @@ public sealed class Tracker
     {
         var session = State.Sessions.FirstOrDefault(s => s.SessionId == sessionId)
             ?? throw new InvalidOperationException("The session could not be found.");
-        var updated = session with { Notes = notes, UpdatedAtUtc = (now ?? DateTimeOffset.UtcNow).ToUniversalTime(), SyncState = "pending" };
+        var updated = session with { Notes = CapitalizeEntries(notes), UpdatedAtUtc = (now ?? DateTimeOffset.UtcNow).ToUniversalTime(), SyncState = "pending" };
         Commit(State with { Sessions = State.Sessions.Select(s => s.SessionId == sessionId ? updated : s).ToArray() });
     }
     public Session[] ExportSessions(ExportRange? range = null, TimeZoneInfo? zone = null) => State.Sessions

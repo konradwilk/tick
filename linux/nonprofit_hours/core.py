@@ -10,6 +10,18 @@ from datetime import datetime, timezone, timedelta
 from uuid import uuid4, UUID
 
 
+def capitalize_entries(value):
+    first = True
+    result = []
+    for character in value:
+        result.append(character.upper() if first and character.isalpha() else character)
+        if character.isalpha():
+            first = False
+        if character in ",\r\n":
+            first = True
+    return "".join(result)
+
+
 def timestamp(value=None):
     value = value or datetime.now(timezone.utc)
     if value.tzinfo is None:
@@ -139,7 +151,7 @@ class Tracker:
         self.state = state
 
     def add_nonprofit(self, name):
-        name = name.strip()
+        name = capitalize_entries(name.strip())
         if not name or any(n["name"].casefold() == name.casefold() for n in self.state["nonprofits"]):
             raise ValueError("Enter a unique nonprofit name.")
         nonprofit = {"id": str(uuid4()), "name": name}
@@ -158,7 +170,7 @@ class Tracker:
         state = copy.deepcopy(self.state)
         state["sessions"].append({"sessionId": str(uuid4()), "nonprofitId": nonprofit_id,
             "nonprofitName": nonprofit["name"], "startTimeUtc": date, "endTimeUtc": None,
-            "durationSeconds": None, "notes": notes, "deviceId": state["deviceId"],
+            "durationSeconds": None, "notes": capitalize_entries(notes), "deviceId": state["deviceId"],
             "platform": "linux", "updatedAtUtc": date, "syncState": "pending"})
         self.commit(state)
 
@@ -175,7 +187,7 @@ class Tracker:
         state = copy.deepcopy(self.state)
         state["sessions"].append({"sessionId": str(uuid4()), "nonprofitId": nonprofit_id,
             "nonprofitName": nonprofit["name"], "startTimeUtc": start_text, "endTimeUtc": end_text,
-            "durationSeconds": int(seconds), "notes": notes, "deviceId": state["deviceId"],
+            "durationSeconds": int(seconds), "notes": capitalize_entries(notes), "deviceId": state["deviceId"],
             "platform": "linux", "updatedAtUtc": timestamp(now), "syncState": "pending"})
         self.commit(state)
 
@@ -194,7 +206,7 @@ class Tracker:
         session = next((s for s in state["sessions"] if s["sessionId"] == session_id), None)
         if session is None:
             raise ValueError("The session could not be found.")
-        session.update(notes=notes, updatedAtUtc=timestamp(now), syncState="pending")
+        session.update(notes=capitalize_entries(notes), updatedAtUtc=timestamp(now), syncState="pending")
         self.commit(state)
 
     def stop(self, now=None):

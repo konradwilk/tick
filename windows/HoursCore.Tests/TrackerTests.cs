@@ -3,6 +3,19 @@ using Xunit;
 namespace HoursCore.Tests;
 public class TrackerTests
 {
+    [Fact] public void CapitalizesNewAndEditedActivitiesWithoutChangingOtherLetters()
+    {
+        var tracker = new Tracker(TrackerState.Empty(), _ => { });
+        var id = tracker.AddNonprofit("kitchen");
+        Assert.Equal("Kitchen", tracker.State.Nonprofits.Single().Name);
+        tracker.Start(id, "  emails, google Fi\n990-EZ review", DateTimeOffset.UnixEpoch);
+        Assert.Equal("  Emails, Google Fi\n990-EZ review", tracker.State.Active!.Notes);
+        tracker.Stop(DateTimeOffset.UnixEpoch.AddHours(1));
+        tracker.UpdateNotes(tracker.State.Sessions.Single().SessionId, "collect payments\r\n\"annual meeting\",MN DOT");
+        Assert.Equal("Collect payments\r\n\"Annual meeting\",MN DOT", tracker.State.Sessions.Single().Notes);
+        tracker.AddSession(id, "cooking,etc", DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch.AddMinutes(15));
+        Assert.Equal("Cooking,Etc", tracker.State.Sessions.Last().Notes);
+    }
     [Theory]
     [InlineData(0)] [InlineData(59)] [InlineData(60)]
     public void DeleteOnlyShortCompletedSessions(int seconds)
@@ -103,7 +116,7 @@ public class TrackerTests
         var start = DateTimeOffset.Parse("2024-12-31T22:00:00Z");
         tracker.Start(id, "Outside", start.AddSeconds(-1));
         tracker.Stop(start);
-        tracker.Start(id, "Meals, \"served\"\nCleanup 🍲", start);
+        tracker.Start(id, "Meals, \"Served\"\nCleanup 🍲", start);
         tracker.Stop(start.AddHours(25));
         tracker.Start(id, "End boundary", start.AddDays(1));
         tracker.Stop(start.AddDays(1).AddMinutes(1));
@@ -111,9 +124,9 @@ public class TrackerTests
         var range = ExportRange.For(ExportPeriod.Daily, new DateOnly(2025, 1, 1));
         var zone = TimeZoneInfo.CreateCustomTimeZone("Test", TimeSpan.FromHours(2), "Test", "Test");
         Assert.Single(tracker.ExportSessions(range, zone));
-        Assert.Equal("Kitchen 25:00:00:\n\"served\"   08:20:00\nCleanup 🍲   08:20:00\nMeals   08:20:00", tracker.ClipboardText(range, zone));
+        Assert.Equal("Kitchen 25:00:00:\n\"Served\"   08:20:00\nCleanup 🍲   08:20:00\nMeals   08:20:00", tracker.ClipboardText(range, zone));
         var csv = tracker.Csv(range, zone);
-        Assert.Contains("Meals, \"\"served\"\"\nCleanup 🍲", csv);
+        Assert.Contains("Meals, \"\"Served\"\"\nCleanup 🍲", csv);
         Assert.DoesNotContain("Outside", csv);
         Assert.DoesNotContain("Active", csv);
         Assert.DoesNotContain("End boundary", csv);
@@ -123,7 +136,7 @@ public class TrackerTests
         Assert.Equal("", tracker.ClipboardText(ExportRange.For(ExportPeriod.Daily, new DateOnly(2025, 1, 3)), zone));
     }
     [Theory]
-    [InlineData("Updated work, \"details\"\nSecond line")]
+    [InlineData("Updated work, \"Details\"\nSecond line")]
     [InlineData("")]
     public void EditedNotesPersistWithoutChangingRecordedHours(string notes)
     {
@@ -188,7 +201,7 @@ public class TrackerTests
         Assert.Throws<InvalidOperationException>(() => tracker.AddNonprofit(" "));
         var id = tracker.AddNonprofit("=SUM(1,2)");
         Assert.Throws<InvalidOperationException>(() => tracker.AddNonprofit("=sum(1,2)"));
-        tracker.Start(id, "A, \"quote\"\nline", DateTimeOffset.UnixEpoch);
+        tracker.Start(id, "A, \"Quote\"\nLine", DateTimeOffset.UnixEpoch);
         Assert.DoesNotContain("SUM", tracker.Csv());
         Assert.Throws<InvalidOperationException>(() => tracker.Stop(DateTimeOffset.UnixEpoch.AddSeconds(-1)));
         Assert.NotNull(tracker.State.Active);
@@ -197,6 +210,6 @@ public class TrackerTests
         Assert.DoesNotContain(id.ToString(), tracker.Csv());
         Assert.DoesNotContain(tracker.State.Sessions.Single().SessionId.ToString(), tracker.Csv());
         Assert.Contains("\"'=SUM(1,2)\"", tracker.Csv());
-        Assert.Contains("\"A, \"\"quote\"\"\nline\"", tracker.Csv());
+        Assert.Contains("\"A, \"\"Quote\"\"\nLine\"", tracker.Csv());
     }
 }

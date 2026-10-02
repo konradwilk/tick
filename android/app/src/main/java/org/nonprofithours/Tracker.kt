@@ -38,11 +38,21 @@ data class ExportRange(val start: LocalDate, val end: LocalDate) {
     }
 }
 class Tracker(initial: TrackerState, private val save: (TrackerState) -> Unit) {
+    private fun capitalizeEntries(value: String): String {
+        var first = true
+        return buildString {
+            value.forEach { character ->
+                append(if (first && character.isLetter()) character.uppercaseChar() else character)
+                if (character.isLetter()) first = false
+                if (character in listOf(',', '\r', '\n')) first = true
+            }
+        }
+    }
     var state = initial
         private set
     private fun commit(next: TrackerState) { save(next); state = next }
     fun addNonprofit(input: String): String {
-        val name = input.trim()
+        val name = capitalizeEntries(input.trim())
         require(name.isNotEmpty() && state.nonprofits.none { it.name.equals(name, true) }) { "Enter a unique nonprofit name." }
         val nonprofit = Nonprofit(name = name)
         commit(state.copy(nonprofits = state.nonprofits + nonprofit))
@@ -52,7 +62,7 @@ class Tracker(initial: TrackerState, private val save: (TrackerState) -> Unit) {
         check(state.active == null) { "Stop the current session first." }
         val nonprofit = requireNotNull(state.nonprofits.find { it.id == id }) { "Select a nonprofit." }
         val session = Session(nonprofitId = id, nonprofitName = nonprofit.name, startTimeUtc = now.toString(),
-            notes = notes, deviceId = state.deviceId, updatedAtUtc = now.toString())
+            notes = capitalizeEntries(notes), deviceId = state.deviceId, updatedAtUtc = now.toString())
         commit(state.copy(sessions = state.sessions + session))
     }
     fun stop(now: Instant = Instant.now()) {
@@ -70,7 +80,7 @@ class Tracker(initial: TrackerState, private val save: (TrackerState) -> Unit) {
         require(end.isAfter(start)) { "End must be after start." }
         val session = Session(nonprofitId = id, nonprofitName = nonprofit.name, startTimeUtc = start.toString(),
             endTimeUtc = end.toString(), durationSeconds = Duration.between(start, end).seconds,
-            notes = notes, deviceId = state.deviceId, updatedAtUtc = now.toString())
+            notes = capitalizeEntries(notes), deviceId = state.deviceId, updatedAtUtc = now.toString())
         commit(state.copy(sessions = state.sessions + session))
     }
     fun deleteSession(sessionId: String) {
@@ -81,7 +91,7 @@ class Tracker(initial: TrackerState, private val save: (TrackerState) -> Unit) {
     fun updateNotes(sessionId: String, notes: String, now: Instant = Instant.now()) {
         require(state.sessions.any { it.sessionId == sessionId }) { "The session could not be found." }
         commit(state.copy(sessions = state.sessions.map {
-            if (it.sessionId != sessionId) it else it.copy(notes = notes, updatedAtUtc = now.toString(), syncState = "pending")
+            if (it.sessionId != sessionId) it else it.copy(notes = capitalizeEntries(notes), updatedAtUtc = now.toString(), syncState = "pending")
         }))
     }
     fun exportSessions(range: ExportRange? = null, zone: ZoneId = ZoneId.systemDefault()): List<Session> =

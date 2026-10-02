@@ -14,6 +14,11 @@ Native time-tracking apps for Android, iPhone, macOS, Windows, and Linux with CS
 
 ## Native clients
 
+New nonprofit names and saved notes capitalize the first letter of each entry.
+Commas and line breaks start a new activity; other casing and whitespace are preserved.
+This applies to tracking, manual sessions, and note edits. Existing saved data is
+unchanged until edited.
+
 The main screen puts nonprofit selection and Start/Stop first, followed by notes.
 History and **Export & copy** sit side by side in wide windows and stack on
 phones or narrow windows. Capture stays visible while the workspace scrolls.

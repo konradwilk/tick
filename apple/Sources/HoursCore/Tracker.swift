@@ -71,6 +71,16 @@ public enum TrackerError: LocalizedError {
 
 /// Each change is saved atomically before it becomes visible to the caller.
 public final class Tracker {
+    private func capitalizeEntries(_ value: String) -> String {
+        var first = true
+        var result = ""
+        for character in value {
+            result += first && character.isLetter ? String(character).uppercased() : String(character)
+            if character.isLetter { first = false }
+            if character == "," || character == "\r" || character == "\n" || character == "\r\n" { first = true }
+        }
+        return result
+    }
     public private(set) var state: TrackerState
     public let file: URL
     private var snapshot: Data?
@@ -104,7 +114,7 @@ public final class Tracker {
         return try Tracker(file: destination, requireExisting: true)
     }
     @discardableResult public func addNonprofit(_ name: String) throws -> UUID {
-        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = capitalizeEntries(name.trimmingCharacters(in: .whitespacesAndNewlines))
         guard !name.isEmpty, !state.nonprofits.contains(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else { throw TrackerError.invalidNonprofit }
         let nonprofit = Nonprofit(name: name)
         var next = state
@@ -116,7 +126,7 @@ public final class Tracker {
         guard state.active == nil else { throw TrackerError.activeSession }
         guard let nonprofit = state.nonprofits.first(where: { $0.id == nonprofitId }) else { throw TrackerError.invalidNonprofit }
         var next = state
-        next.sessions.append(Session(sessionId: UUID(), nonprofitId: nonprofit.id, nonprofitName: nonprofit.name, startTimeUtc: now, notes: notes, deviceId: state.deviceId, platform: platform, updatedAtUtc: now, syncState: "pending"))
+        next.sessions.append(Session(sessionId: UUID(), nonprofitId: nonprofit.id, nonprofitName: nonprofit.name, startTimeUtc: now, notes: capitalizeEntries(notes), deviceId: state.deviceId, platform: platform, updatedAtUtc: now, syncState: "pending"))
         try save(next)
     }
     public func stop(now: Date = Date()) throws {
@@ -134,7 +144,7 @@ public final class Tracker {
         guard end > start else { throw TrackerError.invalidInterval }
         var next = state
         next.sessions.append(Session(sessionId: UUID(), nonprofitId: nonprofit.id, nonprofitName: nonprofit.name,
-            startTimeUtc: start, endTimeUtc: end, durationSeconds: Int(end.timeIntervalSince(start)), notes: notes,
+            startTimeUtc: start, endTimeUtc: end, durationSeconds: Int(end.timeIntervalSince(start)), notes: capitalizeEntries(notes),
             deviceId: state.deviceId, platform: platform, updatedAtUtc: now, syncState: "pending"))
         try save(next)
     }
@@ -148,7 +158,7 @@ public final class Tracker {
     public func updateNotes(sessionId: UUID, notes: String, now: Date = Date()) throws {
         guard let index = state.sessions.firstIndex(where: { $0.sessionId == sessionId }) else { throw TrackerError.missingSession }
         var next = state
-        next.sessions[index].notes = notes
+        next.sessions[index].notes = capitalizeEntries(notes)
         next.sessions[index].updatedAtUtc = now
         next.sessions[index].syncState = "pending"
         try save(next)

@@ -12,6 +12,17 @@ from nonprofit_hours.core import FileStore, Tracker, data_path, elapsed, period_
 
 
 class TrackerTests(unittest.TestCase):
+    def test_capitalizes_new_and_edited_activities(self):
+        nonprofit = self.tracker.add_nonprofit("kitchen")
+        self.assertEqual("Kitchen", self.tracker.state["nonprofits"][0]["name"])
+        self.tracker.start(nonprofit, "  emails, google Fi\n990-EZ review", self.start)
+        self.assertEqual("  Emails, Google Fi\n990-EZ review", self.tracker.active["notes"])
+        self.tracker.stop(self.start + timedelta(hours=1))
+        self.tracker.update_notes(self.tracker.state["sessions"][0]["sessionId"], 'collect payments\r\n"annual meeting",MN DOT')
+        self.assertEqual('Collect payments\r\n"Annual meeting",MN DOT', self.tracker.state["sessions"][0]["notes"])
+        self.tracker.add_session(nonprofit, "cooking,etc", self.start, self.start + timedelta(minutes=15))
+        self.assertEqual("Cooking,Etc", self.tracker.state["sessions"][-1]["notes"])
+
     def test_delete_only_short_completed_sessions(self):
         nonprofit = self.tracker.add_nonprofit("Kitchen")
         for seconds in (0, 59, 60):
@@ -97,7 +108,7 @@ class TrackerTests(unittest.TestCase):
     def test_exports_and_clipboard_use_local_start_dates(self):
         nonprofit = self.tracker.add_nonprofit("Kitchen")
         start = datetime(2024, 12, 31, 22, tzinfo=timezone.utc)
-        notes = 'Meals, "served"\nCleanup 🍲'
+        notes = 'Meals, "Served"\nCleanup 🍲'
         for offset, duration, text in [(-1, 1, "Outside"), (0, 90000, notes), (86400, 60, "End boundary")]:
             self.tracker.start(nonprofit, text, start + timedelta(seconds=offset))
             self.tracker.stop(start + timedelta(seconds=offset + duration))
@@ -106,7 +117,7 @@ class TrackerTests(unittest.TestCase):
         day = date(2025, 1, 1)
         rows = list(csv.DictReader(io.StringIO(self.tracker.csv("Daily", day, zone))))
         self.assertEqual([row["notes"] for row in rows], [notes])
-        self.assertEqual(self.tracker.clipboard_text("Daily", day, zone), 'Kitchen 25:00:00:\n"served"   08:20:00\nCleanup 🍲   08:20:00\nMeals   08:20:00')
+        self.assertEqual(self.tracker.clipboard_text("Daily", day, zone), 'Kitchen 25:00:00:\n"Served"   08:20:00\nCleanup 🍲   08:20:00\nMeals   08:20:00')
         self.assertEqual(self.tracker.clipboard_text("Daily", date(2025, 1, 3), zone), "")
         self.assertEqual(len(self.tracker.export_sessions("Monthly", day, zone)), 2)
         self.assertEqual(len(self.tracker.export_sessions("Weekly", day, zone)), 3)
@@ -139,7 +150,7 @@ class TrackerTests(unittest.TestCase):
         self.tracker.start(nonprofit, "Original", self.start)
         self.tracker.stop(self.start + timedelta(hours=1))
         original = copy.deepcopy(self.tracker.state["sessions"][0])
-        for notes in ('Meals, "served"\nCleanup 🍲', ''):
+        for notes in ('Meals, "Served"\nCleanup 🍲', ''):
             self.tracker.update_notes(original["sessionId"], notes, self.start)
             expected = dict(original, notes=notes, updatedAtUtc=original["startTimeUtc"], syncState="pending")
             self.assertEqual(Tracker(FileStore(self.path)).state["sessions"][0], expected)
@@ -209,14 +220,14 @@ class TrackerTests(unittest.TestCase):
 
     def test_csv_round_trip_and_formula_escaping(self):
         nonprofit = self.tracker.add_nonprofit("=SUM(1,2)")
-        self.tracker.start(nonprofit, 'A, "quote"\nand a newline', self.start)
+        self.tracker.start(nonprofit, 'A, "Quote"\nAnd a newline', self.start)
         self.assertEqual(len(list(csv.reader(io.StringIO(self.tracker.csv())))), 1)
         self.tracker.stop(self.start + timedelta(hours=1))
         rows = list(csv.DictReader(io.StringIO(self.tracker.csv())))
         self.assertEqual(rows[0]["nonprofitName"], "'=SUM(1,2)")
         self.assertEqual(list(rows[0]), ["nonprofitName", "startTimeUtc", "endTimeUtc", "durationSeconds", "hours", "notes", "deviceId", "platform"])
         self.assertNotIn(None, rows[0])
-        self.assertEqual(rows[0]["notes"], 'A, "quote"\nand a newline')
+        self.assertEqual(rows[0]["notes"], 'A, "Quote"\nAnd a newline')
         self.assertEqual(rows[0]["hours"], "1.0")
         self.assertEqual(rows[0]["startTimeUtc"], "2026-01-01T00:00:00Z")
         self.assertEqual(self.tracker.state["sessions"][0]["syncState"], "pending")

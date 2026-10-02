@@ -8,6 +8,18 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 class TrackerTest {
+    @Test fun capitalizesNewAndEditedActivities() {
+        val tracker = Tracker(TrackerState()) {}
+        val id = tracker.addNonprofit("kitchen")
+        assertEquals("Kitchen", tracker.state.nonprofits.single().name)
+        tracker.start(id, "  emails, google Fi\n990-EZ review", Instant.EPOCH)
+        assertEquals("  Emails, Google Fi\n990-EZ review", tracker.state.active!!.notes)
+        tracker.stop(Instant.EPOCH.plusSeconds(3600))
+        tracker.updateNotes(tracker.state.sessions.single().sessionId, "collect payments\r\n\"annual meeting\",MN DOT")
+        assertEquals("Collect payments\r\n\"Annual meeting\",MN DOT", tracker.state.sessions.single().notes)
+        tracker.addSession(id, "cooking,etc", Instant.EPOCH, Instant.EPOCH.plusSeconds(900))
+        assertEquals("Cooking,Etc", tracker.state.sessions.last().notes)
+    }
     @Test fun deleteOnlyShortCompletedSessions() {
         val tracker = Tracker(TrackerState()) {}
         val id = tracker.addNonprofit("Kitchen")
@@ -97,7 +109,7 @@ class TrackerTest {
         val start = Instant.parse("2024-12-31T22:00:00Z")
         tracker.start(id, "Outside", start.minusSeconds(1))
         tracker.stop(start)
-        val notes = "Meals, \"served\"\nCleanup 🍲"
+        val notes = "Meals, \"Served\"\nCleanup 🍲"
         tracker.start(id, notes, start)
         tracker.stop(start.plusSeconds(90000))
         tracker.start(id, "End boundary", start.plusSeconds(86400))
@@ -106,7 +118,7 @@ class TrackerTest {
         val range = ExportRange.forDate(ExportPeriod.Daily, LocalDate.parse("2025-01-01"))
         val zone = ZoneId.of("+02:00")
         assertEquals(1, tracker.exportSessions(range, zone).size)
-        assertEquals("Kitchen 25:00:00:\n\"served\"   08:20:00\nCleanup 🍲   08:20:00\nMeals   08:20:00", tracker.clipboardText(range, zone))
+        assertEquals("Kitchen 25:00:00:\n\"Served\"   08:20:00\nCleanup 🍲   08:20:00\nMeals   08:20:00", tracker.clipboardText(range, zone))
         assertFalse(tracker.csv(range, zone).contains("Outside"))
         assertFalse(tracker.csv(range, zone).contains("Active"))
         assertFalse(tracker.csv(range, zone).contains("End boundary"))
@@ -121,7 +133,7 @@ class TrackerTest {
         var saved = ""
         val editor = Tracker(tracker.state.copy(sessions = listOf(original))) { saved = Json.encodeToString(it) }
         val editedAt = Instant.EPOCH.plusSeconds(7200)
-        for (notes in listOf("Meals, \"served\"\nCleanup 🍲", "")) {
+        for (notes in listOf("Meals, \"Served\"\nCleanup 🍲", "")) {
             editor.updateNotes(original.sessionId, notes, editedAt)
             val restored = Json.decodeFromString<TrackerState>(saved)
             assertEquals(original.copy(notes = notes, updatedAtUtc = editedAt.toString(), syncState = "pending"), restored.sessions.single())
@@ -156,7 +168,7 @@ class TrackerTest {
         assertThrows(IllegalArgumentException::class.java) { tracker.addNonprofit(" ") }
         val id = tracker.addNonprofit("=SUM(1,2)")
         assertThrows(IllegalArgumentException::class.java) { tracker.addNonprofit("=sum(1,2)") }
-        tracker.start(id, "A, \"quote\"\nline", Instant.EPOCH)
+        tracker.start(id, "A, \"Quote\"\nLine", Instant.EPOCH)
         assertFalse(tracker.csv().contains("SUM"))
         assertThrows(IllegalArgumentException::class.java) { tracker.stop(Instant.EPOCH.minusSeconds(1)) }
         assertNotNull(tracker.state.active)
@@ -165,6 +177,6 @@ class TrackerTest {
         assertFalse(tracker.csv().contains(id))
         assertFalse(tracker.csv().contains(tracker.state.sessions.single().sessionId))
         assertTrue(tracker.csv().contains("\"'=SUM(1,2)\""))
-        assertTrue(tracker.csv().contains("\"A, \"\"quote\"\"\nline\""))
+        assertTrue(tracker.csv().contains("\"A, \"\"Quote\"\"\nLine\""))
     }
 }
