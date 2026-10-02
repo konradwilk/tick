@@ -40,7 +40,7 @@ import UIKit
                     }
                 }
             }
-            .navigationTitle("Nonprofit Hours").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("Time is Clearly Kept").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Settings") { settings = true } } }
         }
         .onChange(of: period) { copyStatus = "" }
@@ -123,7 +123,7 @@ import UIKit
                     formatter.locale = Locale(identifier: "en_US_POSIX")
                     formatter.calendar = Calendar(identifier: .gregorian)
                     formatter.dateFormat = "yyyy-MM-dd"
-                    filename = "nonprofit-hours-\(period.rawValue.lowercased())-\(formatter.string(from: range.start))"
+                    filename = "tick-\(period.rawValue.lowercased())-\(formatter.string(from: range.start))"
                     exporting = true
                 }.buttonStyle(.bordered).disabled(count == 0)
                 Button("Copy summary") {

@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from nonprofit_hours.core import FileStore, Tracker, data_path, elapsed, period_bounds
+from tick.core import FileStore, Tracker, data_path, elapsed, period_bounds
 
 
 class TrackerTests(unittest.TestCase):
@@ -186,7 +186,7 @@ class TrackerTests(unittest.TestCase):
     def test_failed_save_preserves_memory_and_disk(self):
         nonprofit = self.tracker.add_nonprofit("Kitchen")
         original = self.path.read_bytes()
-        with patch("nonprofit_hours.core.os.replace", side_effect=OSError("Disk full")):
+        with patch("tick.core.os.replace", side_effect=OSError("Disk full")):
             with self.assertRaises(OSError):
                 self.tracker.start(nonprofit, now=self.start)
         self.assertIsNone(self.tracker.active)

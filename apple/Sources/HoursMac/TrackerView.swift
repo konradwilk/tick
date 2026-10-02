@@ -17,7 +17,7 @@ struct TrackerView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack {
-                Text("Nonprofit Hours").font(.title2.bold())
+                Text("Time is Clearly Kept").font(.title2.bold())
                 Spacer()
                 Button("Settings") { settings.toggle() }
                     .popover(isPresented: $settings) { settingsView }

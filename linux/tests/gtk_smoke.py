@@ -5,7 +5,7 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, Gio
-from nonprofit_hours.app import HoursWindow
+from tick.app import HoursWindow
 
 app = Gtk.Application(application_id="org.nonprofithours.Smoke", flags=Gio.ApplicationFlags.NON_UNIQUE)
 app.register(None)

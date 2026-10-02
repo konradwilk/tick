@@ -3,7 +3,7 @@ using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 using Forms = System.Windows.Forms;
 
-namespace NonprofitHours;
+namespace Tick;
 
 /// <summary>Owns the notification icon and its native resources on the UI thread.</summary>
 internal sealed class TrayIcon : IDisposable
@@ -15,13 +15,13 @@ internal sealed class TrayIcon : IDisposable
     public TrayIcon(Action open, Action quit)
     {
         icon = CreateClockIcon();
-        menu.Items.Add("Open Nonprofit Hours", null, (_, _) => open());
+        menu.Items.Add("Open Time is Clearly Kept", null, (_, _) => open());
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("Quit", null, (_, _) => quit());
         notification = new Forms.NotifyIcon
         {
             Icon = icon,
-            Text = "Nonprofit Hours",
+            Text = "Time is Clearly Kept",
             ContextMenuStrip = menu,
             Visible = true
         };

@@ -1,4 +1,4 @@
-# Nonprofit Hours
+# Time is Clearly Kept (TICK)
 
 Native time-tracking apps for Android, iPhone, macOS, Windows, and Linux with CSV export for Google Sheets.
 
@@ -109,15 +109,15 @@ Requires macOS 14 or later and Swift 6. Build the app from the repository root:
 sh apple/scripts/build-macos.sh
 ```
 
-Open `apple/build/Nonprofit Hours.app`. Quit any older running copy before opening
+Open `apple/build/Time is Clearly Kept.app`. Quit any older running copy before opening
 the rebuilt app. The build script also accepts Swift build options such as
-`--scratch-path /tmp/nonprofit-hours-build`.
+`--scratch-path /tmp/tick-build`.
 
 Click the clock in the menu bar at the top of the screen to select a nonprofit,
 enter optional notes, and use green **Start** / red **Stop**. While tracking, the
 icon becomes a recording symbol and the panel shows elapsed time. The menu bar
 and main window share the same session, nonprofit selection, and draft notes.
-Close the main window to keep using the menu bar; choose **Open Nonprofit Hours**
+Close the main window to keep using the menu bar; choose **Open Time is Clearly Kept**
 to return to history and CSV export. Add your first nonprofit in the main window.
 
 Quitting does not stop an active session. Its start time is saved; reopen the app
@@ -155,7 +155,7 @@ before distributing either app.
 
 [Linux setup and tests](linux/README.md) — native GTK 4 interface with nonprofit
 selection, Start/Stop, notes, restart-safe timing, history, totals, and CSV export.
-Install the system GTK/Python packages, then run `python3 -m nonprofit_hours` from
+Install the system GTK/Python packages, then run `python3 -m tick` from
 `linux/`. Core tests run without GTK; the Native clients workflow also runs a GTK
 smoke test on Ubuntu. Automatic Google Sheets sync remains pending.
 
@@ -172,3 +172,10 @@ and Android formats. Use one device at a time and let any cloud synchronization
 finish before switching devices. See [storage behavior and compatibility](docs/data-storage.md).
 
 [iPhone/iPad build instructions](apple/iOS/README.md).
+
+## Naming and compatibility
+
+TICK stands for **Time is Clearly Kept**. Project files, executables, and CSV
+exports use `tick`. Existing application identifiers, saved-data locations, and
+the portable `nonprofit-hours.json` filename are retained so existing installations
+continue to find their data and settings.

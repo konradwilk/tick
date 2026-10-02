@@ -1,7 +1,7 @@
 # iPhone and iPad
 
-Open `NonprofitHours.xcodeproj` in Xcode 16 or later on a Mac. Select the
-NonprofitHours target, choose your development team under Signing & Capabilities,
+Open `tick.xcodeproj` in Xcode 16 or later on a Mac. Select the
+tick target, choose your development team under Signing & Capabilities,
 and run on an iOS 17+ device or simulator. No third-party packages are required.
 
 The project compiles the same files in `../Sources/HoursCore` as the macOS app.
@@ -15,7 +15,7 @@ From the repository root on macOS:
 
 ```sh
 swift test --package-path apple
-xcodebuild -project apple/iOS/NonprofitHours.xcodeproj -target NonprofitHours -configuration Debug -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO build
+xcodebuild -project apple/iOS/tick.xcodeproj -target tick -configuration Debug -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO build
 ```
 
 The source was generated on Windows; an Xcode build and simulator/device check

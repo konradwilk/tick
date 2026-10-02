@@ -12,22 +12,22 @@ the edit. Session times and recorded hours stay unchanged.
 ## Build on Windows
 
 Install Visual Studio 2022 with Windows application development tools, .NET 8 SDK,
-and Windows SDK 10.0.26100. Open `NonprofitHours/NonprofitHours.csproj` in Visual
+and Windows SDK 10.0.26100. Open `tick/tick.csproj` in Visual
 Studio and select x64, or run from the repository root:
 
 ```powershell
 dotnet test windows/HoursCore.Tests/HoursCore.Tests.csproj -c Release
-dotnet publish windows/NonprofitHours/NonprofitHours.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained true -o windows/publish
+dotnet publish windows/tick/tick.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained true -o windows/publish
 ```
 
-Run `windows/publish/NonprofitHours.exe`. Keep the entire published directory together;
+Run `windows/publish/tick.exe`. Keep the entire published directory together;
 the app is unpackaged and includes its runtime dependencies. For ARM64 use
 `-p:Platform=ARM64 -r win-arm64`. Native UI compilation requires Windows; the core
 library and tests are independent of WinUI. The repository's Native clients workflow
 builds the x64 app and uploads the published directory. No installer or signing yet.
 
 The green clock icon in the Windows system tray stays available when you close the
-window. Click it to reopen, or right-click for **Open Nonprofit Hours** and **Quit**.
+window. Click it to reopen, or right-click for **Open Time is Clearly Kept** and **Quit**.
 Launching the app again also reopens the existing window. Windows may initially
 place the icon in the hidden-icons menu near the clock; drag it onto the tray to
 keep it visible. Quitting preserves any active session; press Stop to finish tracking.

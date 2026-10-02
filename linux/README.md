@@ -25,7 +25,7 @@ From the repository root:
 
 ```sh
 cd linux
-/usr/bin/python3 -m nonprofit_hours
+/usr/bin/python3 -m tick
 ```
 
 Run this in a normal graphical desktop session. Repeated launches activate the

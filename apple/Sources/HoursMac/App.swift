@@ -80,7 +80,7 @@ import HoursCore
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.dateFormat = "yyyy-MM-dd"
-        panel.nameFieldStringValue = "nonprofit-hours-\(reportPeriod.rawValue.lowercased())-\(formatter.string(from: range.start)).csv"
+        panel.nameFieldStringValue = "tick-\(reportPeriod.rawValue.lowercased())-\(formatter.string(from: range.start)).csv"
         if panel.runModal() == .OK, let url = panel.url {
             do { try snapshot.write(to: url, atomically: true, encoding: .utf8) }
             catch { self.error = error.localizedDescription }
@@ -98,12 +98,12 @@ import HoursCore
 @main struct HoursApp: App {
     @State private var model = AppModel()
     var body: some Scene {
-        Window("Nonprofit Hours", id: "main") { TrackerView(model: model) }
+        Window("Time is Clearly Kept", id: "main") { TrackerView(model: model) }
             .defaultSize(width: 1000, height: 760)
         MenuBarExtra {
             MenuBarTrackerView(model: model)
         } label: {
-            Label(model.state.active == nil ? "Nonprofit Hours" : "Tracking hours",
+            Label(model.state.active == nil ? "Time is Clearly Kept" : "Tracking hours",
                   systemImage: model.state.active == nil ? "clock" : "record.circle.fill")
         }
         .menuBarExtraStyle(.window)
@@ -154,7 +154,7 @@ struct MenuBarTrackerView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Nonprofit Hours").font(.headline)
+            Text("Time is Clearly Kept").font(.headline)
             if let active {
                 Text(active.nonprofitName).font(.subheadline.bold())
                 TimelineView(.periodic(from: .now, by: 1)) { context in
@@ -186,11 +186,11 @@ struct MenuBarTrackerView: View {
                 Button("Dismiss error") { model.error = nil }
             }
             Divider()
-            Button("Open Nonprofit Hours") {
+            Button("Open Time is Clearly Kept") {
                 openWindow(id: "main")
                 NSApplication.shared.activate(ignoringOtherApps: true)
             }
-            Button("Quit Nonprofit Hours") { NSApplication.shared.terminate(nil) }
+            Button("Quit Time is Clearly Kept") { NSApplication.shared.terminate(nil) }
             if active != nil {
                 Text("Closing the window or quitting keeps this session running until you stop it.")
                     .font(.caption).foregroundStyle(.secondary)

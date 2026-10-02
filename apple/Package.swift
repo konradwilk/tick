@@ -1,8 +1,8 @@
 // swift-tools-version: 6.0
 import PackageDescription
 let package = Package(
-    name: "NonprofitHours",
+    name: "tick",
     platforms: [.macOS(.v14), .iOS(.v17)],
-    products: [.library(name: "HoursCore", targets: ["HoursCore"]), .executable(name: "NonprofitHours", targets: ["HoursMac"])],
+    products: [.library(name: "HoursCore", targets: ["HoursCore"]), .executable(name: "tick", targets: ["HoursMac"])],
     targets: [.target(name: "HoursCore"), .executableTarget(name: "HoursMac", dependencies: ["HoursCore"]), .testTarget(name: "HoursCoreTests", dependencies: ["HoursCore"])]
 )

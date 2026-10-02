@@ -1,6 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.Windows.AppLifecycle;
-namespace NonprofitHours;
+namespace Tick;
 public partial class App : Application
 {
     private Window? window;

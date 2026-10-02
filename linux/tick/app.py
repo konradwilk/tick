@@ -1,4 +1,4 @@
-"""GTK 4 UI. Run with python3 -m nonprofit_hours from linux/."""
+"""GTK 4 UI. Run with python3 -m tick from linux/."""
 import gi
 
 gi.require_version("Gtk", "4.0")
@@ -10,7 +10,7 @@ from .layout import build_layout
 
 class HoursWindow(Gtk.ApplicationWindow):
     def __init__(self, application, path=None):
-        super().__init__(application=application, title="Nonprofit Hours", default_width=1000, default_height=760)
+        super().__init__(application=application, title="Time is Clearly Kept", default_width=1000, default_height=760)
         self.tracker = None
         self.timer = None
         self.chooser = None
@@ -272,7 +272,7 @@ class HoursWindow(Gtk.ApplicationWindow):
             self.error.set_text(str(error))
             return
         self.chooser = Gtk.FileChooserNative.new("Export completed hours", self, Gtk.FileChooserAction.SAVE, "Save", "Cancel")
-        self.chooser.set_current_name(f"nonprofit-hours-{period.lower()}-{start.isoformat()}.csv")
+        self.chooser.set_current_name(f"tick-{period.lower()}-{start.isoformat()}.csv")
         filter_ = Gtk.FileFilter()
         filter_.set_name("CSV files")
         filter_.add_pattern("*.csv")

@@ -182,7 +182,7 @@ class MainActivity : ComponentActivity() {
                 { reportPeriod = it; copyStatus = "" }, { reportDate = it; copyStatus = "" },
                 onExport = { action { reportRange?.let { range ->
                     exportSnapshot = tracker.csv(range)
-                    export.launch("nonprofit-hours-${reportPeriod.lowercase(java.util.Locale.ROOT)}-${range.start}.csv")
+                    export.launch("tick-${reportPeriod.lowercase(java.util.Locale.ROOT)}-${range.start}.csv")
                 } } },
                 onCopy = { action { reportRange?.let { range ->
                     val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -192,7 +192,7 @@ class MainActivity : ComponentActivity() {
         }
         Column(Modifier.fillMaxSize().imePadding().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Nonprofit Hours", style = MaterialTheme.typography.titleLarge)
+                Text("Time is Clearly Kept", style = MaterialTheme.typography.titleLarge)
                 TextButton(onClick = { settings = true }) { Text("Settings") }
             }
             CapturePanel(state, selected, notes, now, { selected = it }, { notes = it },

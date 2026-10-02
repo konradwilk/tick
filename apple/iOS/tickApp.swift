@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 import UIKit
 
-@main @MainActor struct NonprofitHoursApp: App {
+@main @MainActor struct TickApp: App {
     @State private var model = PhoneModel()
     var body: some Scene { WindowGroup { PhoneTrackerView(model: model) } }
 }

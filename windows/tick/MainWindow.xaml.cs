@@ -4,7 +4,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Windows.Storage.Pickers;
-namespace NonprofitHours;
+namespace Tick;
 public sealed partial class MainWindow : Window
 {
     private Tracker? tracker;
@@ -191,7 +191,7 @@ public sealed partial class MainWindow : Window
         {
             var range = SelectedRange();
             var snapshot = tracker!.Csv(range);
-            var picker = new FileSavePicker { SuggestedFileName = $"nonprofit-hours-{((ExportPeriod)ReportPeriod.SelectedIndex).ToString().ToLowerInvariant()}-{range.Start:yyyy-MM-dd}" };
+            var picker = new FileSavePicker { SuggestedFileName = $"tick-{((ExportPeriod)ReportPeriod.SelectedIndex).ToString().ToLowerInvariant()}-{range.Start:yyyy-MM-dd}" };
             picker.FileTypeChoices.Add("CSV", new List<string> { ".csv" });
             WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
             var file = await picker.PickSaveFileAsync();

@@ -9,7 +9,7 @@ def build_layout(window):
         getattr(root, "set_margin_" + side)(24)
     window.set_child(root)
     header = Gtk.Box(spacing=12)
-    title = Gtk.Label(label="Nonprofit Hours", xalign=0, hexpand=True)
+    title = Gtk.Label(label="Time is Clearly Kept", xalign=0, hexpand=True)
     title.add_css_class("title-1")
     header.append(title)
     settings = Gtk.Button(label="Settings")
