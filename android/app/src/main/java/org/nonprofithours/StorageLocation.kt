@@ -68,16 +68,17 @@ class StorageLocation(private val context: Context) {
     var label: String = "Private app storage"
         private set
 
-    fun open(): Tracker {
+    fun open(): Tracker? {
         val saved = preferences.getString("tree", null)
         if (saved != null) {
             val tree = Uri.parse(saved)
-            val file = requireNotNull(findData(tree)) { "The selected data file is missing. Select its folder again." }
+            val file = findData(tree) ?: return null
             val tracker = documentTracker(file)
             label = tree.toString()
             return tracker
         }
-        val file = AtomicFile(File(context.filesDir, "sessions.json"))
+        val file = AtomicFile(File(context.filesDir, "tick.json"))
+        if (!file.baseFile.exists()) return null
         fun read(): ByteArray? = try { file.readFully() } catch (error: java.io.FileNotFoundException) {
             if (file.baseFile.exists()) throw error else null
         }
@@ -90,7 +91,7 @@ class StorageLocation(private val context: Context) {
     fun select(tree: Uri, current: Tracker?): Tracker {
         context.contentResolver.takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
         val file = findData(tree) ?: run {
-            val bytes = PortableData.encode(requireNotNull(current) { "Choose a folder containing saved hours." }.state)
+            val bytes = PortableData.encode(current?.state ?: TrackerState())
             val parent = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
             val created = requireNotNull(DocumentsContract.createDocument(context.contentResolver, parent, "application/json", "tick.json")) { "Could not create data file." }
             try { writeDocument(created, bytes) }

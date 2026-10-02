@@ -36,8 +36,8 @@ Nonprofit selection and notes are locked during an active session.
 
 ## Data and export
 
-Sessions live at `$XDG_DATA_HOME/nonprofit-hours/sessions.json`, defaulting to
-`~/.local/share/nonprofit-hours/sessions.json`. Saves use a temporary file and atomic
+Sessions live at `$XDG_DATA_HOME/nonprofit-hours/tick.json`, defaulting to
+`~/.local/share/nonprofit-hours/tick.json`. Saves use a temporary file and atomic
 replacement before publishing the change in memory. Unreadable or malformed data
 disables tracking instead of overwriting saved history. Back up this file to retain
 local data. Dates are UTC ISO-8601 and sessions use `platform: linux`.

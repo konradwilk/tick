@@ -10,7 +10,7 @@ public sealed partial class MainWindow : Window
     private Tracker? tracker;
     private readonly StorageLocation location = new(
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NonprofitHours", "location.json"),
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NonprofitHours", "sessions.json"));
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NonprofitHours", "tick.json"));
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(1) };
     public MainWindow()
     {
@@ -32,8 +32,18 @@ public sealed partial class MainWindow : Window
         {
             Nonprofits.IsEnabled = Notes.IsEnabled = NewName.IsEnabled = AddButton.IsEnabled =
                 Toggle.IsEnabled = ExportButton.IsEnabled = CopyButton.IsEnabled = false;
-            ErrorText.Text = "Could not load saved hours. Your file was not changed. " + e.Message;
+            if (e is FileNotFoundException or DirectoryNotFoundException)
+            {
+                ErrorText.Text = "Choose where to save tick.json (Settings → Data location).";
+                ((FrameworkElement)Content).Loaded += PromptForDataLocation;
+            }
+            else ErrorText.Text = "Could not load saved hours. Your file was not changed. " + e.Message;
         }
+    }
+    private void PromptForDataLocation(object sender, RoutedEventArgs args)
+    {
+        ((FrameworkElement)Content).Loaded -= PromptForDataLocation;
+        ChooseDataLocation(sender, args);
     }
     private void Perform(Action action)
     {

@@ -22,3 +22,8 @@ restore the original bytes. Back up the shared file before using a new provider.
 Earlier unversioned files are accepted, including Apple timestamps represented
 as seconds since 2001-01-01. Invalid identities, duplicate sessions, multiple
 active sessions, unsupported versions, and inconsistent durations are rejected.
+
+If `tick.json` is missing at startup, the app opens a folder picker. Choosing a
+folder creates and saves an empty `tick.json` immediately, or loads the existing
+file there. Canceling leaves tracking disabled until a folder is chosen through
+Data location. The chosen location is remembered for subsequent launches.

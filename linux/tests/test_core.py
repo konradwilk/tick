@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from tick.core import FileStore, Tracker, data_path, elapsed, period_bounds
+from tick.core import StorageLocation, FileStore, Tracker, data_path, elapsed, period_bounds
 
 
 class TrackerTests(unittest.TestCase):
@@ -234,15 +234,41 @@ class TrackerTests(unittest.TestCase):
 
     def test_xdg_location_and_relative_fallback(self):
         with patch.dict("os.environ", {"XDG_DATA_HOME": self.directory.name}):
-            self.assertEqual(data_path(), Path(self.directory.name) / "nonprofit-hours/sessions.json")
+            self.assertEqual(data_path(), Path(self.directory.name) / "nonprofit-hours/tick.json")
         with patch.dict("os.environ", {"XDG_DATA_HOME": "relative"}):
-            self.assertEqual(data_path(), Path.home() / ".local/share/nonprofit-hours/sessions.json")
+            self.assertEqual(data_path(), Path.home() / ".local/share/nonprofit-hours/tick.json")
 
     def test_naive_timestamp_is_rejected(self):
         nonprofit = self.tracker.add_nonprofit("Kitchen")
         with self.assertRaises(ValueError):
             self.tracker.start(nonprofit, now=datetime(2026, 1, 1))
         self.assertIsNone(self.tracker.active)
+
+
+class FirstRunStorageTests(unittest.TestCase):
+    def test_first_run_requires_location_then_creates_and_reopens_tick(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            storage = StorageLocation(root / "location.json")
+            with patch("tick.core.data_path", return_value=root / "default" / "tick.json"):
+                with self.assertRaises(FileNotFoundError):
+                    storage.open()
+                self.assertFalse((root / "default").exists())
+            tracker = storage.select(root)
+            self.assertTrue((root / "tick.json").exists())
+            self.assertEqual(storage.open().state, tracker.state)
+            tracker.add_nonprofit("Kitchen")
+            self.assertEqual(storage.select(root).state, tracker.state)
+
+    def test_invalid_file_is_not_replaced(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "tick.json").write_text("invalid")
+            storage = StorageLocation(root / "location.json")
+            with self.assertRaises(ValueError):
+                storage.select(root)
+            self.assertEqual((root / "tick.json").read_text(), "invalid")
+            self.assertFalse((root / "location.json").exists())
 
 
 if __name__ == "__main__":

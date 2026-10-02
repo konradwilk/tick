@@ -39,7 +39,7 @@ def parse(value):
 def data_path():
     root = os.environ.get("XDG_DATA_HOME", "")
     base = Path(root) if root and Path(root).is_absolute() else Path.home() / ".local/share"
-    return base / "nonprofit-hours/sessions.json"
+    return base / "nonprofit-hours/tick.json"
 
 
 def decode_data(raw):
@@ -290,17 +290,17 @@ class StorageLocation:
 
     def open(self):
         if not self.settings.exists():
-            return Tracker(FileStore(data_path()))
+            return Tracker(FileStore(data_path(), require_existing=True))
         path = Path(json.loads(self.settings.read_text(encoding="utf-8"))["path"]).parent / "tick.json"
         return Tracker(FileStore(path, require_existing=True))
 
     def select(self, folder, current=None):
         path = Path(folder).absolute() / "tick.json"
-        if not path.exists() and current is not None:
+        if not path.exists():
             # Initialize the configured folder, keeping the previous file intact.
             destination = FileStore(path)
             destination.snapshot = path.read_bytes() if path.exists() else None
-            destination.save(copy.deepcopy(current.state))
+            destination.save(copy.deepcopy(current.state) if current else destination.load())
         next_tracker = Tracker(FileStore(path, require_existing=True))
         self.settings.parent.mkdir(parents=True, exist_ok=True)
         temporary = None

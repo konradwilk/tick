@@ -42,6 +42,13 @@ class MainActivity : ComponentActivity() {
                     } catch (error: Exception) { storageError = error.message }
                 }
             }
+            var promptedForFolder by rememberSaveable { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                if (!promptedForFolder && loaded.isSuccess && tracker == null) {
+                    promptedForFolder = true
+                    chooseFolder.launch(null)
+                }
+            }
             Surface(Modifier.fillMaxSize()) {
                 Column(Modifier.safeDrawingPadding()) {
                     storageError?.let { Text(it, Modifier.padding(20.dp), color = MaterialTheme.colorScheme.error) }
@@ -49,7 +56,7 @@ class MainActivity : ComponentActivity() {
                         val current = tracker
                         if (current != null) key(current) { TrackerScreen(current, location) { chooseFolder.launch(null) } }
                         else Column(Modifier.padding(20.dp)) {
-                            Text("Choose a folder containing your data to resume. The original file was not changed.")
+                            Text("Choose where to save tick.json, or select a folder containing an existing tick.json.")
                             OutlinedButton(onClick = { chooseFolder.launch(null) }) { Text("Data location…") }
                         }
                     }

@@ -22,6 +22,10 @@ struct TrackerView: View {
                 Button("Settings") { settings.toggle() }
                     .popover(isPresented: $settings) { settingsView }
             }
+            if model.needsDataLocation {
+                Text("Choose where to save tick.json to get started.")
+                Button("Choose data folder…") { model.chooseDataLocation() }
+            }
             HStack(alignment: .bottom, spacing: 20) {
                 Picker("Nonprofit", selection: $model.selected) {
                     Text("Choose a nonprofit").tag(nil as UUID?)
@@ -51,6 +55,12 @@ struct TrackerView: View {
                 }
             }
         }.padding(24).frame(minWidth: 420, minHeight: 580)
+        .task {
+            if model.needsDataLocation && !model.promptedForDataLocation {
+                model.promptedForDataLocation = true
+                model.chooseDataLocation()
+            }
+        }
         .onChange(of: model.reportPeriod) { model.copyStatus = "" }
         .onChange(of: model.reportDate) { model.copyStatus = "" }
         .sheet(item: $editingSession) { SessionNotesEditor(session: $0, model: model) }

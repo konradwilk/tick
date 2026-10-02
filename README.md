@@ -156,7 +156,13 @@ smoke test on Ubuntu.
 
 ## Configure where data is stored
 
-Use **Data location** to choose a folder. The app remembers it and automatically
+On first launch, if `tick.json` is missing, the app prompts you to choose where
+to save it. Choose a folder to create `tick.json`, or open an existing `tick.json`
+by choosing its folder. Canceling leaves tracking disabled; use **Data location**
+to choose a folder when ready. The new file is saved immediately, even before
+you record any hours.
+
+Use **Data location** to change the folder later. The app remembers it and automatically
 reads and saves `tick.json` there on every launch and change. If the file
 already exists, its data is loaded; otherwise the current data is copied into the
 folder, preserving the original. This is a persistent setting, not an import/export

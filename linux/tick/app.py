@@ -29,7 +29,15 @@ class HoursWindow(Gtk.ApplicationWindow):
             self.controls.set_sensitive(False)
             self.name.set_sensitive(False)
             self.add.set_sensitive(False)
-            self.error.set_text("Could not load saved hours. Your file was not changed. " + str(error))
+            if isinstance(error, FileNotFoundError):
+                self.error.set_text("Choose where to save tick.json to get started (Settings → Data location).")
+                GLib.idle_add(self.prompt_for_data_location)
+            else:
+                self.error.set_text("Could not load saved hours. Your file was not changed. " + str(error))
+
+    def prompt_for_data_location(self):
+        self.choose_data_location()
+        return GLib.SOURCE_REMOVE
 
     def perform(self, operation):
         try:
@@ -233,7 +241,7 @@ class HoursWindow(Gtk.ApplicationWindow):
         if self.chooser:
             self.chooser.show()
             return
-        self.chooser = Gtk.FileChooserNative.new("Choose data folder", self,
+        self.chooser = Gtk.FileChooserNative.new("Choose where to save tick.json", self,
             Gtk.FileChooserAction.SELECT_FOLDER, "Use this folder", "Cancel")
         self.chooser.connect("response", self.on_data_response)
         self.chooser.show()

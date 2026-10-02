@@ -16,6 +16,7 @@ import UIKit
     @State private var period = ExportPeriod.monthly
     @State private var date = Date()
     @State private var choosingFolder = false
+    @State private var chooseFolderAfterSettings = false
     @State private var exporting = false
     @State private var document = CSVDocument(text: "")
     @State private var filename = "nonprofit-hours"
@@ -28,6 +29,10 @@ import UIKit
     var body: some View {
         NavigationStack {
             VStack(spacing: 12) {
+                if model.needsDataLocation {
+                    Text("Choose where to save tick.json to get started.")
+                    Button("Choose data folder…") { choosingFolder = true }
+                }
                 capture.padding(.horizontal)
                 Divider()
                 GeometryReader { geometry in
@@ -43,9 +48,23 @@ import UIKit
             .navigationTitle("Time is Clearly Kept").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Settings") { settings = true } } }
         }
+        .task {
+            if model.needsDataLocation && !model.promptedForDataLocation {
+                model.promptedForDataLocation = true
+                choosingFolder = true
+            }
+        }
+        .fileImporter(isPresented: $choosingFolder, allowedContentTypes: [.folder]) { result in
+            switch result {
+            case .success(let folder): model.selectFolder(folder)
+            case .failure(let error): model.error = error.localizedDescription
+            }
+        }
         .onChange(of: period) { copyStatus = "" }
         .onChange(of: date) { copyStatus = "" }
-        .sheet(isPresented: $settings) { settingsView }
+        .sheet(isPresented: $settings, onDismiss: {
+            if chooseFolderAfterSettings { chooseFolderAfterSettings = false; choosingFolder = true }
+        }) { settingsView }
         .fileExporter(isPresented: $exporting, document: document, contentType: .commaSeparatedText, defaultFilename: filename) { result in
             if case .failure(let error) = result { model.error = error.localizedDescription }
         }
@@ -182,7 +201,7 @@ import UIKit
                 }.disabled(model.tracker == nil || model.state.active != nil)
                 Section { manualSessionForm }
                 Section("Data location") {
-                    Button("Choose data folder…") { choosingFolder = true }
+                    Button("Choose data folder…") { chooseFolderAfterSettings = true; settings = false }
                     Text(model.location).font(.caption)
                     Text("All changes are saved here. Use one device at a time.").font(.caption)
                 }
@@ -190,12 +209,7 @@ import UIKit
                 if let error = model.error { Text(error).foregroundStyle(.red) }
             }.navigationTitle("Settings")
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { settings = false } } }
-                .fileImporter(isPresented: $choosingFolder, allowedContentTypes: [.folder]) { result in
-                    switch result {
-                    case .success(let folder): model.selectFolder(folder)
-                    case .failure(let error): model.error = error.localizedDescription
-                    }
-                }
+
         }
     }
 }

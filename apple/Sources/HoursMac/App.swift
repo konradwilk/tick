@@ -4,6 +4,8 @@ import UniformTypeIdentifiers
 import HoursCore
 
 @MainActor @Observable final class AppModel {
+    var needsDataLocation = false
+    var promptedForDataLocation = false
     var tracker: Tracker?
     var state = TrackerState()
     var error: String?
@@ -19,8 +21,9 @@ import HoursCore
     init() {
         do {
             let folder = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-            let location = try storage.resolve(defaultURL: folder.appending(path: "NonprofitHours/sessions.json"))
+            let location = try storage.resolve(defaultURL: folder.appending(path: "NonprofitHours/tick.json"))
             let file = location.selected ? location.url.appendingPathComponent("tick.json") : location.url
+            guard FileManager.default.fileExists(atPath: file.path) else { needsDataLocation = true; return }
             dataLocation = file.deletingLastPathComponent().path
             let tracker = try Tracker(file: file, requireExisting: location.selected)
             self.tracker = tracker
@@ -43,7 +46,7 @@ import HoursCore
     func chooseDataLocation() {
         do {
             let panel = NSOpenPanel()
-            panel.title = "Choose data folder"
+            panel.title = "Choose where to save tick.json"
             panel.prompt = "Use this folder"
             panel.canChooseFiles = false
             panel.canChooseDirectories = true
@@ -59,9 +62,11 @@ import HoursCore
             } else if let tracker {
                 next = try tracker.saveAs(file)
             } else {
-                throw CocoaError(.fileReadNoSuchFile)
+                let fresh = try Tracker(file: file)
+                next = try fresh.saveAs(file)
             }
             try storage.remember(folder)
+            needsDataLocation = false
             tracker = next
             state = next.state
             dataLocation = folder.path

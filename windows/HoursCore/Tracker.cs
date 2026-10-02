@@ -177,14 +177,14 @@ public sealed class StorageLocation(string settingsPath, string defaultPath)
         var path = selected ? JsonSerializer.Deserialize<string>(File.ReadAllText(settingsPath)) ?? throw new InvalidDataException("Invalid location setting.") : defaultPath;
         if (selected) path = Path.Combine(Path.GetDirectoryName(path)!, "tick.json");
         var store = new FileStore(path);
-        var tracker = new Tracker(store.Load(selected), store.Save);
+        var tracker = new Tracker(store.Load(true), store.Save);
         CurrentPath = path;
         return tracker;
     }
     public Tracker Select(string folder, TrackerState? copy = null)
     {
         var path = Path.Combine(folder, "tick.json");
-        if (!File.Exists(path) && copy != null) FileStore.WriteAtomically(path, PortableData.Encode(copy));
+        if (!File.Exists(path)) FileStore.WriteAtomically(path, PortableData.Encode(copy ?? TrackerState.Empty()));
         var store = new FileStore(path);
         var next = new Tracker(store.Load(true), store.Save);
         FileStore.WriteAtomically(settingsPath, JsonSerializer.SerializeToUtf8Bytes(path));

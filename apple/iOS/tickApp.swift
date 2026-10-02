@@ -8,6 +8,8 @@ import UIKit
 }
 
 @MainActor @Observable final class PhoneModel {
+    var needsDataLocation = false
+    var promptedForDataLocation = false
     var tracker: Tracker?
     var state = TrackerState()
     var selected: UUID?
@@ -19,12 +21,14 @@ import UIKit
     init() {
         do {
             let base = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-            let saved = try storage.resolve(defaultURL: base.appendingPathComponent("NonprofitHours/sessions.json"))
+            let saved = try storage.resolve(defaultURL: base.appendingPathComponent("NonprofitHours/tick.json"))
             let file = saved.selected ? saved.url.appendingPathComponent("tick.json") : saved.url
+            guard FileManager.default.fileExists(atPath: file.path) else { needsDataLocation = true; return }
             adopt(try Tracker(file: file, requireExisting: saved.selected))
         } catch { self.error = "Could not load saved hours. " + error.localizedDescription }
     }
     private func adopt(_ next: Tracker) {
+        needsDataLocation = false
         tracker = next
         state = next.state
         selected = state.active?.nonprofitId ?? state.nonprofits.first?.id
@@ -45,7 +49,7 @@ import UIKit
             if FileManager.default.fileExists(atPath: file.path) {
                 next = try Tracker(file: file, requireExisting: true)
             } else if let tracker { next = try tracker.saveAs(file) }
-            else { throw CocoaError(.fileReadNoSuchFile) }
+            else { let fresh = try Tracker(file: file); next = try fresh.saveAs(file) }
             try storage.remember(folder)
             adopt(next)
             error = nil

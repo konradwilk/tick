@@ -2,6 +2,19 @@ import XCTest
 @testable import HoursCore
 
 final class PortableDataTests: XCTestCase {
+    func testFirstRunCreatesEmptyFileBeforeTracking() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let file = folder.appendingPathComponent("tick.json")
+        let fresh = try Tracker(file: file)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
+        let saved = try fresh.saveAs(file)
+        let reopened = try Tracker(file: file, requireExisting: true)
+        XCTAssertEqual(saved.state.deviceId, reopened.state.deviceId)
+        XCTAssertTrue(reopened.state.sessions.isEmpty)
+        XCTAssertTrue(reopened.state.nonprofits.isEmpty)
+    }
+
     func testSharedFileRoundTripAndLegacyDates() throws {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("sessions.json")
         defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
