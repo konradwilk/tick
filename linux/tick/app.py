@@ -94,7 +94,7 @@ class HoursWindow(Gtk.ApplicationWindow):
             self.history.remove(child)
         if not state["sessions"]:
             self.history.append(Gtk.Label(label="Sessions will appear here.", xalign=0))
-        for session in reversed(state["sessions"]):
+        for session in sorted(state["sessions"], key=lambda s: parse(s["startTimeUtc"]), reverse=True):
             duration = elapsed(session["durationSeconds"]) if session.get("endTimeUtc") else "In progress"
             date = parse(session["startTimeUtc"]).astimezone().strftime("%Y-%m-%d %H:%M")
             label = Gtk.Label(label=f"{session['project']} — {date}\n{duration}\n{session['notes']}", xalign=0, wrap=True, selectable=True)

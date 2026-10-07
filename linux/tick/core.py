@@ -120,14 +120,15 @@ class FileStore:
         current = self.path.read_bytes() if self.path.exists() else None
         if current != self.snapshot:
             raise ValueError("The data file changed or was removed. Select its data folder again before saving.")
-        raw = json.dumps(state, ensure_ascii=False).encode("utf-8")
+        ordered = dict(state, sessions=sorted(state["sessions"], key=lambda s: parse(s["startTimeUtc"])))
+        raw = json.dumps(ordered, ensure_ascii=False).encode("utf-8")
         decode_data(raw)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         name = None
         try:
             with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=self.path.parent, delete=False) as stream:
                 name = stream.name
-                json.dump(state, stream, ensure_ascii=False)
+                stream.write(raw.decode("utf-8"))
                 stream.flush()
                 os.fsync(stream.fileno())
             os.replace(name, self.path)

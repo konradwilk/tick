@@ -12,6 +12,19 @@ from tick.core import StorageLocation, FileStore, Tracker, data_path, elapsed, p
 
 
 class TrackerTests(unittest.TestCase):
+    def test_every_write_orders_saved_sessions_by_start(self):
+        nonprofit = self.tracker.add_nonprofit("Kitchen")
+        self.tracker.start(nonprofit, "Active", self.start + timedelta(days=2))
+        self.tracker.add_session(nonprofit, "Later", self.start + timedelta(days=1), self.start + timedelta(days=1, hours=1))
+        self.tracker.add_session(nonprofit, "Earlier", self.start, self.start + timedelta(hours=1))
+        original = copy.deepcopy(self.tracker.state)
+        saved = json.loads(self.path.read_bytes())
+        self.assertEqual(["Earlier", "Later", "Active"], [s["notes"] for s in saved["sessions"]])
+        self.assertEqual(original, self.tracker.state)
+        self.tracker.update_notes(saved["sessions"][0]["sessionId"], "Edited")
+        saved = json.loads(self.path.read_bytes())
+        self.assertEqual(["Edited", "Later", "Active"], [s["notes"] for s in saved["sessions"]])
+
     def test_capitalizes_new_and_edited_activities(self):
         nonprofit = self.tracker.add_nonprofit("kitchen")
         self.assertEqual("Kitchen", self.tracker.state["nonprofits"][0]["name"])

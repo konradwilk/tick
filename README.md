@@ -66,6 +66,9 @@ sorting ignores case. Saved notes and CSV retain the original text and individua
 and durations longer than 24 hours are not wrapped. A confirmation appears after
 copying. iOS and macOS compile the same tracking and export implementation.
 
+Session history displays entries by start time, newest first,
+including newly added backdated sessions.
+
 In session history, choose **Edit notes** on a completed session in Windows,
 macOS, iOS, Android, or Linux. Completed sessions under one minute also show
 **Delete** beside **Edit notes**; deleting removes them from history, totals,

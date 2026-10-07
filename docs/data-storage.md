@@ -7,6 +7,9 @@ use UTC. Active sessions have no end time or duration. UUIDs and session times
 remain in storage even though the CSV report omits sessionId, projectId, and
 updatedAtUtc.
 
+Sessions are sorted chronologically by start time (oldest first) on every write,
+including backdated additions and note edits. Equal start times retain their order.
+
 Choose Data location to use `tick.json` in a selected folder. An
 existing file is read before adopting it. A new folder receives a copy of the
 current state. Folder selection is remembered using platform settings (Apple

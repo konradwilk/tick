@@ -15,6 +15,7 @@ public static class PortableData
     {
         // Validate before FileStore replaces any saved history, and normalize dates to UTC.
         var validated = Decode(JsonSerializer.SerializeToUtf8Bytes(state, Options));
+        validated = validated with { Sessions = validated.Sessions.OrderBy(s => s.StartTimeUtc).ToArray() };
         return JsonSerializer.SerializeToUtf8Bytes(validated, Options);
     }
 

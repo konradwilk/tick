@@ -102,7 +102,7 @@ import UIKit
             Text("History").font(.title2.bold())
             Text("Completed: \(Double(model.state.sessions.compactMap(\.durationSeconds).reduce(0, +)) / 3600, specifier: "%.2f") hours").font(.subheadline)
             if model.state.sessions.isEmpty { Text("Sessions will appear here.").foregroundStyle(.secondary) }
-            ForEach(model.state.sessions.reversed()) { session in
+            ForEach(model.state.sessions.sorted { $0.startTimeUtc > $1.startTimeUtc }) { session in
                 GroupBox {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(session.project).font(.headline)

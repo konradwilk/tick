@@ -2,6 +2,26 @@ import XCTest
 @testable import HoursCore
 
 final class PortableDataTests: XCTestCase {
+    func testEncodingOrdersSessionsWithoutChangingInput() throws {
+        var state = TrackerState()
+        let project = Nonprofit(name: "Kitchen")
+        state.nonprofits = [project]
+        let early = Session(sessionId: UUID(), projectId: project.id, project: project.name,
+                            startTimeUtc: Date(timeIntervalSince1970: 0),
+                            endTimeUtc: Date(timeIntervalSince1970: 60), durationSeconds: 60,
+                            notes: "Early", deviceId: state.deviceId, platform: "macos",
+                            updatedAtUtc: Date(timeIntervalSince1970: 60), syncState: "pending")
+        var late = early
+        late.sessionId = UUID()
+        late.startTimeUtc = Date(timeIntervalSince1970: 3600)
+        late.endTimeUtc = nil
+        late.durationSeconds = nil
+        state.sessions = [late, early]
+        let restored = try PortableData.decode(PortableData.encode(state))
+        XCTAssertEqual(restored.sessions.map(\.sessionId), [early.sessionId, late.sessionId])
+        XCTAssertEqual(state.sessions.map(\.sessionId), [late.sessionId, early.sessionId])
+    }
+
     func testDecodingErrorsIdentifySessionField() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: folder) }

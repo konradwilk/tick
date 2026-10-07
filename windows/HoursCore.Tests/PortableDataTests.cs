@@ -7,6 +7,18 @@ namespace HoursCore.Tests;
 
 public class PortableDataTests
 {
+    [Fact] public void EncodeOrdersSessionsByStartWithoutChangingInput()
+    {
+        var state = PortableData.Decode(Bytes(Sample()));
+        var early = state.Sessions[0];
+        var late = early with { SessionId = Guid.NewGuid(), StartTimeUtc = early.StartTimeUtc.AddDays(1), EndTimeUtc = early.EndTimeUtc!.Value.AddDays(1) };
+        var active = late with { SessionId = Guid.NewGuid(), StartTimeUtc = late.StartTimeUtc.AddDays(1), EndTimeUtc = null, DurationSeconds = null };
+        state = state with { Sessions = [active, late, early] };
+        var restored = PortableData.Decode(PortableData.Encode(state));
+        Assert.Equal(new[] { early.SessionId, late.SessionId, active.SessionId }, restored.Sessions.Select(s => s.SessionId));
+        Assert.Equal(active.SessionId, state.Sessions[0].SessionId);
+    }
+
     private static JsonObject Sample() => JsonNode.Parse("""
         {
           "schemaVersion": 1,

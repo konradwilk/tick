@@ -44,7 +44,7 @@ import java.time.format.DateTimeFormatter
         Text("History", style = MaterialTheme.typography.headlineSmall)
         Text("Completed: %.2f hours".format(state.sessions.sumOf { it.durationSeconds ?: 0 } / 3600.0))
         if (state.sessions.isEmpty()) Text("Sessions will appear here.")
-        state.sessions.asReversed().forEach { session ->
+        state.sessions.sortedByDescending { Instant.parse(it.startTimeUtc) }.forEach { session ->
             OutlinedCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(session.project, style = MaterialTheme.typography.titleMedium)

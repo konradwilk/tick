@@ -79,7 +79,7 @@ public sealed partial class MainWindow : Window
         Toggle.Background = new SolidColorBrush(active ? Colors.Firebrick : Colors.ForestGreen);
         Total.Text = $"Completed: {state.Sessions.Sum(s => s.DurationSeconds ?? 0) / 3600.0:F2} hours";
         UpdateReport();
-        History.ItemsSource = state.Sessions.Reverse().Select(s => new HistoryEntry(s.SessionId,
+        History.ItemsSource = state.Sessions.OrderByDescending(s => s.StartTimeUtc).Select(s => new HistoryEntry(s.SessionId,
             $"{s.Project} — {s.StartTimeUtc.ToLocalTime():g}\n{(s.DurationSeconds is long seconds ? Elapsed(seconds) : "In progress")}\n{s.Notes}", s.EndTimeUtc != null,
             s.EndTimeUtc != null && s.DurationSeconds is >= 0 and < 60 ? Visibility.Visible : Visibility.Collapsed)).ToArray();
         UpdateClock();

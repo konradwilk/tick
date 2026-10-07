@@ -75,7 +75,9 @@ public enum PortableData {
             var value = encoder.singleValueContainer()
             try value.encode(formatter.string(from: date))
         }
-        return try encoder.encode(state)
+        var ordered = state
+        ordered.sessions = state.sessions.sorted { $0.startTimeUtc < $1.startTimeUtc }
+        return try encoder.encode(ordered)
     }
     private static func validate(_ state: TrackerState) throws {
         let nonprofits = Set(state.nonprofits.map(\.id))

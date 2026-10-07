@@ -37,7 +37,8 @@ internal object PortableData {
     }
     fun encode(state: TrackerState): ByteArray {
         validate(state)
-        return json.encodeToString(state).toByteArray(Charsets.UTF_8)
+        val ordered = state.copy(sessions = state.sessions.sortedBy { Instant.parse(it.startTimeUtc) })
+        return json.encodeToString(ordered).toByteArray(Charsets.UTF_8)
     }
     private fun validate(state: TrackerState) {
         require(state.schemaVersion == 1) { "Unsupported data file version." }
