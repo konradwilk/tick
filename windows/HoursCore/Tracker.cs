@@ -180,11 +180,12 @@ public sealed class FileStore(string path)
 
 public sealed class StorageLocation(string settingsPath, string defaultPath)
 {
+    private readonly string defaultDataPath = defaultPath;
     public string CurrentPath { get; private set; } = defaultPath;
     public Tracker Open()
     {
         var selected = File.Exists(settingsPath);
-        var path = selected ? JsonSerializer.Deserialize<string>(File.ReadAllText(settingsPath)) ?? throw new InvalidDataException("Invalid location setting.") : defaultPath;
+        var path = selected ? JsonSerializer.Deserialize<string>(File.ReadAllText(settingsPath)) ?? throw new InvalidDataException("Invalid location setting.") : defaultDataPath;
         if (selected) path = Path.Combine(Path.GetDirectoryName(path)!, "tick.json");
         var store = new FileStore(path);
         var tracker = new Tracker(store.Load(true), store.Save);
