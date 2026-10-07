@@ -75,6 +75,12 @@ macOS, iOS, Android, or Linux. Completed sessions under one minute also show
 and future exports and summaries. Sessions lasting exactly one minute or longer
 and active sessions cannot be deleted.
 
+Choose **Edit times** on a completed session to correct its start and end dates
+and times in your local timezone. The end must be after the start. **Save**
+recalculates the duration, updates totals and reports, and reorders History;
+**Cancel** leaves the original times unchanged. If saving fails, the editor stays
+open with your changes available to retry. Stop active sessions before editing times.
+
 In the notes editor, **Save** persists the edited notes and includes them in
 future CSV exports; **Cancel** discards the draft. Times and recorded hours stay
 unchanged. If saving fails, the editor keeps your draft available to retry.

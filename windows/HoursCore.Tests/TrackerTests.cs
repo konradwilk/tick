@@ -3,6 +3,39 @@ using Xunit;
 namespace HoursCore.Tests;
 public class TrackerTests
 {
+    [Fact] public void EditTimesRecalculatesReportsAndPreservesStateOnFailure()
+    {
+        var tracker = new Tracker(TrackerState.Empty(), _ => { });
+        var id = tracker.AddNonprofit("Kitchen");
+        var start = DateTimeOffset.UnixEpoch;
+        tracker.AddSession(id, "Meals", start, start.AddHours(1));
+        var original = tracker.State.Sessions.Single();
+        tracker.Start(id, "Active", start.AddDays(2));
+        var active = tracker.State.Active;
+        var editedStart = start.AddDays(-1).ToOffset(TimeSpan.FromHours(2));
+        tracker.UpdateTimes(original.SessionId, editedStart, editedStart.AddMinutes(30), start.AddDays(3));
+        var updated = tracker.State.Sessions[0];
+        Assert.Equal(original.SessionId, updated.SessionId);
+        Assert.Equal(original.Notes, updated.Notes);
+        Assert.Equal(1800L, updated.DurationSeconds);
+        Assert.Equal(TimeSpan.Zero, updated.StartTimeUtc.Offset);
+        Assert.Equal(active, tracker.State.Active);
+        Assert.Contains("00:30:00", tracker.ClipboardText());
+        var range = ExportRange.For(ExportPeriod.Daily, DateOnly.FromDateTime(editedStart.UtcDateTime));
+        Assert.Single(tracker.ExportSessions(range, TimeZoneInfo.Utc));
+        var before = tracker.State;
+        Assert.Throws<InvalidOperationException>(() => tracker.UpdateTimes(original.SessionId, start, start));
+        Assert.Throws<InvalidOperationException>(() => tracker.UpdateTimes(original.SessionId, start, start.AddSeconds(-1)));
+        Assert.Throws<InvalidOperationException>(() => tracker.UpdateTimes(active!.SessionId, start, start.AddMinutes(1)));
+        Assert.Throws<InvalidOperationException>(() => tracker.UpdateTimes(Guid.NewGuid(), start, start.AddMinutes(1)));
+        Assert.Same(before, tracker.State);
+        var failing = new Tracker(before, _ => throw new IOException("Disk full"));
+        Assert.Throws<IOException>(() => failing.UpdateTimes(original.SessionId, start, start.AddHours(2)));
+        Assert.Same(before, failing.State);
+        var restored = PortableData.Decode(PortableData.Encode(before));
+        Assert.Equal(updated, restored.Sessions[0]);
+    }
+
     [Fact] public void CapitalizesNewAndEditedActivitiesWithoutChangingOtherLetters()
     {
         var tracker = new Tracker(TrackerState.Empty(), _ => { });

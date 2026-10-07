@@ -202,6 +202,21 @@ class Tracker:
         state["sessions"] = [s for s in state["sessions"] if s["sessionId"] != session_id]
         self.commit(state)
 
+    def update_times(self, session_id, start, end, now=None):
+        state = copy.deepcopy(self.state)
+        session = next((s for s in state["sessions"] if s["sessionId"] == session_id), None)
+        if session is None:
+            raise ValueError("The session could not be found.")
+        if session["endTimeUtc"] is None:
+            raise ValueError("Stop the session before editing its times.")
+        start_text, end_text = timestamp(start), timestamp(end)
+        seconds = (parse(end_text) - parse(start_text)).total_seconds()
+        if seconds <= 0:
+            raise ValueError("End must be after start.")
+        session.update(startTimeUtc=start_text, endTimeUtc=end_text, durationSeconds=int(seconds),
+                       updatedAtUtc=timestamp(now), syncState="pending")
+        self.commit(state)
+
     def update_notes(self, session_id, notes, now=None):
         state = copy.deepcopy(self.state)
         session = next((s for s in state["sessions"] if s["sessionId"] == session_id), None)

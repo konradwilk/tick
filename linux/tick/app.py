@@ -104,6 +104,9 @@ class HoursWindow(Gtk.ApplicationWindow):
                 edit.connect("clicked", lambda _, selected=session: self.edit_notes(selected))
                 actions = Gtk.Box(spacing=8)
                 actions.append(edit)
+                times = Gtk.Button(label="Edit times", halign=Gtk.Align.START)
+                times.connect("clicked", lambda _, selected=session: self.edit_times(selected))
+                actions.append(times)
                 if session.get("durationSeconds") is not None and 0 <= session["durationSeconds"] < 60:
                     delete = Gtk.Button(label="Delete")
                     delete.connect("clicked", lambda _, selected=session: self.perform(lambda: self.tracker.delete_session(selected["sessionId"])))
@@ -181,6 +184,59 @@ class HoursWindow(Gtk.ApplicationWindow):
                             raise ValueError("This local time is missing or repeated due to a clock change.")
                         return choices[0]
                     self.tracker.add_session(nonprofits[index]["id"], entries[0].get_text(), local_time(entries[1]), local_time(entries[2]))
+                    self.refresh()
+                    self.error.set_text("")
+                except Exception as problem:
+                    error.set_text(str(problem))
+                    return
+            dialog.destroy()
+        dialog.connect("response", respond)
+        dialog.present()
+        return dialog
+
+    def edit_times(self, session):
+        dialog = Gtk.Dialog(title="Edit session times", transient_for=self, modal=True)
+        dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        dialog.add_button("Save", Gtk.ResponseType.ACCEPT)
+        content = dialog.get_content_area()
+        content.set_spacing(12)
+        for side in ("top", "bottom", "start", "end"):
+            getattr(content, "set_margin_" + side)(16)
+        content.append(Gtk.Label(label=session["project"], xalign=0))
+        content.append(Gtk.Label(label="Local dates and times: YYYY-MM-DD HH:MM:SS (24-hour).", xalign=0))
+        entries = []
+        originals = []
+        for label, key in (("Started", "startTimeUtc"), ("Ended", "endTimeUtc")):
+            original = parse(session[key])
+            text = original.astimezone().replace(tzinfo=None).isoformat(sep=" ")
+            originals.append((original, text))
+            content.append(Gtk.Label(label=label, xalign=0))
+            entry = Gtk.Entry(text=text)
+            entries.append(entry)
+            content.append(entry)
+        error = Gtk.Label(xalign=0, wrap=True)
+        error.add_css_class("error")
+        content.append(error)
+
+        def respond(_, response):
+            if response == Gtk.ResponseType.ACCEPT:
+                try:
+                    def local_time(index):
+                        text = entries[index].get_text()
+                        original, initial = originals[index]
+                        if text == initial:
+                            return original
+                        try:
+                            value = datetime.fromisoformat(text)
+                            if value.tzinfo is not None:
+                                raise ValueError()
+                        except ValueError:
+                            raise ValueError("Enter local dates and times as YYYY-MM-DD HH:MM:SS.")
+                        choices = [value.replace(fold=fold).astimezone(timezone.utc) for fold in (0, 1)]
+                        if choices[0] != choices[1] or choices[0].astimezone().replace(tzinfo=None) != value:
+                            raise ValueError("This local time is missing or repeated due to a clock change.")
+                        return choices[0]
+                    self.tracker.update_times(session["sessionId"], local_time(0), local_time(1))
                     self.refresh()
                     self.error.set_text("")
                 except Exception as problem:

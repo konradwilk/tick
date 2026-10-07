@@ -76,6 +76,11 @@ class MainActivity : ComponentActivity() {
         var editingId by rememberSaveable { mutableStateOf<String?>(null) }
         var editedNotes by rememberSaveable { mutableStateOf("") }
         var editError by remember { mutableStateOf<String?>(null) }
+        var timeEditingId by rememberSaveable { mutableStateOf<String?>(null) }
+        var editedStart by rememberSaveable { mutableStateOf("") }
+        var editedEnd by rememberSaveable { mutableStateOf("") }
+        var timeError by remember { mutableStateOf<String?>(null) }
+        val timeFormat = DateTimeFormatter.ISO_LOCAL_DATE_TIME
         var reportPeriod by rememberSaveable { mutableStateOf("Monthly") }
         var reportDate by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
         var copyStatus by remember { mutableStateOf("") }
@@ -180,8 +185,43 @@ class MainActivity : ComponentActivity() {
                 dismissButton = { TextButton(onClick = { editingId = null }) { Text("Cancel") } }
             )
         }
+        timeEditingId?.let { sessionId ->
+            AlertDialog(onDismissRequest = { timeEditingId = null }, title = { Text("Edit session times") },
+                text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(state.sessions.find { it.sessionId == sessionId }?.project.orEmpty())
+                    Text("Local dates and times: YYYY-MM-DDTHH:mm:ss (24-hour). Fractional seconds are optional.")
+                    OutlinedTextField(editedStart, { editedStart = it }, label = { Text("Started") }, singleLine = true)
+                    OutlinedTextField(editedEnd, { editedEnd = it }, label = { Text("Ended") }, singleLine = true)
+                    timeError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                } },
+                confirmButton = { TextButton(onClick = {
+                    try {
+                        val original = requireNotNull(state.sessions.find { it.sessionId == sessionId }) { "The session could not be found." }
+                        fun localTime(text: String, saved: String): Instant {
+                            val instant = Instant.parse(saved)
+                            if (text == instant.atZone(ZoneId.systemDefault()).format(timeFormat)) return instant
+                            val local = try { LocalDateTime.parse(text, timeFormat) }
+                                catch (_: Exception) { throw IllegalArgumentException("Enter dates and times as YYYY-MM-DDTHH:mm:ss.") }
+                            val offsets = ZoneId.systemDefault().rules.getValidOffsets(local)
+                            require(offsets.size == 1) { "This local time is missing or repeated due to a clock change. Choose an unambiguous time." }
+                            return local.toInstant(offsets.single())
+                        }
+                        tracker.updateTimes(sessionId, localTime(editedStart, original.startTimeUtc), localTime(editedEnd, requireNotNull(original.endTimeUtc)))
+                        state = tracker.state
+                        timeEditingId = null
+                        copyStatus = ""
+                        error = null
+                    } catch (e: Exception) { timeError = e.message ?: "Could not save times." }
+                }) { Text("Save") } },
+                dismissButton = { TextButton(onClick = { timeEditingId = null }) { Text("Cancel") } })
+        }
         val history: @Composable () -> Unit = {
-            HistoryPanel(state, onDelete = { session -> action { tracker.deleteSession(session.sessionId); copyStatus = "" } }) { session -> editedNotes = session.notes; editError = null; editingId = session.sessionId }
+            HistoryPanel(state, onDelete = { session -> action { tracker.deleteSession(session.sessionId); copyStatus = "" } }, onEditTimes = { session ->
+                editedStart = Instant.parse(session.startTimeUtc).atZone(ZoneId.systemDefault()).format(timeFormat)
+                editedEnd = Instant.parse(session.endTimeUtc).atZone(ZoneId.systemDefault()).format(timeFormat)
+                timeError = null
+                timeEditingId = session.sessionId
+            }) { session -> editedNotes = session.notes; editError = null; editingId = session.sessionId }
         }
         val report: @Composable () -> Unit = {
             ReportPanel(reportPeriod, reportDate, reportRange, reportCount,

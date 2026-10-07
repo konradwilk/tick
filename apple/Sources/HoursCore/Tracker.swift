@@ -155,6 +155,20 @@ public final class Tracker {
         next.sessions.removeAll { $0.sessionId == sessionId }
         try save(next)
     }
+    public func updateTimes(sessionId: UUID, start: Date, end: Date, now: Date = Date()) throws {
+        guard let index = state.sessions.firstIndex(where: { $0.sessionId == sessionId }) else { throw TrackerError.missingSession }
+        guard state.sessions[index].endTimeUtc != nil else { throw TrackerError.activeSession }
+        let seconds = end.timeIntervalSince(start)
+        guard start.timeIntervalSince1970.isFinite, end.timeIntervalSince1970.isFinite,
+              seconds.isFinite, seconds > 0, seconds < Double(Int.max) else { throw TrackerError.invalidInterval }
+        var next = state
+        next.sessions[index].startTimeUtc = start
+        next.sessions[index].endTimeUtc = end
+        next.sessions[index].durationSeconds = Int(seconds)
+        next.sessions[index].updatedAtUtc = now
+        next.sessions[index].syncState = "pending"
+        try save(next)
+    }
     public func updateNotes(sessionId: UUID, notes: String, now: Date = Date()) throws {
         guard let index = state.sessions.firstIndex(where: { $0.sessionId == sessionId }) else { throw TrackerError.missingSession }
         var next = state

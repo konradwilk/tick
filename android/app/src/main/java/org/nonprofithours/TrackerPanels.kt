@@ -39,7 +39,7 @@ import java.time.format.DateTimeFormatter
     }
 }
 
-@Composable internal fun HistoryPanel(state: TrackerState, onDelete: (Session) -> Unit, onEdit: (Session) -> Unit) {
+@Composable internal fun HistoryPanel(state: TrackerState, onDelete: (Session) -> Unit, onEditTimes: (Session) -> Unit, onEdit: (Session) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("History", style = MaterialTheme.typography.headlineSmall)
         Text("Completed: %.2f hours".format(state.sessions.sumOf { it.durationSeconds ?: 0 } / 3600.0))
@@ -53,6 +53,7 @@ import java.time.format.DateTimeFormatter
                     Text(session.notes.ifBlank { "No notes" })
                     if (session.endTimeUtc != null) Row {
                         TextButton(onClick = { onEdit(session) }) { Text("Edit notes") }
+                        TextButton(onClick = { onEditTimes(session) }) { Text("Edit times") }
                         if (session.durationSeconds != null && session.durationSeconds in 0L..59L)
                             TextButton(onClick = { onDelete(session) }) { Text("Delete") }
                     }

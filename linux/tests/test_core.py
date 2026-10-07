@@ -12,6 +12,34 @@ from tick.core import StorageLocation, FileStore, Tracker, data_path, elapsed, p
 
 
 class TrackerTests(unittest.TestCase):
+    def test_edit_times_updates_reports_and_preserves_state_on_failure(self):
+        nonprofit = self.tracker.add_nonprofit("Kitchen")
+        self.tracker.add_session(nonprofit, "Meals", self.start, self.start + timedelta(hours=1))
+        original = copy.deepcopy(self.tracker.state["sessions"][0])
+        session_id = original["sessionId"]
+        self.tracker.start(nonprofit, "Active", self.start + timedelta(days=2))
+        active = copy.deepcopy(self.tracker.active)
+        start = self.start - timedelta(days=1)
+        self.tracker.update_times(session_id, start, start + timedelta(minutes=30), self.start)
+        saved = Tracker(FileStore(self.path)).state["sessions"][0]
+        self.assertEqual(1800, saved["durationSeconds"])
+        self.assertEqual(original["sessionId"], saved["sessionId"])
+        self.assertEqual(original["notes"], saved["notes"])
+        self.assertEqual(active, self.tracker.active)
+        self.assertIn("00:30:00", self.tracker.clipboard_text())
+        self.assertIn("1800", self.tracker.csv())
+        before = copy.deepcopy(self.tracker.state)
+        disk = self.path.read_bytes()
+        for selected, end in [(session_id, start), (session_id, start - timedelta(seconds=1)),
+                              (active["sessionId"], start + timedelta(hours=1)), ("missing", start + timedelta(hours=1))]:
+            with self.assertRaises(ValueError):
+                self.tracker.update_times(selected, start, end)
+        with patch.object(self.tracker.store, "save", side_effect=OSError("Disk full")):
+            with self.assertRaises(OSError):
+                self.tracker.update_times(session_id, start, start + timedelta(hours=2))
+        self.assertEqual(before, self.tracker.state)
+        self.assertEqual(disk, self.path.read_bytes())
+
     def test_every_write_orders_saved_sessions_by_start(self):
         nonprofit = self.tracker.add_nonprofit("Kitchen")
         self.tracker.start(nonprofit, "Active", self.start + timedelta(days=2))

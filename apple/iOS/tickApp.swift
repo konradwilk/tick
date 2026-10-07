@@ -77,6 +77,47 @@ func duration(_ seconds: Int) -> String {
     return String(format: "%02d:%02d:%02d", value / 3600, value % 3600 / 60, value % 60)
 }
 
+@MainActor struct PhoneTimesEditor: View {
+    let session: Session
+    let model: PhoneModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var start: Date
+    @State private var end: Date
+    @State private var error: String?
+    init(session: Session, model: PhoneModel) {
+        self.session = session
+        self.model = model
+        _start = State(initialValue: session.startTimeUtc)
+        _end = State(initialValue: session.endTimeUtc ?? session.startTimeUtc)
+    }
+    var body: some View {
+        NavigationStack {
+            Form {
+                Text(session.project)
+                DatePicker("Started", selection: $start, displayedComponents: [.date, .hourAndMinute])
+                DatePicker("Ended", selection: $end, displayedComponents: [.date, .hourAndMinute])
+                Text("Times use your local timezone.").font(.caption)
+                if end <= start { Text("End must be after start.").foregroundStyle(.red) }
+                if let error { Text(error).foregroundStyle(.red) }
+            }.navigationTitle("Edit times")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Save") {
+                            do {
+                                guard let tracker = model.tracker else { throw TrackerError.missingSession }
+                                try tracker.updateTimes(sessionId: session.sessionId, start: start, end: end)
+                                model.state = tracker.state
+                                model.error = nil
+                                dismiss()
+                            } catch { self.error = error.localizedDescription }
+                        }.disabled(end <= start)
+                    }
+                }
+        }
+    }
+}
+
 @MainActor struct PhoneNotesEditor: View {
     let session: Session
     let model: PhoneModel

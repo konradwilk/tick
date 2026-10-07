@@ -86,6 +86,16 @@ public sealed class Tracker
             throw new InvalidOperationException("Only completed sessions under one minute can be deleted.");
         Commit(State with { Sessions = State.Sessions.Where(s => s.SessionId != sessionId).ToArray() });
     }
+    public void UpdateTimes(Guid sessionId, DateTimeOffset start, DateTimeOffset end, DateTimeOffset? now = null)
+    {
+        var session = State.Sessions.FirstOrDefault(s => s.SessionId == sessionId)
+            ?? throw new InvalidOperationException("The session could not be found.");
+        if (session.EndTimeUtc == null) throw new InvalidOperationException("Stop the session before editing its times.");
+        if (end <= start) throw new InvalidOperationException("End must be after start.");
+        var updated = session with { StartTimeUtc = start.ToUniversalTime(), EndTimeUtc = end.ToUniversalTime(),
+            DurationSeconds = (long)(end - start).TotalSeconds, UpdatedAtUtc = (now ?? DateTimeOffset.UtcNow).ToUniversalTime(), SyncState = "pending" };
+        Commit(State with { Sessions = State.Sessions.Select(s => s.SessionId == sessionId ? updated : s).ToArray() });
+    }
     public void UpdateNotes(Guid sessionId, string notes, DateTimeOffset? now = null)
     {
         var session = State.Sessions.FirstOrDefault(s => s.SessionId == sessionId)

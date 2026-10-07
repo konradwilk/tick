@@ -88,6 +88,15 @@ class Tracker(initial: TrackerState, private val save: (TrackerState) -> Unit) {
         require(session.endTimeUtc != null && session.durationSeconds != null && session.durationSeconds in 0L..59L) { "Only completed sessions under one minute can be deleted." }
         commit(state.copy(sessions = state.sessions.filter { it.sessionId != sessionId }))
     }
+    fun updateTimes(sessionId: String, start: Instant, end: Instant, now: Instant = Instant.now()) {
+        val session = state.sessions.find { it.sessionId == sessionId }
+            ?: throw IllegalArgumentException("The session could not be found.")
+        require(session.endTimeUtc != null) { "Stop the session before editing its times." }
+        require(end > start) { "End must be after start." }
+        val updated = session.copy(startTimeUtc = start.toString(), endTimeUtc = end.toString(),
+            durationSeconds = Duration.between(start, end).seconds, updatedAtUtc = now.toString(), syncState = "pending")
+        commit(state.copy(sessions = state.sessions.map { if (it.sessionId == sessionId) updated else it }))
+    }
     fun updateNotes(sessionId: String, notes: String, now: Instant = Instant.now()) {
         require(state.sessions.any { it.sessionId == sessionId }) { "The session could not be found." }
         commit(state.copy(sessions = state.sessions.map {

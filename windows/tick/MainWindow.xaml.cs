@@ -143,6 +143,39 @@ public sealed partial class MainWindow : Window
         };
         await dialog.ShowAsync();
     }
+    private async void EditTimes(object sender, RoutedEventArgs args)
+    {
+        if (tracker == null || sender is not Button { Tag: Guid sessionId }) return;
+        var session = tracker.State.Sessions.FirstOrDefault(s => s.SessionId == sessionId);
+        if (session?.EndTimeUtc == null) return;
+        var start = session.StartTimeUtc.ToLocalTime();
+        var end = session.EndTimeUtc.Value.ToLocalTime();
+        var startDate = new CalendarDatePicker { Header = "Start date", Date = start };
+        var startTime = new TimePicker { Header = "Start time", Time = start.TimeOfDay };
+        var endDate = new CalendarDatePicker { Header = "End date", Date = end };
+        var endTime = new TimePicker { Header = "End time", Time = end.TimeOfDay };
+        var error = new TextBlock { TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush(Colors.Firebrick) };
+        var content = new StackPanel { Spacing = 12 };
+        foreach (var control in new UIElement[] { new TextBlock { Text = session.Project },
+            new TextBlock { Text = "Times use your local timezone." }, startDate, startTime, endDate, endTime, error }) content.Children.Add(control);
+        var dialog = new ContentDialog { XamlRoot = Controls.XamlRoot, Title = "Edit session times",
+            Content = new ScrollViewer { Content = content, MaxHeight = 450 }, PrimaryButtonText = "Save", CloseButtonText = "Cancel" };
+        DateTimeOffset LocalTime(CalendarDatePicker date, TimePicker time, DateTimeOffset original)
+        {
+            if (date.Date == null || time.SelectedTime == null) throw new InvalidOperationException("Enter both dates and times.");
+            var value = DateTime.SpecifyKind(date.Date.Value.Date + time.Time, DateTimeKind.Unspecified);
+            if (value == original.DateTime) return original;
+            if (TimeZoneInfo.Local.IsInvalidTime(value) || TimeZoneInfo.Local.IsAmbiguousTime(value))
+                throw new InvalidOperationException("This local time is missing or repeated due to a clock change. Choose an unambiguous time.");
+            return new DateTimeOffset(value, TimeZoneInfo.Local.GetUtcOffset(value));
+        }
+        dialog.PrimaryButtonClick += (_, eventArgs) =>
+        {
+            try { tracker.UpdateTimes(sessionId, LocalTime(startDate, startTime, start), LocalTime(endDate, endTime, end)); ErrorText.Text = ""; Refresh(); }
+            catch (Exception e) { eventArgs.Cancel = true; error.Text = e.Message; }
+        };
+        await dialog.ShowAsync();
+    }
     private async void EditNotes(object sender, RoutedEventArgs args)
     {
         if (tracker == null || sender is not Button { Tag: Guid sessionId }) return;

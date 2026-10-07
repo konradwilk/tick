@@ -13,6 +13,7 @@ struct TrackerView: View {
     @State private var manualEndEdited = false
     @State private var manualStatus = ""
     @State private var editingSession: Session?
+    @State private var editingTimes: Session?
     private var active: Session? { model.state.active }
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -64,6 +65,7 @@ struct TrackerView: View {
         .onChange(of: model.reportPeriod) { model.copyStatus = "" }
         .onChange(of: model.reportDate) { model.copyStatus = "" }
         .sheet(item: $editingSession) { SessionNotesEditor(session: $0, model: model) }
+        .sheet(item: $editingTimes) { SessionTimesEditor(session: $0, model: model) }
         .alert("Unable to complete action", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
             Button("OK") { model.error = nil }
         } message: { Text(model.error ?? "") }
@@ -83,6 +85,7 @@ struct TrackerView: View {
                         if session.endTimeUtc != nil {
                             HStack {
                                 Button("Edit notes") { editingSession = session }
+                                Button("Edit times") { editingTimes = session }
                                 if let seconds = session.durationSeconds, seconds >= 0, seconds < 60 {
                                     Button("Delete", role: .destructive) { model.perform { try $0.deleteSession(sessionId: session.sessionId) } }
                                 }

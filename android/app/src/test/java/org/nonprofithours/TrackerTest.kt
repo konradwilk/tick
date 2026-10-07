@@ -8,6 +8,33 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 class TrackerTest {
+    @Test fun editTimesRecalculatesDurationAndRejectsInvalidChanges() {
+        val tracker = Tracker(TrackerState()) {}
+        val id = tracker.addNonprofit("Kitchen")
+        val start = Instant.EPOCH
+        tracker.addSession(id, "Meals", start, start.plusSeconds(3600))
+        val original = tracker.state.sessions.single()
+        tracker.start(id, "Active", start.plusSeconds(172800))
+        val active = tracker.state.active
+        tracker.updateTimes(original.sessionId, start.minusSeconds(86400), start.minusSeconds(84600))
+        val updated = tracker.state.sessions.first()
+        assertEquals(1800L, updated.durationSeconds)
+        assertEquals(original.notes, updated.notes)
+        assertEquals(original.sessionId, updated.sessionId)
+        assertEquals(active, tracker.state.active)
+        assertTrue(tracker.clipboardText().contains("00:30:00"))
+        val before = tracker.state
+        assertThrows(IllegalArgumentException::class.java) { tracker.updateTimes(original.sessionId, start, start) }
+        assertThrows(IllegalArgumentException::class.java) { tracker.updateTimes(original.sessionId, start, start.minusSeconds(1)) }
+        assertThrows(IllegalArgumentException::class.java) { tracker.updateTimes(active!!.sessionId, start, start.plusSeconds(60)) }
+        assertThrows(IllegalArgumentException::class.java) { tracker.updateTimes("missing", start, start.plusSeconds(60)) }
+        assertEquals(before, tracker.state)
+        val failing = Tracker(before) { throw java.io.IOException("Disk full") }
+        assertThrows(java.io.IOException::class.java) { failing.updateTimes(original.sessionId, start, start.plusSeconds(7200)) }
+        assertEquals(before, failing.state)
+        assertEquals(updated, PortableData.decode(PortableData.encode(before)).sessions.first())
+    }
+
     @Test fun capitalizesNewAndEditedActivities() {
         val tracker = Tracker(TrackerState()) {}
         val id = tracker.addNonprofit("kitchen")

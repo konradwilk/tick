@@ -2,6 +2,36 @@ import XCTest
 @testable import HoursCore
 
 final class TrackerTests: XCTestCase {
+    func testEditTimesRecalculatesReportsAndRejectsInvalidChanges() throws {
+        let file = location()
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+        let tracker = try Tracker(file: file)
+        let id = try tracker.addNonprofit("Kitchen")
+        let start = Date(timeIntervalSince1970: 0)
+        try tracker.addSession(projectId: id, notes: "Meals", start: start, end: start.addingTimeInterval(3600))
+        let original = tracker.state.sessions[0]
+        try tracker.start(projectId: id, notes: "Active", now: start.addingTimeInterval(172800))
+        let active = tracker.state.active?.sessionId
+        try tracker.updateTimes(sessionId: original.sessionId, start: start.addingTimeInterval(-86400), end: start.addingTimeInterval(-84600))
+        XCTAssertEqual(tracker.state.sessions[0].durationSeconds, 1800)
+        XCTAssertEqual(tracker.state.sessions[0].notes, original.notes)
+        XCTAssertEqual(tracker.state.active?.sessionId, active)
+        XCTAssertTrue(tracker.clipboardText().contains("00:30:00"))
+        let reopened = try Tracker(file: file)
+        XCTAssertEqual(reopened.state.sessions[0].sessionId, original.sessionId)
+        XCTAssertEqual(reopened.state.sessions[0].durationSeconds, 1800)
+        for end in [start, start.addingTimeInterval(-1)] {
+            XCTAssertThrowsError(try tracker.updateTimes(sessionId: original.sessionId, start: start, end: end))
+        }
+        XCTAssertThrowsError(try tracker.updateTimes(sessionId: XCTUnwrap(active), start: start, end: start.addingTimeInterval(60)))
+        XCTAssertThrowsError(try tracker.updateTimes(sessionId: UUID(), start: start, end: start.addingTimeInterval(60)))
+        let saved = try Data(contentsOf: file)
+        try Data("changed".utf8).write(to: file)
+        XCTAssertThrowsError(try tracker.updateTimes(sessionId: original.sessionId, start: start, end: start.addingTimeInterval(7200)))
+        XCTAssertEqual(tracker.state.sessions[0].durationSeconds, 1800)
+        try saved.write(to: file)
+    }
+
     func testCapitalizesNewAndEditedActivities() throws {
         let file = location()
         defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }

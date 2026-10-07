@@ -22,6 +22,7 @@ import UIKit
     @State private var filename = "nonprofit-hours"
     @State private var copyStatus = ""
     @State private var editing: Session?
+    @State private var editingTimes: Session?
     private var range: ExportRange { ExportRange(period: period, date: date) }
     private var count: Int {
         model.state.sessions.filter { $0.endTimeUtc != nil && $0.startTimeUtc >= range.start && $0.startTimeUtc < range.end }.count
@@ -62,6 +63,7 @@ import UIKit
         }
         .onChange(of: period) { copyStatus = "" }
         .onChange(of: date) { copyStatus = "" }
+        .onChange(of: model.state.sessions.map { $0.updatedAtUtc }) { copyStatus = "" }
         .sheet(isPresented: $settings, onDismiss: {
             if chooseFolderAfterSettings { chooseFolderAfterSettings = false; choosingFolder = true }
         }) { settingsView }
@@ -69,6 +71,7 @@ import UIKit
             if case .failure(let error) = result { model.error = error.localizedDescription }
         }
         .sheet(item: $editing) { PhoneNotesEditor(session: $0, model: model) }
+        .sheet(item: $editingTimes) { PhoneTimesEditor(session: $0, model: model) }
         .alert("Unable to complete action", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
             Button("OK") { model.error = nil }
         } message: { Text(model.error ?? "") }
@@ -112,6 +115,7 @@ import UIKit
                         if session.endTimeUtc != nil {
                             HStack {
                                 Button("Edit notes") { editing = session }
+                                Button("Edit times") { editingTimes = session }
                                 if let seconds = session.durationSeconds, seconds >= 0, seconds < 60 {
                                     Button("Delete", role: .destructive) { model.perform { try $0.deleteSession(sessionId: session.sessionId); copyStatus = "" } }
                                 }

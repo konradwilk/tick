@@ -115,6 +115,46 @@ import HoursCore
     }
 }
 
+@MainActor struct SessionTimesEditor: View {
+    let session: Session
+    let model: AppModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var start: Date
+    @State private var end: Date
+    @State private var error: String?
+    init(session: Session, model: AppModel) {
+        self.session = session
+        self.model = model
+        _start = State(initialValue: session.startTimeUtc)
+        _end = State(initialValue: session.endTimeUtc ?? session.startTimeUtc)
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Edit session times").font(.title2)
+            Text(session.project)
+            DatePicker("Started", selection: $start, displayedComponents: [.date, .hourAndMinute])
+            DatePicker("Ended", selection: $end, displayedComponents: [.date, .hourAndMinute])
+            Text("Times use your local timezone.").font(.caption)
+            if end <= start { Text("End must be after start.").foregroundStyle(.red) }
+            if let error { Text(error).foregroundStyle(.red) }
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Save") {
+                    do {
+                        guard let tracker = model.tracker else { throw TrackerError.missingSession }
+                        try tracker.updateTimes(sessionId: session.sessionId, start: start, end: end)
+                        model.state = tracker.state
+                        model.error = nil
+                        model.copyStatus = ""
+                        dismiss()
+                    } catch { self.error = error.localizedDescription }
+                }.disabled(end <= start).keyboardShortcut(.defaultAction)
+            }
+        }.padding(24).frame(width: 440)
+    }
+}
+
 struct SessionNotesEditor: View {
     let session: Session
     let model: AppModel
