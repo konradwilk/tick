@@ -8,6 +8,26 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 class TrackerTest {
+    @Test fun startReloadsBeforeValidation() {
+        var saved = TrackerState()
+        val tracker = Tracker(saved, reload = { saved }) { saved = it }
+        val id = tracker.addNonprofit("Kitchen")
+        val other = Tracker(saved, reload = { saved }) { saved = it }
+        other.start(id, "Remote", Instant.EPOCH)
+        val before = saved
+        assertThrows(IllegalStateException::class.java) { tracker.start(id) }
+        assertEquals(other.state.active, tracker.state.active)
+        assertEquals(before, saved)
+        other.stop(Instant.EPOCH.plusSeconds(60))
+        tracker.start(id, "Local", Instant.EPOCH.plusSeconds(120))
+        assertEquals(listOf("Remote", "Local"), saved.sessions.map { it.notes })
+        val failing = Tracker(saved, reload = { throw java.io.IOException("Missing file") }) { saved = it }
+        assertThrows(java.io.IOException::class.java) { failing.start(id) }
+        assertEquals(saved, failing.state)
+        saved = saved.copy(nonprofits = emptyList(), sessions = emptyList())
+        assertThrows(IllegalArgumentException::class.java) { tracker.start(id) }
+        assertTrue(saved.sessions.isEmpty())
+    }
     @Test fun editTimesRecalculatesDurationAndRejectsInvalidChanges() {
         val tracker = Tracker(TrackerState()) {}
         val id = tracker.addNonprofit("Kitchen")

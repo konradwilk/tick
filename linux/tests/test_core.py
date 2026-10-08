@@ -12,6 +12,40 @@ from tick.core import StorageLocation, FileStore, Tracker, data_path, elapsed, p
 
 
 class TrackerTests(unittest.TestCase):
+    def test_start_reloads_remote_history_and_active_session(self):
+        project = self.tracker.add_nonprofit("Kitchen")
+        other = Tracker(FileStore(self.path))
+        other.start(project, "Remote", self.start)
+        before = self.path.read_bytes()
+        with self.assertRaisesRegex(ValueError, "Stop the current session"):
+            self.tracker.start(project, "Local", self.start)
+        self.assertEqual(self.tracker.active, other.active)
+        self.assertEqual(self.path.read_bytes(), before)
+        other.stop(self.start + timedelta(seconds=60))
+        self.tracker.start(project, "Local", self.start + timedelta(seconds=120))
+        saved = Tracker(FileStore(self.path))
+        self.assertEqual([s["notes"] for s in saved.state["sessions"]], ["Remote", "Local"])
+        self.assertEqual(saved.state["sessions"][0]["durationSeconds"], 60)
+
+    def test_start_rejects_removed_project_and_unreadable_file(self):
+        project = self.tracker.add_nonprofit("Kitchen")
+        latest = copy.deepcopy(self.tracker.state)
+        latest["nonprofits"] = []
+        self.path.write_text(json.dumps(latest))
+        before = self.path.read_bytes()
+        with self.assertRaisesRegex(ValueError, "Select a project"):
+            self.tracker.start(project)
+        self.assertEqual(self.path.read_bytes(), before)
+        for raw in (b"broken", None):
+            if raw is None:
+                self.path.unlink()
+            else:
+                self.path.write_bytes(raw)
+            with self.assertRaises((ValueError, OSError)):
+                self.tracker.start(project)
+            self.assertEqual(self.tracker.state, latest)
+            self.assertEqual(self.path.read_bytes() if self.path.exists() else None, raw)
+
     def test_edit_times_updates_reports_and_preserves_state_on_failure(self):
         nonprofit = self.tracker.add_nonprofit("Kitchen")
         self.tracker.add_session(nonprofit, "Meals", self.start, self.start + timedelta(hours=1))

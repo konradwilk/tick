@@ -133,7 +133,12 @@ class StorageLocation(private val context: Context) {
     private fun tracker(read: () -> ByteArray?, write: (ByteArray) -> Unit): Tracker {
         var snapshot = read()
         val initial = snapshot?.let { PortableData.decode(it) } ?: TrackerState()
-        return Tracker(initial) { next ->
+        return Tracker(initial, reload = {
+            val bytes = requireNotNull(read()) { "The data file was removed. Select its folder again." }
+            val latest = PortableData.decode(bytes)
+            snapshot = bytes
+            latest
+        }) { next ->
             check(read().contentEquals(snapshot)) { "The data file changed or was removed. Select its folder again before saving." }
             val bytes = PortableData.encode(next)
             write(bytes)

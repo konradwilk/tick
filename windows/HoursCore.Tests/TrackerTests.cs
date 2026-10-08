@@ -3,6 +3,35 @@ using Xunit;
 namespace HoursCore.Tests;
 public class TrackerTests
 {
+    [Fact] public void StartReloadsSharedFileBeforeValidation()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var path = Path.Combine(directory, "tick.json");
+            var store = new FileStore(path);
+            var tracker = new Tracker(store.Load(), store.Save, () => store.Load(true));
+            var id = tracker.AddNonprofit("Kitchen");
+            var remoteStore = new FileStore(path);
+            var other = new Tracker(remoteStore.Load(true), remoteStore.Save, () => remoteStore.Load(true));
+            other.Start(id, "Remote", DateTimeOffset.UnixEpoch);
+            var before = File.ReadAllBytes(path);
+            Assert.Throws<InvalidOperationException>(() => tracker.Start(id));
+            Assert.Equal(other.State.Active!.SessionId, tracker.State.Active!.SessionId);
+            Assert.Equal(before, File.ReadAllBytes(path));
+            other.Stop(DateTimeOffset.UnixEpoch.AddMinutes(1));
+            tracker.Start(id, "Local", DateTimeOffset.UnixEpoch.AddMinutes(2));
+            Assert.Equal(new[] { "Remote", "Local" }, store.Load(true).Sessions.Select(s => s.Notes));
+            File.WriteAllText(path, "broken");
+            Assert.ThrowsAny<Exception>(() => tracker.Start(id));
+            Assert.Equal("broken", File.ReadAllText(path));
+            File.Delete(path);
+            Assert.ThrowsAny<IOException>(() => tracker.Start(id));
+            Assert.False(File.Exists(path));
+        }
+        finally { Directory.Delete(directory, true); }
+    }
     [Fact] public void EditTimesRecalculatesReportsAndPreservesStateOnFailure()
     {
         var tracker = new Tracker(TrackerState.Empty(), _ => { });

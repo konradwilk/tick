@@ -34,7 +34,8 @@ import HoursCore
     }
     func perform(_ action: (Tracker) throws -> Void) {
         guard let tracker else { return }
-        do { try action(tracker); state = tracker.state }
+        defer { state = tracker.state }
+        do { try action(tracker) }
         catch { self.error = error.localizedDescription }
     }
     func toggleTracking() {

@@ -107,8 +107,8 @@ class FileStore:
         self.require_existing = require_existing
         self.snapshot = None
 
-    def load(self):
-        if not self.path.exists() and not self.require_existing:
+    def load(self, require_existing=False):
+        if not self.path.exists() and not (self.require_existing or require_existing):
             self.snapshot = None
             return {"schemaVersion": 1, "deviceId": str(uuid4()), "nonprofits": [], "sessions": []}
         raw = self.path.read_bytes()
@@ -162,6 +162,7 @@ class Tracker:
         return nonprofit["id"]
 
     def start(self, project_id, notes="", now=None):
+        self.state = self.store.load(require_existing=True)
         if self.active:
             raise ValueError("Stop the current session first.")
         nonprofit = next((n for n in self.state["nonprofits"] if n["id"] == project_id), None)

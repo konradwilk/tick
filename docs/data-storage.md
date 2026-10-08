@@ -15,7 +15,11 @@ existing file is read before adopting it. A new folder receives a copy of the
 current state. Folder selection is remembered using platform settings (Apple
 security-scoped bookmarks and Android persistable document-tree permissions).
 Use one device at a time and let cloud synchronization finish before switching.
-The apps reject writes when the file differs from the snapshot they loaded.
+Pressing Start rereads the file before checking the selected project and active
+session, preserving updates saved by another instance. If another session is
+already running, it is shown instead of creating a second session. Missing or
+unreadable files block Start. The apps still reject writes when the file differs
+from the snapshot they loaded, including changes made after this refresh.
 
 Windows, Linux, and Apple use atomic local file replacement; Android uses
 AtomicFile for private storage. Android document-provider writes depend on the

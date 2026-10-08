@@ -123,6 +123,11 @@ public final class Tracker {
         return nonprofit.id
     }
     public func start(projectId: UUID, notes: String = "", platform: String = "macos", now: Date = Date()) throws {
+        // Read the shared file again before validating or adding a session.
+        let data = try Data(contentsOf: file)
+        let latest = try PortableData.decode(data)
+        state = latest
+        snapshot = data
         guard state.active == nil else { throw TrackerError.activeSession }
         guard let nonprofit = state.nonprofits.first(where: { $0.id == projectId }) else { throw TrackerError.invalidNonprofit }
         var next = state

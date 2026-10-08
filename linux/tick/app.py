@@ -45,6 +45,7 @@ class HoursWindow(Gtk.ApplicationWindow):
             self.refresh()
             self.error.set_text("")
         except Exception as error:
+            self.refresh()
             self.error.set_text(str(error))
 
     def add_nonprofit(self):

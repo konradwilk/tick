@@ -37,7 +37,7 @@ data class ExportRange(val start: LocalDate, val end: LocalDate) {
         }
     }
 }
-class Tracker(initial: TrackerState, private val save: (TrackerState) -> Unit) {
+class Tracker(initial: TrackerState, private val reload: (() -> TrackerState)? = null, private val save: (TrackerState) -> Unit) {
     private fun capitalizeEntries(value: String): String {
         var first = true
         return buildString {
@@ -59,6 +59,7 @@ class Tracker(initial: TrackerState, private val save: (TrackerState) -> Unit) {
         return nonprofit.id
     }
     fun start(id: String, notes: String = "", now: Instant = Instant.now()) {
+        reload?.let { state = it() }
         check(state.active == null) { "Stop the current session first." }
         val nonprofit = requireNotNull(state.nonprofits.find { it.id == id }) { "Select a project." }
         val session = Session(projectId = id, project = nonprofit.name, startTimeUtc = now.toString(),

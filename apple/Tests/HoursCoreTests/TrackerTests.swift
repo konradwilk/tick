@@ -2,6 +2,45 @@ import XCTest
 @testable import HoursCore
 
 final class TrackerTests: XCTestCase {
+    func testStartReloadsRemoteHistoryAndActiveSession() throws {
+        let file = location()
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+        let tracker = try Tracker(file: file)
+        let id = try tracker.addNonprofit("Kitchen")
+        let other = try Tracker(file: file)
+        let start = Date(timeIntervalSince1970: 0)
+        try other.start(projectId: id, notes: "Remote", now: start)
+        let before = try Data(contentsOf: file)
+        XCTAssertThrowsError(try tracker.start(projectId: id, notes: "Local", now: start)) { error in
+            XCTAssertEqual(error as? TrackerError, .activeSession)
+        }
+        XCTAssertEqual(tracker.state.active?.sessionId, other.state.active?.sessionId)
+        XCTAssertEqual(try Data(contentsOf: file), before)
+        try other.stop(now: start.addingTimeInterval(60))
+        try tracker.start(projectId: id, notes: "Local", now: start.addingTimeInterval(120))
+        let saved = try Tracker(file: file)
+        XCTAssertEqual(saved.state.sessions.map(\.notes), ["Remote", "Local"])
+        XCTAssertEqual(saved.state.sessions.first?.durationSeconds, 60)
+    }
+    func testStartRejectsRemovedProjectAndUnreadableFile() throws {
+        let file = location()
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+        let tracker = try Tracker(file: file)
+        let id = try tracker.addNonprofit("Kitchen")
+        var latest = tracker.state
+        latest.nonprofits = []
+        let data = try PortableData.encode(latest)
+        try data.write(to: file)
+        XCTAssertThrowsError(try tracker.start(projectId: id))
+        XCTAssertEqual(try Data(contentsOf: file), data)
+        XCTAssertTrue(tracker.state.nonprofits.isEmpty)
+        try Data("broken".utf8).write(to: file)
+        XCTAssertThrowsError(try tracker.start(projectId: id))
+        XCTAssertEqual(try Data(contentsOf: file), Data("broken".utf8))
+        try FileManager.default.removeItem(at: file)
+        XCTAssertThrowsError(try tracker.start(projectId: id))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
+    }
     func testEditTimesRecalculatesReportsAndRejectsInvalidChanges() throws {
         let file = location()
         defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
@@ -219,7 +258,7 @@ final class TrackerTests: XCTestCase {
         XCTAssertFalse(tracker.csv().contains(id.uuidString))
         XCTAssertFalse(tracker.csv().contains(try XCTUnwrap(tracker.state.sessions.first?.sessionId).uuidString))
         XCTAssertTrue(tracker.csv().contains("\"'=SUM(1,2)\""))
-        XCTAssertTrue(tracker.csv().contains("\"A, \"\"Quote\"\"\nand newline\""))
+        XCTAssertTrue(tracker.csv().contains("\"A, \"\"Quote\"\"\nAnd newline\""))
         XCTAssertTrue(tracker.csv().contains("1970-01-01T00:01:00Z"))
     }
     func testInvalidActionsAndBackwardClockDoNotChangeSession() throws {

@@ -37,7 +37,8 @@ import UIKit
     }
     func perform(_ action: (Tracker) throws -> Void) {
         guard let tracker else { return }
-        do { try action(tracker); state = tracker.state; error = nil }
+        defer { state = tracker.state }
+        do { try action(tracker); error = nil }
         catch { self.error = error.localizedDescription }
     }
     func selectFolder(_ folder: URL) {

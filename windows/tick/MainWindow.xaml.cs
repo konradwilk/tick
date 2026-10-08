@@ -48,7 +48,7 @@ public sealed partial class MainWindow : Window
     private void Perform(Action action)
     {
         try { action(); ErrorText.Text = ""; Refresh(); }
-        catch (Exception e) { ErrorText.Text = e.Message; }
+        catch (Exception e) { if (tracker != null) Refresh(); ErrorText.Text = e.Message; }
     }
     private void AddNonprofit(object sender, RoutedEventArgs args) => Perform(() =>
     {

@@ -96,8 +96,9 @@ class MainActivity : ComponentActivity() {
         val reportRange = runCatching { ExportRange.forDate(ExportPeriod.valueOf(reportPeriod), LocalDate.parse(reportDate)) }.getOrNull()
         val reportCount = reportRange?.let { tracker.exportSessions(it).size } ?: 0
         fun action(block: () -> Unit) {
-            try { block(); state = tracker.state; error = null }
+            try { block(); error = null }
             catch (e: Exception) { error = e.message ?: "Unable to save hours." }
+            finally { state = tracker.state }
         }
         val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
             if (uri != null) action {
