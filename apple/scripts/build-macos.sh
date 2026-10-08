@@ -7,12 +7,14 @@ fi
 swift build -c release --product tick "$@"
 binary_dir=$(swift build -c release --show-bin-path "$@")
 app="build/Time is Clearly Kept.app"
-mkdir -p "$app/Contents/MacOS"
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+cp Assets/Tick.icns "$app/Contents/Resources/Tick.icns"
 cp "$binary_dir/tick" "$app/Contents/MacOS/tick"
 cat > "$app/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
+<key>CFBundleIconFile</key><string>Tick</string>
 <key>CFBundleExecutable</key><string>tick</string>
 <key>CFBundleIdentifier</key><string>org.nonprofithours.mac</string>
 <key>CFBundleName</key><string>Time is Clearly Kept</string>
