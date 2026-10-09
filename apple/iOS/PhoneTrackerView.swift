@@ -61,6 +61,11 @@ import UIKit
             case .failure(let error): model.error = error.localizedDescription
             }
         }
+        .onChange(of: model.needsDataLocation) { wasNeeded, isNeeded in
+            if wasNeeded && !isNeeded && model.state.nonprofits.isEmpty {
+                settings = true
+            }
+        }
         .onChange(of: period) { copyStatus = "" }
         .onChange(of: date) { copyStatus = "" }
         .onChange(of: model.state.sessions.map { $0.updatedAtUtc }) { copyStatus = "" }

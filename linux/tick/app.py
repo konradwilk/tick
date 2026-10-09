@@ -310,6 +310,7 @@ class HoursWindow(Gtk.ApplicationWindow):
                 path = target.get_path() if target else None
                 if not path:
                     raise ValueError("Choose a local file or a mounted cloud/network folder.")
+                first_run = self.tracker is None
                 next_tracker = self.location.select(path, self.tracker)
                 self.tracker = next_tracker
                 active = self.tracker.active
@@ -319,6 +320,9 @@ class HoursWindow(Gtk.ApplicationWindow):
                 if self.timer is None:
                     self.timer = GLib.timeout_add_seconds(1, self.update_clock)
                 self.error.set_text("")
+                if first_run and not self.tracker.state["nonprofits"]:
+                    self.settings_panel.set_reveal_child(True)
+                    self.name.grab_focus()
         except Exception as error:
             self.error.set_text(str(error))
         finally:

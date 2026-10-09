@@ -6,6 +6,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, Gio
 from tick.app import HoursWindow
+from tick.core import FileStore, Tracker, StorageLocation
 
 app = Gtk.Application(application_id="org.nonprofithours.Smoke", flags=Gio.ApplicationFlags.NON_UNIQUE)
 app.register(None)
@@ -68,4 +69,48 @@ with tempfile.TemporaryDirectory() as directory:
     assert restored.tracker.state["sessions"][0]["notes"] == "Updated dinner service\nCleanup"
     restored.on_close()
     restored.destroy()
+# Exercise the location-picker callback with isolated first-run data.
+class FolderChooser:
+    def __init__(self, folder):
+        self.folder = folder
+        self.destroyed = False
+
+    def get_file(self):
+        return Gio.File.new_for_path(str(self.folder))
+
+    def destroy(self):
+        self.destroyed = True
+
+
+for scenario in ("empty", "populated", "cancel", "invalid", "later"):
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        folder = root / "selected"
+        folder.mkdir()
+        if scenario == "populated":
+            saved = Tracker(FileStore(folder / "tick.json"))
+            saved.add_nonprofit("Existing project")
+        elif scenario == "invalid":
+            (folder / "tick.json").write_text("invalid JSON")
+        elif scenario == "empty":
+            FileStore(folder / "tick.json").save(Tracker(FileStore(root / "empty.json")).state)
+        window = HoursWindow(app, root / "seed.json")
+        window.location = StorageLocation(root / "location.json")
+        if scenario != "later":
+            window.tracker = None
+        chooser = FolderChooser(folder)
+        window.chooser = chooser
+        response = Gtk.ResponseType.CANCEL if scenario == "cancel" else Gtk.ResponseType.ACCEPT
+        window.on_data_response(chooser, response)
+        assert window.settings_panel.get_reveal_child() == (scenario == "empty"), scenario
+        assert chooser.destroyed and window.chooser is None
+        if scenario == "empty":
+            assert window.name.get_sensitive() and window.add.get_sensitive()
+            window.name.set_text("First project")
+            window.add_nonprofit()
+            assert window.tracker.state["nonprofits"][0]["name"] == "First project"
+        elif scenario in ("cancel", "invalid"):
+            assert window.tracker is None
+        window.on_close()
+        window.destroy()
 print("GTK smoke test passed")

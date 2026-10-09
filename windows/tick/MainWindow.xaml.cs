@@ -219,12 +219,18 @@ public sealed partial class MainWindow : Window
             var folder = await picker.PickSingleFolderAsync();
             if (folder == null) return;
             if (string.IsNullOrEmpty(folder.Path)) throw new IOException("Choose a local or mounted cloud folder.");
+            var firstRun = tracker == null;
             var next = location.Select(folder.Path, tracker?.State);
             tracker = next;
             Refresh();
             Nonprofits.SelectedItem = tracker.State.Nonprofits.FirstOrDefault(n => n.Id == tracker.State.Active?.ProjectId) ?? tracker.State.Nonprofits.FirstOrDefault();
             Notes.Text = tracker.State.Active?.Notes ?? "";
             ErrorText.Text = "";
+            if (firstRun && tracker.State.Nonprofits.Length == 0)
+            {
+                SettingsPanel.Visibility = Visibility.Visible;
+                NewName.Focus(FocusState.Programmatic);
+            }
         }
         catch (Exception e) { ErrorText.Text = e.Message; }
     }

@@ -32,10 +32,12 @@ class MainActivity : ComponentActivity() {
             var tracker by remember { mutableStateOf(loaded.getOrNull()) }
             var storageError by remember { mutableStateOf(loaded.exceptionOrNull()?.message) }
             var location by remember { mutableStateOf(storage.label) }
+            var openSettingsOnLoad by rememberSaveable { mutableStateOf(false) }
             val chooseFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
                 if (uri != null) {
                     try {
                         val next = storage.select(uri, tracker)
+                        openSettingsOnLoad = tracker == null && next.state.nonprofits.isEmpty()
                         tracker = next
                         location = storage.label
                         storageError = null
@@ -54,7 +56,7 @@ class MainActivity : ComponentActivity() {
                     storageError?.let { Text(it, Modifier.padding(20.dp), color = MaterialTheme.colorScheme.error) }
                     Box(Modifier.weight(1f)) {
                         val current = tracker
-                        if (current != null) key(current) { TrackerScreen(current, location) { chooseFolder.launch(null) } }
+                        if (current != null) key(current) { TrackerScreen(current, location, openSettingsOnLoad) { chooseFolder.launch(null) } }
                         else Column(Modifier.padding(20.dp)) {
                             Text("Choose where to save tick.json, or select a folder containing an existing tick.json.")
                             OutlinedButton(onClick = { chooseFolder.launch(null) }) { Text("Data location…") }
@@ -65,7 +67,7 @@ class MainActivity : ComponentActivity() {
         } }
     }
 
-    @Composable private fun TrackerScreen(tracker: Tracker, location: String, chooseFolder: () -> Unit) {
+    @Composable private fun TrackerScreen(tracker: Tracker, location: String, initialSettings: Boolean, chooseFolder: () -> Unit) {
         var state by remember { mutableStateOf(tracker.state) }
         var selected by rememberSaveable { mutableStateOf(state.active?.projectId ?: state.nonprofits.firstOrNull()?.id) }
         var notes by rememberSaveable { mutableStateOf(state.active?.notes.orEmpty()) }
@@ -84,7 +86,7 @@ class MainActivity : ComponentActivity() {
         var reportPeriod by rememberSaveable { mutableStateOf("Monthly") }
         var reportDate by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
         var copyStatus by remember { mutableStateOf("") }
-        var settings by remember { mutableStateOf(false) }
+        var settings by rememberSaveable { mutableStateOf(initialSettings) }
         var manual by rememberSaveable { mutableStateOf(false) }
         var manualId by rememberSaveable { mutableStateOf<String?>(null) }
         var manualNotes by rememberSaveable { mutableStateOf("") }

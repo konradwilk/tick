@@ -62,6 +62,11 @@ struct TrackerView: View {
                 model.chooseDataLocation()
             }
         }
+        .onChange(of: model.needsDataLocation) { wasNeeded, isNeeded in
+            if wasNeeded && !isNeeded && model.state.nonprofits.isEmpty {
+                settings = true
+            }
+        }
         .onChange(of: model.reportPeriod) { model.copyStatus = "" }
         .onChange(of: model.reportDate) { model.copyStatus = "" }
         .sheet(item: $editingSession) { SessionNotesEditor(session: $0, model: model) }
