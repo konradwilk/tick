@@ -44,7 +44,7 @@ struct TrackerView: View {
                 }
             } else { Text("Ready when you are").foregroundStyle(.secondary) }
             TextField("What are you working on? (optional)", text: $model.notes).disabled(active != nil || model.tracker == nil)
-            if model.state.nonprofits.isEmpty { Text("Add your first nonprofit in Settings to begin.").font(.caption) }
+            if model.state.nonprofits.isEmpty { Text("Add your first project in Settings.").font(.caption) }
             Divider()
             GeometryReader { geometry in
                 ScrollView {
@@ -142,7 +142,7 @@ struct TrackerView: View {
                     }
                 }.disabled(manualNonprofit == nil || manualNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || manualEnd <= manualStart)
                 if manualEnd <= manualStart { Text("End must be after start.").foregroundStyle(.red) }
-                if model.state.nonprofits.isEmpty { Text("Add a nonprofit in Settings first.").font(.caption) }
+                if model.state.nonprofits.isEmpty { Text("Add a project in Settings first.").font(.caption) }
                 if let error = model.error { Text(error).foregroundStyle(.red) }
                 if !manualStatus.isEmpty { Text(manualStatus).font(.caption) }
             }.padding(.top, 8)
@@ -160,7 +160,7 @@ struct TrackerView: View {
             Text("Settings").font(.title2)
             HStack {
                 TextField("New project", text: $newName)
-                Button("Add") { model.perform { model.selected = try $0.addNonprofit(newName); newName = "" } }
+                Button("Add project") { model.perform { model.selected = try $0.addNonprofit(newName); newName = "" } }
                     .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }.disabled(active != nil || model.tracker == nil)
             manualSessionForm

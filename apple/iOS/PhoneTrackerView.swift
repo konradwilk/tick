@@ -97,7 +97,7 @@ import UIKit
             } else { Text("Ready when you are").foregroundStyle(.secondary) }
             TextField("What are you working on? (optional)", text: $model.notes)
                 .textFieldStyle(.roundedBorder).disabled(model.tracker == nil || model.state.active != nil)
-            if model.state.nonprofits.isEmpty { Button("Add your first nonprofit in Settings") { settings = true }.font(.caption) }
+            if model.state.nonprofits.isEmpty { Button("Add your first project in Settings.") { settings = true }.font(.caption) }
         }
     }
     private var history: some View {
@@ -183,7 +183,7 @@ import UIKit
                     }
                 }.disabled(manualNonprofit == nil || manualNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || manualEnd <= manualStart)
                 if manualEnd <= manualStart { Text("End must be after start.").foregroundStyle(.red) }
-                if model.state.nonprofits.isEmpty { Text("Add a nonprofit in Settings first.").font(.caption) }
+                if model.state.nonprofits.isEmpty { Text("Add a project in Settings first.").font(.caption) }
                 if let error = model.error { Text(error).foregroundStyle(.red) }
                 if !manualStatus.isEmpty { Text(manualStatus).font(.caption) }
             }.padding(.top, 8)
@@ -198,9 +198,9 @@ import UIKit
     private var settingsView: some View {
         NavigationStack {
             Form {
-                Section("Nonprofits") {
+                Section("Projects") {
                     TextField("New project", text: $newName)
-                    Button("Add nonprofit") { model.perform { model.selected = try $0.addNonprofit(newName); newName = "" } }
+                    Button("Add project") { model.perform { model.selected = try $0.addNonprofit(newName); newName = "" } }
                         .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }.disabled(model.tracker == nil || model.state.active != nil)
                 Section { manualSessionForm }
