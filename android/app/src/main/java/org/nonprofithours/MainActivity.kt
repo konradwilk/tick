@@ -69,7 +69,15 @@ class MainActivity : ComponentActivity() {
 
     @Composable private fun TrackerScreen(tracker: Tracker, location: String, initialSettings: Boolean, chooseFolder: () -> Unit) {
         var state by remember { mutableStateOf(tracker.state) }
-        var selected by rememberSaveable { mutableStateOf(state.active?.projectId ?: state.nonprofits.firstOrNull()?.id) }
+        val projectPreferences = remember { getSharedPreferences("hours-project", MODE_PRIVATE) }
+        var selected by rememberSaveable {
+            mutableStateOf(state.active?.projectId
+                ?: state.nonprofits.find { it.id == projectPreferences.getString("lastSelectedProject", null) }?.id
+                ?: state.nonprofits.firstOrNull()?.id)
+        }
+        LaunchedEffect(selected) {
+            selected?.let { projectPreferences.edit().putString("lastSelectedProject", it).apply() }
+        }
         var notes by rememberSaveable { mutableStateOf(state.active?.notes.orEmpty()) }
         var name by rememberSaveable { mutableStateOf("") }
         var error by remember { mutableStateOf<String?>(null) }
@@ -88,7 +96,15 @@ class MainActivity : ComponentActivity() {
         var copyStatus by remember { mutableStateOf("") }
         var settings by rememberSaveable { mutableStateOf(initialSettings) }
         var manual by rememberSaveable { mutableStateOf(false) }
-        var manualId by rememberSaveable { mutableStateOf<String?>(null) }
+        var manualId by rememberSaveable {
+            mutableStateOf(state.nonprofits.find {
+                it.id == projectPreferences.getString("lastManualProject", null)
+            }?.id)
+        }
+        fun selectManualProject(id: String) {
+            manualId = id
+            projectPreferences.edit().putString("lastManualProject", id).apply()
+        }
         var manualNotes by rememberSaveable { mutableStateOf("") }
         val manualFormat = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm").withResolverStyle(java.time.format.ResolverStyle.STRICT)
         var manualStart by rememberSaveable { mutableStateOf(LocalDateTime.now().minusHours(1).format(manualFormat)) }
@@ -118,7 +134,9 @@ class MainActivity : ComponentActivity() {
                 OutlinedTextField(name, { name = it }, label = { Text("New project") }, enabled = active == null)
                 Button(onClick = { action { selected = tracker.addNonprofit(name); name = "" } }, enabled = active == null && name.isNotBlank()) { Text("Add nonprofit") }
                 OutlinedButton(onClick = chooseFolder) { Text("Data location…") }
-                OutlinedButton(onClick = { settings = false; manual = true; manualError = null }) { Text("Add session by hand…") }
+                OutlinedButton(onClick = { settings = false
+                    manualId = state.nonprofits.find { it.id == projectPreferences.getString("lastManualProject", null) }?.id
+                    manual = true; manualError = null }) { Text("Add session by hand…") }
                 Text(location, style = MaterialTheme.typography.bodySmall)
                 Text("All changes are saved here. Use one device at a time.", style = MaterialTheme.typography.bodySmall)
                 Text("Timing continues when the app closes. Reopen and press Stop to finish.", style = MaterialTheme.typography.bodySmall)
@@ -131,8 +149,8 @@ class MainActivity : ComponentActivity() {
                 Text("Project")
                 state.nonprofits.forEach { nonprofit ->
                     Row {
-                        RadioButton(selected = manualId == nonprofit.id, onClick = { manualId = nonprofit.id })
-                        TextButton(onClick = { manualId = nonprofit.id }) { Text(nonprofit.name) }
+                        RadioButton(selected = manualId == nonprofit.id, onClick = { selectManualProject(nonprofit.id) })
+                        TextButton(onClick = { selectManualProject(nonprofit.id) }) { Text(nonprofit.name) }
                     }
                 }
                 if (state.nonprofits.isEmpty()) Text("Add a nonprofit in Settings first.")

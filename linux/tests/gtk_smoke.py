@@ -1,6 +1,7 @@
 """Run on Linux with a display (or xvfb-run); never touches real user data."""
 from pathlib import Path
 import tempfile
+import os
 import gi
 
 gi.require_version("Gtk", "4.0")
@@ -11,6 +12,7 @@ from tick.core import FileStore, Tracker, StorageLocation
 app = Gtk.Application(application_id="org.nonprofithours.Smoke", flags=Gio.ApplicationFlags.NON_UNIQUE)
 app.register(None)
 with tempfile.TemporaryDirectory() as directory:
+    os.environ["XDG_CONFIG_HOME"] = directory
     path = Path(directory) / "sessions.json"
     window = HoursWindow(app, path)
     window.present()
@@ -36,6 +38,44 @@ with tempfile.TemporaryDirectory() as directory:
     restored.toggle_tracking()
     assert restored.tracker.active is None
     assert restored.toggle.get_label() == "Start"
+    # A selection without starting a session survives reopening.
+    restored.name.set_text("Second project")
+    restored.add_nonprofit()
+    second_id = restored.selected_id
+    reopened = HoursWindow(app, path)
+    assert reopened.selected_id == second_id
+    reopened.nonprofits.set_selected(0)
+    first_id = reopened.selected_id
+    reopened.destroy()
+    reopened = HoursWindow(app, path)
+    assert reopened.selected_id == first_id
+    reopened.destroy()
+    # An unavailable saved project falls back to the first project.
+    restored.location.settings.with_name("last-project").write_text("missing", encoding="utf-8")
+    reopened = HoursWindow(app, path)
+    assert reopened.selected_id == first_id
+    reopened.destroy()
+    # Remember manual selections even when canceled; leave tracking unchanged.
+    dialog = restored.add_manual_session()
+    selector = dialog.get_content_area().get_first_child().get_next_sibling()
+    selector.set_selected(1)
+    dialog.response(Gtk.ResponseType.CANCEL)
+    reopened = HoursWindow(app, path)
+    assert reopened.selected_id == first_id
+    dialog = reopened.add_manual_session()
+    selector = dialog.get_content_area().get_first_child().get_next_sibling()
+    assert selector.get_selected() == 1
+    selector.set_selected(0)
+    dialog.response(Gtk.ResponseType.CANCEL)
+    dialog = reopened.add_manual_session()
+    assert dialog.get_content_area().get_first_child().get_next_sibling().get_selected() == 0
+    dialog.response(Gtk.ResponseType.CANCEL)
+    reopened.location.settings.with_name("last-manual-project").write_text("missing", encoding="utf-8")
+    dialog = reopened.add_manual_session()
+    assert dialog.get_content_area().get_first_child().get_next_sibling().get_selected() == 0
+    dialog.response(Gtk.ResponseType.CANCEL)
+    reopened.on_close()
+    reopened.destroy()
     assert restored.export.get_sensitive()
     assert restored.copy.get_sensitive()
     assert restored.report_preview.get_text() == restored.tracker.clipboard_text(*restored.report_selection())

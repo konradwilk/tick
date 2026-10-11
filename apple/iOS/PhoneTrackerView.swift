@@ -166,7 +166,10 @@ import UIKit
     private var manualSessionForm: some View {
         DisclosureGroup("Add session by hand") {
             VStack(alignment: .leading, spacing: 12) {
-                Picker("Project", selection: $manualNonprofit) {
+                Picker("Project", selection: Binding(get: { manualNonprofit }, set: {
+                    manualNonprofit = $0
+                    ManualProjectPreference.remember($0)
+                })) {
                     Text("Choose a project").tag(nil as UUID?)
                     ForEach(model.state.nonprofits) { Text($0.name).tag(Optional($0.id)) }
                 }
@@ -194,6 +197,7 @@ import UIKit
             }.padding(.top, 8)
         }.disabled(model.tracker == nil)
             .onAppear {
+                manualNonprofit = ManualProjectPreference.selection(projectIDs: model.state.nonprofits.map(\.id))
                 if !manualDatesInitialized {
                     manualEnd = manualStart.addingTimeInterval(900)
                     manualDatesInitialized = true

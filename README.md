@@ -18,13 +18,17 @@ This applies to tracking, manual sessions, and note edits. Existing saved data i
 unchanged until edited.
 
 The main screen puts project selection and Start/Stop first, followed by notes.
+On every platform, the last selected project is remembered across app launches.
+An active session takes priority; if the remembered project is unavailable, the
+first project is selected.
 History and **Export & copy** sit side by side in wide windows and stack on
 phones or narrow windows. Capture stays visible while the workspace scrolls.
 The report panel previews the exact summary produced by **Copy summary**.
 Use **Settings** for adding project and choosing the data folder.
 
 In all five apps, choose **Settings → Add session by hand** to record completed
-work. Select a project, describe what you worked on, and enter the start and end
+work. Manual entry remembers its last selected project across app launches,
+independently of the tracking selector. Select a project, describe what you worked on, and enter the start and end
 dates and times in your local timezone. Add the project in Settings first if
 needed. The end defaults to 15 minutes after the start and follows start changes
 until you edit the end yourself, moving to the next day when needed. The end must

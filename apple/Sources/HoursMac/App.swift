@@ -9,7 +9,15 @@ import HoursCore
     var tracker: Tracker?
     var state = TrackerState()
     var error: String?
-    var selected: UUID?
+    var selected: UUID? {
+        didSet {
+            if let selected { UserDefaults.standard.set(selected.uuidString, forKey: "lastSelectedProject") }
+        }
+    }
+    private var defaultProject: UUID? {
+        let saved = UserDefaults.standard.string(forKey: "lastSelectedProject").flatMap(UUID.init(uuidString:))
+        return state.active?.projectId ?? state.nonprofits.first(where: { $0.id == saved })?.id ?? state.nonprofits.first?.id
+    }
     var notes = ""
     var dataLocation = ""
     var reportPeriod = ExportPeriod.monthly
@@ -28,7 +36,7 @@ import HoursCore
             let tracker = try Tracker(file: file, requireExisting: location.selected)
             self.tracker = tracker
             state = tracker.state
-            selected = state.active?.projectId ?? state.nonprofits.first?.id
+            selected = defaultProject
             notes = state.active?.notes ?? ""
         } catch { self.error = "Could not load saved hours: \(error.localizedDescription) Your saved file has not been changed." }
     }
@@ -71,7 +79,7 @@ import HoursCore
             tracker = next
             state = next.state
             dataLocation = folder.path
-            selected = state.active?.projectId ?? state.nonprofits.first?.id
+            selected = defaultProject
             notes = state.active?.notes ?? ""
             error = nil
         } catch { self.error = error.localizedDescription }

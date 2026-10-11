@@ -32,3 +32,20 @@ public final class StorageLocation {
         defaults.set(bookmark, forKey: "hours.dataFolder")
     }
 }
+
+
+/// Manual entry keeps its own preference, independent of the running timer.
+public enum ManualProjectPreference {
+    private static let key = "lastManualProject"
+
+    public static func selection(projectIDs: [UUID], defaults: UserDefaults = .standard) -> UUID? {
+        guard let value = defaults.string(forKey: key), let id = UUID(uuidString: value),
+              projectIDs.contains(id) else { return nil }
+        return id
+    }
+
+    public static func remember(_ id: UUID?, defaults: UserDefaults = .standard) {
+        if let id { defaults.set(id.uuidString, forKey: key) }
+        else { defaults.removeObject(forKey: key) }
+    }
+}

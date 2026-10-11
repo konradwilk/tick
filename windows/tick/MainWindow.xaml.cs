@@ -8,6 +8,21 @@ namespace Tick;
 public sealed partial class MainWindow : Window
 {
     private Tracker? tracker;
+    private bool refreshingProjects;
+    private readonly string projectSettingsPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NonprofitHours", "last-project");
+    private Nonprofit? DefaultProject()
+    {
+        Guid.TryParse(ReadLastProject(), out var saved);
+        return tracker!.State.Nonprofits.FirstOrDefault(n => n.Id == tracker.State.Active?.ProjectId)
+            ?? tracker.State.Nonprofits.FirstOrDefault(n => n.Id == saved)
+            ?? tracker.State.Nonprofits.FirstOrDefault();
+    }
+    private string? ReadLastProject()
+    {
+        try { return File.Exists(projectSettingsPath) ? File.ReadAllText(projectSettingsPath) : null; }
+        catch (Exception) { return null; }
+    }
     private readonly StorageLocation location = new(
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NonprofitHours", "location.json"),
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NonprofitHours", "tick.json"));
@@ -24,7 +39,7 @@ public sealed partial class MainWindow : Window
         {
             tracker = location.Open();
             Refresh();
-            Nonprofits.SelectedItem = tracker.State.Nonprofits.FirstOrDefault(n => n.Id == tracker.State.Active?.ProjectId) ?? tracker.State.Nonprofits.FirstOrDefault();
+            Nonprofits.SelectedItem = DefaultProject();
             Notes.Text = tracker.State.Active?.Notes ?? "";
 
         }
@@ -71,8 +86,10 @@ public sealed partial class MainWindow : Window
         FirstRun.Visibility = state.Nonprofits.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
         EmptyHistory.Visibility = state.Sessions.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
         var selected = (Nonprofits.SelectedItem as Nonprofit)?.Id;
+        refreshingProjects = true;
         Nonprofits.ItemsSource = state.Nonprofits;
         Nonprofits.SelectedItem = state.Nonprofits.FirstOrDefault(n => n.Id == selected);
+        refreshingProjects = false;
         var active = state.Active != null;
         Nonprofits.IsEnabled = Notes.IsEnabled = NewName.IsEnabled = AddButton.IsEnabled = !active;
         Toggle.Content = active ? "Stop" : "Start";
@@ -92,8 +109,26 @@ public sealed partial class MainWindow : Window
     private async void AddManualSession(object sender, RoutedEventArgs args)
     {
         if (tracker == null) return;
+        var manualSettingsPath = Path.Combine(Path.GetDirectoryName(projectSettingsPath)!, "last-manual-project");
+        string? savedManualProject = null;
+        try { if (File.Exists(manualSettingsPath)) savedManualProject = File.ReadAllText(manualSettingsPath); }
+        catch (Exception) { }
+        Guid.TryParse(savedManualProject, out var manualProjectId);
         var nonprofit = new ComboBox { Header = "Project", DisplayMemberPath = "Name", ItemsSource = tracker.State.Nonprofits,
-            SelectedItem = Nonprofits.SelectedItem ?? tracker.State.Nonprofits.FirstOrDefault(), HorizontalAlignment = HorizontalAlignment.Stretch };
+            SelectedItem = tracker.State.Nonprofits.FirstOrDefault(n => n.Id == manualProjectId)
+                ?? Nonprofits.SelectedItem ?? tracker.State.Nonprofits.FirstOrDefault(), HorizontalAlignment = HorizontalAlignment.Stretch };
+        void RememberManualProject()
+        {
+            if (nonprofit.SelectedItem is not Nonprofit project) return;
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(manualSettingsPath)!);
+                File.WriteAllText(manualSettingsPath, project.Id.ToString());
+            }
+            catch (Exception e) { ErrorText.Text = "Could not remember the manual project: " + e.Message; }
+        }
+        nonprofit.SelectionChanged += (_, _) => RememberManualProject();
+        RememberManualProject();
         var activity = new TextBox { Header = "What did you work on?", AcceptsReturn = true, TextWrapping = TextWrapping.Wrap };
         var current = DateTime.Now;
         var start = current.Date.AddHours(current.Hour).AddMinutes(current.Minute).AddHours(-1);
@@ -223,7 +258,7 @@ public sealed partial class MainWindow : Window
             var next = location.Select(folder.Path, tracker?.State);
             tracker = next;
             Refresh();
-            Nonprofits.SelectedItem = tracker.State.Nonprofits.FirstOrDefault(n => n.Id == tracker.State.Active?.ProjectId) ?? tracker.State.Nonprofits.FirstOrDefault();
+            Nonprofits.SelectedItem = DefaultProject();
             Notes.Text = tracker.State.Active?.Notes ?? "";
             ErrorText.Text = "";
             if (firstRun && tracker.State.Nonprofits.Length == 0)
@@ -254,6 +289,15 @@ public sealed partial class MainWindow : Window
     private void ReportChanged(object sender, SelectionChangedEventArgs args) => UpdateReport();
     private void NonprofitChanged(object sender, SelectionChangedEventArgs args)
     {
+        if (!refreshingProjects && Nonprofits.SelectedItem is Nonprofit project)
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(projectSettingsPath)!);
+                File.WriteAllText(projectSettingsPath, project.Id.ToString());
+            }
+            catch (Exception e) { ErrorText.Text = "Could not remember the project: " + e.Message; }
+        }
         if (Toggle != null) Toggle.IsEnabled = tracker?.State.Active != null || Nonprofits.SelectedItem != null;
     }
     private void ReportDateChanged(CalendarDatePicker sender, CalendarDatePickerDateChangedEventArgs args) => UpdateReport();

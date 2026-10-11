@@ -15,13 +15,14 @@ class HoursWindow(Gtk.ApplicationWindow):
         self.timer = None
         self.chooser = None
         self.selected_id = None
+        self.refreshing_projects = False
         self.location = StorageLocation()
         self.connect("close-request", self.on_close)
         build_layout(self)
         try:
             self.tracker = Tracker(FileStore(path)) if path else self.location.open()
             active = self.tracker.active
-            self.selected_id = active["projectId"] if active else next((n["id"] for n in self.tracker.state["nonprofits"]), None)
+            self.selected_id = self.default_project()
             self.notes.set_text(active["notes"] if active else "")
             self.refresh()
             self.timer = GLib.timeout_add_seconds(1, self.update_clock)
@@ -54,11 +55,33 @@ class HoursWindow(Gtk.ApplicationWindow):
             self.name.set_text("")
         self.perform(operation)
 
+    def default_project(self):
+        active = self.tracker.active
+        if active:
+            return active["projectId"]
+        try:
+            saved = self.location.settings.with_name("last-project").read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            saved = None
+        nonprofits = self.tracker.state["nonprofits"]
+        return next((n["id"] for n in nonprofits if n["id"] == saved),
+                    next((n["id"] for n in nonprofits), None))
+
+    def remember_project(self):
+        if self.selected_id is not None:
+            try:
+                path = self.location.settings.with_name("last-project")
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(self.selected_id, encoding="utf-8")
+            except OSError as error:
+                self.error.set_text("Could not remember the project: " + str(error))
+
     def on_select(self, *_):
-        if self.tracker:
+        if self.tracker and not self.refreshing_projects:
             index = self.nonprofits.get_selected()
             nonprofits = self.tracker.state["nonprofits"]
             self.selected_id = nonprofits[index]["id"] if index < len(nonprofits) else None
+            self.remember_project()
             self.toggle.set_sensitive(self.tracker.active is not None or self.selected_id is not None)
 
     def toggle_tracking(self):
@@ -77,10 +100,13 @@ class HoursWindow(Gtk.ApplicationWindow):
         self.first_run.set_visible(not state["nonprofits"])
         selected = self.selected_id
         nonprofits = state["nonprofits"]
+        self.refreshing_projects = True
         self.nonprofits.set_model(Gtk.StringList.new([n["name"] for n in nonprofits]))
         index = next((i for i, n in enumerate(nonprofits) if n["id"] == selected), Gtk.INVALID_LIST_POSITION)
         self.nonprofits.set_selected(index)
         self.selected_id = selected
+        self.refreshing_projects = False
+        self.remember_project()
         active = self.tracker.active is not None
         for widget in (self.nonprofits, self.notes, self.name, self.add):
             widget.set_sensitive(not active)
@@ -129,6 +155,25 @@ class HoursWindow(Gtk.ApplicationWindow):
         nonprofits = list(self.tracker.state["nonprofits"])
         content.append(Gtk.Label(label="Project", xalign=0))
         nonprofit = Gtk.DropDown(model=Gtk.StringList.new([n["name"] for n in nonprofits]))
+        manual_path = self.location.settings.with_name("last-manual-project")
+        try:
+            saved = manual_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            saved = None
+        nonprofit.set_selected(next((i for i, n in enumerate(nonprofits) if n["id"] == saved),
+                                    0 if nonprofits else Gtk.INVALID_LIST_POSITION))
+
+        def remember_manual_project(*_):
+            index = nonprofit.get_selected()
+            if index < len(nonprofits):
+                try:
+                    manual_path.parent.mkdir(parents=True, exist_ok=True)
+                    manual_path.write_text(nonprofits[index]["id"], encoding="utf-8")
+                except OSError as problem:
+                    self.error.set_text("Could not remember the manual project: " + str(problem))
+
+        nonprofit.connect("notify::selected", remember_manual_project)
+        remember_manual_project()
         content.append(nonprofit)
         if not nonprofits:
             content.append(Gtk.Label(label="Add a nonprofit in Settings first.", xalign=0))
@@ -314,7 +359,7 @@ class HoursWindow(Gtk.ApplicationWindow):
                 next_tracker = self.location.select(path, self.tracker)
                 self.tracker = next_tracker
                 active = self.tracker.active
-                self.selected_id = active["projectId"] if active else next((n["id"] for n in self.tracker.state["nonprofits"]), None)
+                self.selected_id = self.default_project()
                 self.notes.set_text(active["notes"] if active else "")
                 self.refresh()
                 if self.timer is None:

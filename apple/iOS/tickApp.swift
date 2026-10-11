@@ -12,7 +12,15 @@ import UIKit
     var promptedForDataLocation = false
     var tracker: Tracker?
     var state = TrackerState()
-    var selected: UUID?
+    var selected: UUID? {
+        didSet {
+            if let selected { UserDefaults.standard.set(selected.uuidString, forKey: "lastSelectedProject") }
+        }
+    }
+    private var defaultProject: UUID? {
+        let saved = UserDefaults.standard.string(forKey: "lastSelectedProject").flatMap(UUID.init(uuidString:))
+        return state.active?.projectId ?? state.nonprofits.first(where: { $0.id == saved })?.id ?? state.nonprofits.first?.id
+    }
     var notes = ""
     var error: String?
     var location = ""
@@ -31,7 +39,7 @@ import UIKit
         needsDataLocation = false
         tracker = next
         state = next.state
-        selected = state.active?.projectId ?? state.nonprofits.first?.id
+        selected = defaultProject
         notes = state.active?.notes ?? ""
         location = next.file.deletingLastPathComponent().path
     }
