@@ -3,6 +3,33 @@ using Xunit;
 namespace HoursCore.Tests;
 public class TrackerTests
 {
+    [Fact] public void SessionConflictsCoverBoundariesAndProjects()
+    {
+        var tracker = new Tracker(TrackerState.Empty(), _ => {});
+        var first = tracker.AddNonprofit("Kitchen");
+        var second = tracker.AddNonprofit("Board");
+        DateTimeOffset Time(int seconds) => DateTimeOffset.UnixEpoch.AddSeconds(seconds);
+        tracker.AddSession(first, "Meals", Time(100), Time(200));
+        foreach (var (start, end, expected) in new[] { (50,150,50), (150,250,50), (125,175,50), (50,250,100), (100,200,100), (0,100,0), (200,300,0) }) {
+            var conflicts = tracker.SessionConflicts(Time(start), Time(end));
+            Assert.Equal(expected == 0 ? 0 : 1, conflicts.Length);
+            if (expected > 0) {
+                Assert.Equal(expected, conflicts[0].Overlap.TotalSeconds);
+                Assert.Equal(100, conflicts[0].Duration.TotalSeconds);
+                Assert.Equal(Time(Math.Max(start, 100)), conflicts[0].Start);
+                Assert.Equal(Time(Math.Min(end, 200)), conflicts[0].End);
+                Assert.Contains("Meals — Kitchen", conflicts[0].ToString());
+            }
+        }
+        tracker.AddSession(second, "Meeting", Time(150), Time(300));
+        Assert.Equal(new double[] {25, 50}, tracker.SessionConflicts(Time(175), Time(225)).Select(c => c.Overlap.TotalSeconds));
+        Assert.Equal(2, tracker.State.Sessions.Length);
+        Assert.Empty(tracker.SessionConflicts(Time(225), Time(175)));
+        tracker.Start(first, "Running", Time(400));
+        var active = Assert.Single(tracker.SessionConflicts(Time(425), Time(600), Time(500)));
+        Assert.Equal(75, active.Overlap.TotalSeconds);
+        Assert.Contains("running, so far", active.ToString());
+    }
     [Fact] public void StartReloadsSharedFileBeforeValidation()
     {
         var directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());

@@ -8,6 +8,32 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 class TrackerTest {
+    @Test fun sessionConflictsCoverBoundariesAndProjects() {
+        val tracker = Tracker(TrackerState()) { }
+        val first = tracker.addNonprofit("Kitchen")
+        val second = tracker.addNonprofit("Board")
+        fun time(seconds: Int) = Instant.EPOCH.plusSeconds(seconds.toLong())
+        tracker.addSession(first, "Meals", time(100), time(200))
+        for ((start, end, expected) in listOf(Triple(50,150,50), Triple(150,250,50), Triple(125,175,50), Triple(50,250,100), Triple(100,200,100), Triple(0,100,0), Triple(200,300,0))) {
+            val conflicts = tracker.sessionConflicts(time(start), time(end))
+            assertEquals(if (expected == 0) 0 else 1, conflicts.size)
+            if (expected > 0) {
+                assertEquals(expected.toLong(), conflicts[0].overlap.seconds)
+                assertEquals(100L, conflicts[0].duration.seconds)
+                assertEquals(time(maxOf(start, 100)), conflicts[0].start)
+                assertEquals(time(minOf(end, 200)), conflicts[0].end)
+                assertTrue(conflicts[0].toString().contains("Meals — Kitchen"))
+            }
+        }
+        tracker.addSession(second, "Meeting", time(150), time(300))
+        assertEquals(listOf(25L, 50L), tracker.sessionConflicts(time(175), time(225)).map { it.overlap.seconds })
+        assertEquals(2, tracker.state.sessions.size)
+        assertTrue(tracker.sessionConflicts(time(225), time(175)).isEmpty())
+        tracker.start(first, "Running", time(400))
+        val active = tracker.sessionConflicts(time(425), time(600), time(500)).single()
+        assertEquals(75L, active.overlap.seconds)
+        assertTrue(active.toString().contains("running, so far"))
+    }
     @Test fun startReloadsBeforeValidation() {
         var saved = TrackerState()
         val tracker = Tracker(saved, reload = { saved }) { saved = it }

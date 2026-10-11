@@ -14,6 +14,15 @@ import java.util.UUID
     val durationSeconds: Long? = null, val notes: String, val deviceId: String,
     val platform: String = "android", val updatedAtUtc: String, val syncState: String = "pending"
 )
+data class SessionConflict(val session: Session, val start: Instant, val end: Instant, val existingEnd: Instant) {
+    val duration: Duration get() = Duration.between(Instant.parse(session.startTimeUtc), existingEnd)
+    val overlap: Duration get() = Duration.between(start, end)
+    override fun toString(): String {
+        fun durationText(value: Duration): String = "%02d:%02d:%02d".format(value.seconds / 3600, value.seconds / 60 % 60, value.seconds % 60)
+        val format = java.time.format.DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm:ss z").withZone(ZoneId.systemDefault())
+        return "${session.notes.trim().ifEmpty { "No notes" }} — ${session.project}\nDuration: ${durationText(duration)}${if (session.endTimeUtc == null) " (running, so far)" else ""}\nOverlap: ${durationText(overlap)}\n${format.format(start)} – ${format.format(end)}"
+    }
+}
 @Serializable data class TrackerState(
     val deviceId: String = UUID.randomUUID().toString(),
     val nonprofits: List<Nonprofit> = emptyList(), val sessions: List<Session> = emptyList(),
@@ -74,6 +83,15 @@ class Tracker(initial: TrackerState, private val reload: (() -> TrackerState)? =
             if (it.sessionId != active.sessionId) it else it.copy(endTimeUtc = now.toString(),
                 durationSeconds = Duration.between(start, now).seconds, updatedAtUtc = now.toString())
         }))
+    }
+    fun sessionConflicts(start: Instant, end: Instant, now: Instant = Instant.now()): List<SessionConflict> {
+        if (end <= start) return emptyList()
+        return state.sessions.mapNotNull { session ->
+            val existingEnd = session.endTimeUtc?.let { Instant.parse(it) } ?: now
+            val lower = maxOf(start, Instant.parse(session.startTimeUtc))
+            val upper = minOf(end, existingEnd)
+            if (upper > lower) SessionConflict(session, lower, upper, existingEnd) else null
+        }.sortedBy { it.start }
     }
     fun addSession(id: String, notes: String, start: Instant, end: Instant, now: Instant = Instant.now()) {
         val nonprofit = requireNotNull(state.nonprofits.find { it.id == id }) { "Select a project." }

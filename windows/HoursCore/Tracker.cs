@@ -21,6 +21,13 @@ public record Nonprofit(Guid Id, string Name);
 public record Session(Guid SessionId, Guid ProjectId, string Project,
     DateTimeOffset StartTimeUtc, DateTimeOffset? EndTimeUtc, long? DurationSeconds,
     string Notes, Guid DeviceId, string Platform, DateTimeOffset UpdatedAtUtc, string SyncState = "pending");
+public record SessionConflict(Session Session, DateTimeOffset Start, DateTimeOffset End, DateTimeOffset ExistingEnd)
+{
+    public TimeSpan Duration => ExistingEnd - Session.StartTimeUtc;
+    public TimeSpan Overlap => End - Start;
+    private static string DurationText(TimeSpan value) => $"{(long)value.TotalHours:00}:{value.Minutes:00}:{value.Seconds:00}";
+    public override string ToString() => $"{(string.IsNullOrWhiteSpace(Session.Notes) ? "No notes" : Session.Notes.Trim())} — {Session.Project}\nDuration: {DurationText(Duration)}{(Session.EndTimeUtc == null ? " (running, so far)" : "")}\nOverlap: {DurationText(Overlap)}\n{Start.ToLocalTime():G} – {End.ToLocalTime():G}";
+}
 public record TrackerState(Guid DeviceId, Nonprofit[] Nonprofits, Session[] Sessions)
 {
     public int SchemaVersion { get; init; } = 1;
@@ -72,6 +79,16 @@ public sealed class Tracker
         if (date < active.StartTimeUtc) throw new InvalidOperationException("Correct the system clock before stopping.");
         var completed = active with { EndTimeUtc = date, DurationSeconds = (long)(date - active.StartTimeUtc).TotalSeconds, UpdatedAtUtc = date };
         Commit(State with { Sessions = State.Sessions.Select(s => s.SessionId == active.SessionId ? completed : s).ToArray() });
+    }
+    public SessionConflict[] SessionConflicts(DateTimeOffset start, DateTimeOffset end, DateTimeOffset? now = null)
+    {
+        if (end <= start) return [];
+        return State.Sessions.Select(session => {
+            var existingEnd = session.EndTimeUtc ?? now ?? DateTimeOffset.UtcNow;
+            var lower = start > session.StartTimeUtc ? start : session.StartTimeUtc;
+            var upper = end < existingEnd ? end : existingEnd;
+            return new SessionConflict(session, lower, upper, existingEnd);
+        }).Where(c => c.End > c.Start).OrderBy(c => c.Start).ToArray();
     }
     public void AddSession(Guid id, string notes, DateTimeOffset start, DateTimeOffset end, DateTimeOffset? now = null)
     {

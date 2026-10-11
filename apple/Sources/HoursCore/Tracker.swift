@@ -44,6 +44,37 @@ public struct Session: Codable, Identifiable, Sendable {
     public var syncState: String
 }
 
+/// Intersections use half-open intervals: touching endpoints do not conflict.
+public struct SessionConflict: Identifiable, Sendable {
+    public var id: UUID { session.id }
+    public let session: Session
+    public let start: Date
+    public let end: Date
+    public let existingEnd: Date
+    public var duration: TimeInterval { existingEnd.timeIntervalSince(session.startTimeUtc) }
+    public var overlap: TimeInterval { end.timeIntervalSince(start) }
+    public var description: String {
+        let name = session.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        func durationText(_ seconds: TimeInterval) -> String {
+            let value = Int(seconds)
+            return String(format: "%02d:%02d:%02d", value / 3600, value / 60 % 60, value % 60)
+        }
+        func time(_ date: Date) -> String { date.formatted(date: .numeric, time: .standard) }
+        return "\(name.isEmpty ? "No notes" : name) — \(session.project)\nDuration: \(durationText(duration))\(session.endTimeUtc == nil ? " (running, so far)" : "")\nOverlap: \(durationText(overlap))\n\(time(start)) – \(time(end))"
+    }
+}
+
+public func sessionConflicts(sessions: [Session], start: Date, end: Date, now: Date = Date()) -> [SessionConflict] {
+    guard end > start else { return [] }
+    return sessions.compactMap { session in
+        let existingEnd = session.endTimeUtc ?? now
+        let lower = max(start, session.startTimeUtc)
+        let upper = min(end, existingEnd)
+        guard upper > lower else { return nil }
+        return SessionConflict(session: session, start: lower, end: upper, existingEnd: existingEnd)
+    }.sorted { $0.start < $1.start }
+}
+
 public struct TrackerState: Codable, Sendable {
     public var schemaVersion = 1
     public var deviceId = UUID()

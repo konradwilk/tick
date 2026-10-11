@@ -74,6 +74,35 @@ with tempfile.TemporaryDirectory() as directory:
     dialog = reopened.add_manual_session()
     assert dialog.get_content_area().get_first_child().get_next_sibling().get_selected() == 0
     dialog.response(Gtk.ResponseType.CANCEL)
+    # Live conflicts require a second explicit action; editing revokes confirmation.
+    from datetime import datetime, timedelta, timezone
+    start = datetime(2020, 1, 1, 12, tzinfo=timezone.utc)
+    reopened.tracker.add_session(first_id, "Existing activity", start, start + timedelta(hours=1))
+    dialog = reopened.add_manual_session()
+    widgets = []
+    child = dialog.get_content_area().get_first_child()
+    while child is not None:
+        widgets.append(child)
+        child = child.get_next_sibling()
+    entries = [widget for widget in widgets if isinstance(widget, Gtk.Entry)]
+    warning = next(widget for widget in widgets if isinstance(widget, Gtk.ScrolledWindow)).get_child()
+    if isinstance(warning, Gtk.Viewport):
+        warning = warning.get_child()
+    entries[0].set_text("Intentional overlap")
+    entries[1].set_text((start + timedelta(minutes=15)).astimezone().strftime("%Y-%m-%d %H:%M"))
+    entries[2].set_text((start + timedelta(minutes=45)).astimezone().strftime("%Y-%m-%d %H:%M"))
+    assert "Existing activity" in warning.get_text()
+    assert "Overlap: 00:30:00" in warning.get_text()
+    count = len(reopened.tracker.state["sessions"])
+    dialog.response(Gtk.ResponseType.ACCEPT)
+    assert len(reopened.tracker.state["sessions"]) == count
+    assert dialog.get_widget_for_response(Gtk.ResponseType.ACCEPT).get_label() == "Save anyway"
+    entries[2].set_text((start + timedelta(minutes=50)).astimezone().strftime("%Y-%m-%d %H:%M"))
+    assert dialog.get_widget_for_response(Gtk.ResponseType.ACCEPT).get_label() == "Save"
+    dialog.response(Gtk.ResponseType.ACCEPT)
+    assert len(reopened.tracker.state["sessions"]) == count
+    dialog.response(Gtk.ResponseType.ACCEPT)
+    assert len(reopened.tracker.state["sessions"]) == count + 1
     reopened.on_close()
     reopened.destroy()
     assert restored.export.get_sensitive()

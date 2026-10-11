@@ -157,18 +157,48 @@ public sealed partial class MainWindow : Window
         foreach (var control in new UIElement[] { nonprofit, activity, new TextBlock { Text = "Times use your local timezone." }, startDate, startTime, endDate, endTime, error }) content.Children.Add(control);
         var dialog = new ContentDialog { XamlRoot = Controls.XamlRoot, Title = "Add session by hand",
             Content = new ScrollViewer { Content = content, MaxHeight = 450 }, PrimaryButtonText = "Save", CloseButtonText = "Cancel" };
+        static DateTimeOffset LocalTime(CalendarDatePicker date, TimePicker time)
+        {
+            if (date.Date == null || time.SelectedTime == null) throw new InvalidOperationException("Enter both dates and times.");
+            var value = DateTime.SpecifyKind(date.Date.Value.Date + time.Time, DateTimeKind.Unspecified);
+            if (TimeZoneInfo.Local.IsInvalidTime(value)) throw new InvalidOperationException("This local time does not exist due to a clock change.");
+            if (TimeZoneInfo.Local.IsAmbiguousTime(value)) throw new InvalidOperationException("This local time occurs twice due to a clock change. Choose an unambiguous time.");
+            return new DateTimeOffset(value, TimeZoneInfo.Local.GetUtcOffset(value));
+        }
+        var warning = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        content.Children.Add(warning);
+        string? confirmation = null;
+        SessionConflict[] Conflicts() => tracker.SessionConflicts(LocalTime(startDate, startTime), LocalTime(endDate, endTime));
+        void UpdateConflicts()
+        {
+            confirmation = null;
+            dialog.PrimaryButtonText = "Save";
+            try {
+                var conflicts = Conflicts();
+                warning.Text = conflicts.Length == 0 ? "" : "Time overlap detected\n\n" + string.Join("\n\n", conflicts.Select(c => c.ToString()));
+            } catch (Exception) { warning.Text = ""; }
+        }
+        startDate.DateChanged += (_, _) => UpdateConflicts();
+        startTime.TimeChanged += (_, _) => UpdateConflicts();
+        endDate.DateChanged += (_, _) => UpdateConflicts();
+        endTime.TimeChanged += (_, _) => UpdateConflicts();
+        activity.TextChanged += (_, _) => UpdateConflicts();
+        nonprofit.SelectionChanged += (_, _) => UpdateConflicts();
+        UpdateConflicts();
         dialog.PrimaryButtonClick += (_, eventArgs) =>
         {
             try
             {
                 if (nonprofit.SelectedItem is not Nonprofit selected) throw new InvalidOperationException("Select a project. Add one in Settings first if needed.");
-                static DateTimeOffset LocalTime(CalendarDatePicker date, TimePicker time)
-                {
-                    if (date.Date == null || time.SelectedTime == null) throw new InvalidOperationException("Enter both dates and times.");
-                    var value = DateTime.SpecifyKind(date.Date.Value.Date + time.Time, DateTimeKind.Unspecified);
-                    if (TimeZoneInfo.Local.IsInvalidTime(value)) throw new InvalidOperationException("This local time does not exist due to a clock change.");
-                    if (TimeZoneInfo.Local.IsAmbiguousTime(value)) throw new InvalidOperationException("This local time occurs twice due to a clock change. Choose an unambiguous time.");
-                    return new DateTimeOffset(value, TimeZoneInfo.Local.GetUtcOffset(value));
+                var conflicts = Conflicts();
+                var signature = $"{selected.Id}|{activity.Text}|{LocalTime(startDate, startTime):O}|{LocalTime(endDate, endTime):O}|" + string.Join(";", conflicts.Select(c => $"{c.Session.SessionId}|{c.Session.StartTimeUtc:O}|{c.Session.EndTimeUtc:O}"));
+                warning.Text = conflicts.Length == 0 ? "" : "Time overlap detected\n\n" + string.Join("\n\n", conflicts.Select(c => c.ToString()));
+                if (conflicts.Length > 0 && confirmation != signature) {
+                    confirmation = signature;
+                    eventArgs.Cancel = true;
+                    dialog.PrimaryButtonText = "Save anyway";
+                    error.Text = "Review the conflicts. Choose Save anyway to confirm intentional overlap.";
+                    return;
                 }
                 tracker.AddSession(selected.Id, activity.Text, LocalTime(startDate, startTime), LocalTime(endDate, endTime));
                 ErrorText.Text = "";

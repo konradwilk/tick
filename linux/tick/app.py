@@ -213,22 +213,65 @@ class HoursWindow(Gtk.ApplicationWindow):
         error = Gtk.Label(xalign=0, wrap=True)
         content.append(error)
 
+        def local_time(entry):
+            try:
+                value = datetime.strptime(entry.get_text(), "%Y-%m-%d %H:%M")
+            except ValueError:
+                raise ValueError("Enter dates and times as YYYY-MM-DD HH:MM.")
+            # Reject missing/repeated local wall times rather than silently shifting them.
+            choices = [value.replace(fold=fold).astimezone(timezone.utc) for fold in (0, 1)]
+            if choices[0] != choices[1] or choices[0].astimezone().replace(tzinfo=None) != value:
+                raise ValueError("This local time is missing or repeated due to a clock change.")
+            return choices[0]
+
+        warning = Gtk.Label(xalign=0, wrap=True, selectable=True)
+        scroll = Gtk.ScrolledWindow(max_content_height=220, propagate_natural_height=True)
+        scroll.set_child(warning)
+        content.append(scroll)
+        confirmation = None
+        def check_conflicts(*_):
+            nonlocal confirmation
+            confirmation = None
+            dialog.get_widget_for_response(Gtk.ResponseType.ACCEPT).set_label("Save")
+            try:
+                conflicts = self.tracker.session_conflicts(local_time(entries[1]), local_time(entries[2]))
+                warning.set_text(conflict_text(conflicts))
+            except ValueError:
+                warning.set_text("")
+        def conflict_text(conflicts):
+            def duration(seconds):
+                seconds = int(seconds)
+                return f"{seconds // 3600:02}:{seconds // 60 % 60:02}:{seconds % 60:02}"
+            details = []
+            for c in conflicts:
+                session = c["session"]
+                details.append(f"{session['notes'].strip() or 'No notes'} — {session['project']}\n"
+                               f"Duration: {duration(c['duration'])}"
+                               + (" (running, so far)" if not session.get("endTimeUtc") else "")
+                               + f"\nOverlap: {duration(c['overlap'])}\n"
+                               + f"{c['start'].astimezone():%Y-%m-%d %H:%M:%S %Z} – {c['end'].astimezone():%Y-%m-%d %H:%M:%S %Z}")
+            return "Time overlap detected\n\n" + "\n\n".join(details) if details else ""
+        for entry in entries:
+            entry.connect("changed", check_conflicts)
+        nonprofit.connect("notify::selected", check_conflicts)
+        check_conflicts()
+
         def respond(_, response):
+            nonlocal confirmation
             if response == Gtk.ResponseType.ACCEPT:
                 try:
                     index = nonprofit.get_selected()
                     if index >= len(nonprofits):
                         raise ValueError("Select a project.")
-                    def local_time(entry):
-                        try:
-                            value = datetime.strptime(entry.get_text(), "%Y-%m-%d %H:%M")
-                        except ValueError:
-                            raise ValueError("Enter dates and times as YYYY-MM-DD HH:MM.")
-                        # Reject missing/repeated local wall times rather than silently shifting them.
-                        choices = [value.replace(fold=fold).astimezone(timezone.utc) for fold in (0, 1)]
-                        if choices[0] != choices[1] or choices[0].astimezone().replace(tzinfo=None) != value:
-                            raise ValueError("This local time is missing or repeated due to a clock change.")
-                        return choices[0]
+                    conflicts = self.tracker.session_conflicts(local_time(entries[1]), local_time(entries[2]))
+                    signature = (tuple(e.get_text() for e in entries), index,
+                                 tuple((c["session"]["sessionId"], c["session"]["startTimeUtc"], c["session"].get("endTimeUtc")) for c in conflicts))
+                    warning.set_text(conflict_text(conflicts))
+                    if conflicts and confirmation != signature:
+                        confirmation = signature
+                        error.set_text("Review the conflicts. Choose Save anyway to confirm intentional overlap.")
+                        dialog.get_widget_for_response(Gtk.ResponseType.ACCEPT).set_label("Save anyway")
+                        return
                     self.tracker.add_session(nonprofits[index]["id"], entries[0].get_text(), local_time(entries[1]), local_time(entries[2]))
                     self.refresh()
                     self.error.set_text("")

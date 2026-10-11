@@ -12,6 +12,33 @@ from tick.core import StorageLocation, FileStore, Tracker, data_path, elapsed, p
 
 
 class TrackerTests(unittest.TestCase):
+    def test_session_conflicts(self):
+        first = self.tracker.add_nonprofit("Kitchen")
+        second = self.tracker.add_nonprofit("Board")
+        def time(seconds):
+            return self.start + timedelta(seconds=seconds)
+        self.tracker.add_session(first, "Meals", time(100), time(200))
+        for start, end, expected in [(50, 150, 50), (150, 250, 50), (125, 175, 50), (50, 250, 100), (100, 200, 100), (0, 100, 0), (200, 300, 0)]:
+            with self.subTest(start=start, end=end):
+                conflicts = self.tracker.session_conflicts(time(start), time(end))
+                self.assertEqual(len(conflicts), int(expected > 0))
+                if expected:
+                    self.assertEqual(conflicts[0]["overlap"], expected)
+                    self.assertEqual(conflicts[0]["duration"], 100)
+                    self.assertEqual(conflicts[0]["start"], time(max(start, 100)))
+                    self.assertEqual(conflicts[0]["end"], time(min(end, 200)))
+                    self.assertEqual(conflicts[0]["session"]["notes"], "Meals")
+        self.tracker.add_session(second, "Meeting", time(150), time(300))
+        conflicts = self.tracker.session_conflicts(time(175), time(225))
+        self.assertEqual([c["overlap"] for c in conflicts], [25, 50])
+        self.assertEqual({c["session"]["project"] for c in conflicts}, {"Kitchen", "Board"})
+        self.assertEqual(self.tracker.session_conflicts(time(225), time(175)), [])
+        self.assertEqual(len(Tracker(FileStore(self.path)).state["sessions"]), 2)
+        self.tracker.start(first, "Running", time(400))
+        active = self.tracker.session_conflicts(time(425), time(600), now=time(500))
+        self.assertEqual(active[0]["overlap"], 75)
+        self.assertEqual(active[0]["duration"], 100)
+
     def test_start_reloads_remote_history_and_active_session(self):
         project = self.tracker.add_nonprofit("Kitchen")
         other = Tracker(FileStore(self.path))

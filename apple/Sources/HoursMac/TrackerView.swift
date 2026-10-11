@@ -12,6 +12,7 @@ struct TrackerView: View {
     @State private var manualDatesInitialized = false
     @State private var manualEndEdited = false
     @State private var manualStatus = ""
+    @State private var manualConfirmation: String?
     @State private var editingSession: Session?
     @State private var editingTimes: Session?
     private var active: Session? { model.state.active }
@@ -141,10 +142,24 @@ struct TrackerView: View {
                     manualEnd = $0; manualEndEdited = true
                 }), displayedComponents: [.date, .hourAndMinute])
                 Text("Times use your local timezone.").font(.caption)
-                Button("Save session") {
+                let conflicts = sessionConflicts(sessions: model.state.sessions, start: manualStart, end: manualEnd)
+                if !conflicts.isEmpty {
+                    Text("Time overlap detected").foregroundStyle(.orange).bold()
+                    ForEach(conflicts) { conflict in Text(conflict.description).font(.caption) }
+                }
+                Button(manualConfirmation == nil ? "Save session" : "Save anyway") {
+                    // Recheck the current tracker state immediately before saving.
+                    let latest = sessionConflicts(sessions: model.tracker?.state.sessions ?? [], start: manualStart, end: manualEnd)
+                    let signature = "\(manualStart.timeIntervalSince1970)|\(manualEnd.timeIntervalSince1970)|\(manualNotes)|\(String(describing: manualNonprofit))|" + latest.map { "\($0.id)|\($0.session.startTimeUtc)|\(String(describing: $0.session.endTimeUtc))" }.joined(separator: ";")
+                    if !latest.isEmpty && manualConfirmation != signature {
+                        manualConfirmation = signature
+                        manualStatus = "Review the conflicts above. Choose Save anyway to confirm intentional overlap."
+                        return
+                    }
                     model.perform { tracker in
                         guard let id = manualNonprofit else { throw TrackerError.invalidNonprofit }
                         try tracker.addSession(projectId: id, notes: manualNotes, start: manualStart, end: manualEnd, platform: "macos")
+                        manualConfirmation = nil
                         manualNotes = ""
                         manualStatus = "Session saved."
                     }
@@ -155,6 +170,10 @@ struct TrackerView: View {
                 if !manualStatus.isEmpty { Text(manualStatus).font(.caption) }
             }.padding(.top, 8)
         }.disabled(model.tracker == nil)
+            .onChange(of: manualStart) { _, _ in manualConfirmation = nil; manualStatus = "" }
+            .onChange(of: manualEnd) { _, _ in manualConfirmation = nil; manualStatus = "" }
+            .onChange(of: manualNotes) { _, _ in manualConfirmation = nil }
+            .onChange(of: manualNonprofit) { _, _ in manualConfirmation = nil }
             .onAppear {
                 manualNonprofit = ManualProjectPreference.selection(projectIDs: model.state.nonprofits.map(\.id))
                 if !manualDatesInitialized {

@@ -176,6 +176,21 @@ class Tracker:
             "platform": "linux", "updatedAtUtc": date, "syncState": "pending"})
         self.commit(state)
 
+    def session_conflicts(self, start, end, now=None):
+        if end <= start:
+            return []
+        now = now or datetime.now(timezone.utc)
+        conflicts = []
+        for session in self.state["sessions"]:
+            existing_start = parse(session["startTimeUtc"])
+            existing_end = parse(session["endTimeUtc"]) if session.get("endTimeUtc") else now
+            lower, upper = max(start, existing_start), min(end, existing_end)
+            if upper > lower:
+                conflicts.append(dict(session=session, start=lower, end=upper,
+                                      duration=(existing_end - existing_start).total_seconds(),
+                                      overlap=(upper - lower).total_seconds()))
+        return sorted(conflicts, key=lambda conflict: conflict["start"])
+
     def add_session(self, project_id, notes, start, end, now=None):
         nonprofit = next((n for n in self.state["nonprofits"] if n["id"] == project_id), None)
         if nonprofit is None:

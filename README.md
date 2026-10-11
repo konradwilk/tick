@@ -32,7 +32,13 @@ independently of the tracking selector. Select a project, describe what you work
 dates and times in your local timezone. Add the project in Settings first if
 needed. The end defaults to 15 minutes after the start and follows start changes
 until you edit the end yourself, moving to the next day when needed. The end must
-be after the start. Saving adds the session to history,
+be after the start. The form checks all projects for overlapping saved sessions as
+the dates change and again before saving. Each conflict shows its activity, project,
+total duration, overlap duration (HH:MM:SS), and overlapping local time range.
+Running sessions are checked through the current time and labeled "running, so far".
+Touching endpoints do not overlap. Choose **Save**, review any conflicts, then choose
+**Save anyway** to confirm intentional overlap; changing the draft requires a fresh
+confirmation. Saving adds the session to history,
 totals, CSV exports, and summaries; a running timer continues unchanged.
 
 CSV export in Windows, macOS, iOS, Android, and Linux offers **Daily**, **Weekly**, and

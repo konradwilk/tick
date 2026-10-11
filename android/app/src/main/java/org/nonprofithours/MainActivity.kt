@@ -110,6 +110,7 @@ class MainActivity : ComponentActivity() {
         var manualStart by rememberSaveable { mutableStateOf(LocalDateTime.now().minusHours(1).format(manualFormat)) }
         var manualEnd by rememberSaveable { mutableStateOf(LocalDateTime.parse(manualStart, manualFormat).plusMinutes(15).format(manualFormat)) }
         var manualEndEdited by rememberSaveable { mutableStateOf(false) }
+        var manualConfirmation by remember { mutableStateOf<String?>(null) }
         var manualError by remember { mutableStateOf<String?>(null) }
         val reportRange = runCatching { ExportRange.forDate(ExportPeriod.valueOf(reportPeriod), LocalDate.parse(reportDate)) }.getOrNull()
         val reportCount = reportRange?.let { tracker.exportSessions(it).size } ?: 0
@@ -136,42 +137,56 @@ class MainActivity : ComponentActivity() {
                 OutlinedButton(onClick = chooseFolder) { Text("Data location…") }
                 OutlinedButton(onClick = { settings = false
                     manualId = state.nonprofits.find { it.id == projectPreferences.getString("lastManualProject", null) }?.id
-                    manual = true; manualError = null }) { Text("Add session by hand…") }
+                    manual = true; manualError = null; manualConfirmation = null }) { Text("Add session by hand…") }
                 Text(location, style = MaterialTheme.typography.bodySmall)
                 Text("All changes are saved here. Use one device at a time.", style = MaterialTheme.typography.bodySmall)
                 Text("Timing continues when the app closes. Reopen and press Stop to finish.", style = MaterialTheme.typography.bodySmall)
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             } }, confirmButton = { TextButton(onClick = { settings = false }) { Text("Done") } }
         )
+        fun localTime(value: String): Instant {
+            val local = try { LocalDateTime.parse(value, manualFormat) }
+                catch (_: Exception) { throw IllegalArgumentException("Enter dates and times as YYYY-MM-DD HH:mm.") }
+            val offsets = ZoneId.systemDefault().rules.getValidOffsets(local)
+            require(offsets.size == 1) { "This local time is missing or repeated due to a clock change. Choose an unambiguous time." }
+            return local.toInstant(offsets.single())
+        }
+        val manualConflicts = runCatching { tracker.sessionConflicts(localTime(manualStart), localTime(manualEnd)) }.getOrDefault(emptyList())
+        val manualSignature = "$manualId|$manualNotes|$manualStart|$manualEnd|" + manualConflicts.joinToString(";") { "${it.session.sessionId}|${it.session.startTimeUtc}|${it.session.endTimeUtc}" }
         if (manual) AlertDialog(
             onDismissRequest = { manual = false }, title = { Text("Add session by hand") },
             text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Project")
                 state.nonprofits.forEach { nonprofit ->
                     Row {
-                        RadioButton(selected = manualId == nonprofit.id, onClick = { selectManualProject(nonprofit.id) })
-                        TextButton(onClick = { selectManualProject(nonprofit.id) }) { Text(nonprofit.name) }
+                        RadioButton(selected = manualId == nonprofit.id, onClick = { manualConfirmation = null; selectManualProject(nonprofit.id) })
+                        TextButton(onClick = { manualConfirmation = null; selectManualProject(nonprofit.id) }) { Text(nonprofit.name) }
                     }
                 }
                 if (state.nonprofits.isEmpty()) Text("Add a nonprofit in Settings first.")
-                OutlinedTextField(manualNotes, { manualNotes = it }, label = { Text("What did you work on?") }, minLines = 2)
+                OutlinedTextField(manualNotes, { manualConfirmation = null; manualNotes = it }, label = { Text("What did you work on?") }, minLines = 2)
                 Text("Local dates and times: YYYY-MM-DD HH:mm (24-hour)")
                 OutlinedTextField(manualStart, {
+                    manualConfirmation = null
                     manualStart = it
                     if (!manualEndEdited) runCatching { LocalDateTime.parse(it, manualFormat).plusMinutes(15).format(manualFormat) }
                         .onSuccess { suggested -> manualEnd = suggested }
                 }, label = { Text("Started") }, singleLine = true)
-                OutlinedTextField(manualEnd, { manualEnd = it; manualEndEdited = true }, label = { Text("Ended") }, singleLine = true)
+                OutlinedTextField(manualEnd, { manualConfirmation = null; manualEnd = it; manualEndEdited = true }, label = { Text("Ended") }, singleLine = true)
+                if (manualConflicts.isNotEmpty()) {
+                    Text("Time overlap detected", color = MaterialTheme.colorScheme.error)
+                    manualConflicts.forEach { Text(it.toString()) }
+                }
                 manualError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             } },
             confirmButton = { TextButton(onClick = {
                 try {
-                    fun localTime(value: String): Instant {
-                        val local = try { LocalDateTime.parse(value, manualFormat) }
-                            catch (_: Exception) { throw IllegalArgumentException("Enter dates and times as YYYY-MM-DD HH:mm.") }
-                        val offsets = ZoneId.systemDefault().rules.getValidOffsets(local)
-                        require(offsets.size == 1) { "This local time is missing or repeated due to a clock change. Choose an unambiguous time." }
-                        return local.toInstant(offsets.single())
+                    val latest = tracker.sessionConflicts(localTime(manualStart), localTime(manualEnd))
+                    val signature = "$manualId|$manualNotes|$manualStart|$manualEnd|" + latest.joinToString(";") { "${it.session.sessionId}|${it.session.startTimeUtc}|${it.session.endTimeUtc}" }
+                    if (latest.isNotEmpty() && manualConfirmation != signature) {
+                        manualConfirmation = signature
+                        manualError = "Review the conflicts. Choose Save anyway to confirm intentional overlap."
+                        return@TextButton
                     }
                     tracker.addSession(requireNotNull(manualId) { "Select a project." }, manualNotes, localTime(manualStart), localTime(manualEnd))
                     state = tracker.state
@@ -180,7 +195,7 @@ class MainActivity : ComponentActivity() {
                     error = null
                     copyStatus = ""
                 } catch (e: Exception) { manualError = e.message ?: "Could not save session." }
-            }) { Text("Save") } },
+            }) { Text(if (manualConflicts.isNotEmpty() && manualConfirmation == manualSignature) "Save anyway" else "Save") } },
             dismissButton = { TextButton(onClick = { manual = false }) { Text("Cancel") } }
         )
         editingId?.let { sessionId ->
