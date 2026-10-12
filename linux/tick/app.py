@@ -524,7 +524,7 @@ class HoursWindow(Gtk.ApplicationWindow):
 class HoursApplication(Gtk.Application):
     def __init__(self):
         # GApplication forwards repeat launches to the existing process via D-Bus.
-        super().__init__(application_id="org.nonprofithours.Linux", flags=Gio.ApplicationFlags.FLAGS_NONE)
+        super().__init__(application_id="org.timeisclearlykept.Linux", flags=Gio.ApplicationFlags.FLAGS_NONE)
 
     def do_activate(self):
         window = self.get_active_window()

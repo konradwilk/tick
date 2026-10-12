@@ -1,4 +1,4 @@
-package org.nonprofithours
+package org.timeisclearlykept
 import org.junit.Assert.*
 import org.junit.Test
 import kotlinx.serialization.encodeToString
@@ -8,6 +8,22 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 class TrackerTest {
+    @Test fun reloadUpdatesStateWithoutSavingAndPreservesStateOnFailure() {
+        val latest = TrackerState(nonprofits = listOf(Nonprofit(name = "Remote")))
+        var unavailable = false
+        var saves = 0
+        val tracker = Tracker(TrackerState(), reload = {
+            check(!unavailable) { "Unavailable" }
+            latest
+        }) { saves++ }
+        tracker.reload()
+        assertSame(latest, tracker.state)
+        assertEquals(0, saves)
+        unavailable = true
+        try { tracker.reload(); fail("Expected reload failure") }
+        catch (_: IllegalStateException) { }
+        assertSame(latest, tracker.state)
+    }
     @Test fun sessionConflictsCoverBoundariesAndProjects() {
         val tracker = Tracker(TrackerState()) { }
         val first = tracker.addNonprofit("Kitchen")

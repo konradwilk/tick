@@ -10,7 +10,7 @@ public sealed partial class MainWindow : Window
     private Tracker? tracker;
     private bool refreshingProjects;
     private readonly string projectSettingsPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NonprofitHours", "last-project");
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TimeIsClearlyKept", "last-project");
     private Nonprofit? DefaultProject()
     {
         Guid.TryParse(ReadLastProject(), out var saved);
@@ -24,8 +24,8 @@ public sealed partial class MainWindow : Window
         catch (Exception) { return null; }
     }
     private readonly StorageLocation location = new(
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NonprofitHours", "location.json"),
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NonprofitHours", "tick.json"));
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TimeIsClearlyKept", "location.json"),
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TimeIsClearlyKept", "tick.json"));
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(1) };
     public MainWindow()
     {

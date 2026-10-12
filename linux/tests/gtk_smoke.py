@@ -9,7 +9,7 @@ from gi.repository import Gtk, Gio
 from tick.app import HoursWindow
 from tick.core import FileStore, Tracker, StorageLocation
 
-app = Gtk.Application(application_id="org.nonprofithours.Smoke", flags=Gio.ApplicationFlags.NON_UNIQUE)
+app = Gtk.Application(application_id="org.timeisclearlykept.Smoke", flags=Gio.ApplicationFlags.NON_UNIQUE)
 app.register(None)
 with tempfile.TemporaryDirectory() as directory:
     os.environ["XDG_CONFIG_HOME"] = directory

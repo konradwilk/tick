@@ -1,4 +1,4 @@
-package org.nonprofithours
+package org.timeisclearlykept
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -24,6 +24,13 @@ import android.content.ClipboardManager
 import android.content.Context
 
 class MainActivity : ComponentActivity() {
+    private var focusGeneration by mutableStateOf(0)
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) focusGeneration++
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val storage = StorageLocation(this)
@@ -56,7 +63,7 @@ class MainActivity : ComponentActivity() {
                     storageError?.let { Text(it, Modifier.padding(20.dp), color = MaterialTheme.colorScheme.error) }
                     Box(Modifier.weight(1f)) {
                         val current = tracker
-                        if (current != null) key(current) { TrackerScreen(current, location, openSettingsOnLoad) { chooseFolder.launch(null) } }
+                        if (current != null) key(current) { TrackerScreen(current, location, openSettingsOnLoad, focusGeneration) { chooseFolder.launch(null) } }
                         else Column(Modifier.padding(20.dp)) {
                             Text("Choose where to save tick.json, or select a folder containing an existing tick.json.")
                             OutlinedButton(onClick = { chooseFolder.launch(null) }) { Text("Data location…") }
@@ -67,7 +74,7 @@ class MainActivity : ComponentActivity() {
         } }
     }
 
-    @Composable private fun TrackerScreen(tracker: Tracker, location: String, initialSettings: Boolean, chooseFolder: () -> Unit) {
+    @Composable private fun TrackerScreen(tracker: Tracker, location: String, initialSettings: Boolean, focusGeneration: Int, chooseFolder: () -> Unit) {
         var state by remember { mutableStateOf(tracker.state) }
         val projectPreferences = remember { getSharedPreferences("hours-project", MODE_PRIVATE) }
         var selected by rememberSaveable {
@@ -81,6 +88,17 @@ class MainActivity : ComponentActivity() {
         var notes by rememberSaveable { mutableStateOf(state.active?.notes.orEmpty()) }
         var name by rememberSaveable { mutableStateOf("") }
         var error by remember { mutableStateOf<String?>(null) }
+        LaunchedEffect(tracker, focusGeneration) {
+            try {
+                val previousActive = state.active
+                tracker.reload()
+                state = tracker.state
+                selected = state.active?.projectId
+                    ?: state.nonprofits.find { it.id == selected }?.id
+                    ?: state.nonprofits.firstOrNull()?.id
+                if (previousActive != state.active) notes = state.active?.notes.orEmpty()
+            } catch (failure: Exception) { error = "Could not reload saved hours. " + failure.message }
+        }
         var now by remember { mutableStateOf(Instant.now()) }
         var exportSnapshot by rememberSaveable { mutableStateOf("") }
         var editingId by rememberSaveable { mutableStateOf<String?>(null) }

@@ -11,7 +11,7 @@ public partial class App : Application
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
         // Avoid concurrent writers to the same local session file.
-        instance = AppInstance.FindOrRegisterForKey("NonprofitHours");
+        instance = AppInstance.FindOrRegisterForKey("org.timeisclearlykept.windows");
         if (!instance.IsCurrent)
         {
             var activation = AppInstance.GetCurrent().GetActivatedEventArgs();

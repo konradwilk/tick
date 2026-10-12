@@ -1,4 +1,4 @@
-package org.nonprofithours
+package org.timeisclearlykept
 
 import org.junit.Assert.*
 import org.junit.Test

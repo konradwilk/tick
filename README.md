@@ -197,5 +197,20 @@ finish before switching devices. See [storage behavior and compatibility](docs/d
 ## Naming and compatibility
 
 TICK stands for **Time is Clearly Kept**. Project files, executables, and CSV
-exports use `tick`. Shared data folders use `tick.json`. Application identifiers
-remain unchanged. Data files are named `tick.json`; there is no filename migration.
+exports use `tick`. Shared data folders use `tick.json`. Application identifiers use the `org.timeisclearlykept` base:
+
+| Platform | Application identifier |
+| --- | --- |
+| Android | `org.timeisclearlykept` |
+| iPhone / iPad | `org.timeisclearlykept.ios` |
+| macOS | `org.timeisclearlykept.mac` |
+| Windows (unpackaged manifest and instance key) | `org.timeisclearlykept.windows` |
+| Linux | `org.timeisclearlykept.Linux` |
+
+Android source packages and the Gradle namespace also use `org.timeisclearlykept`.
+Default Apple and Windows data folders use `TimeIsClearlyKept`; Linux uses
+`time-is-clearly-kept` for its data and settings folders. Old default locations
+are not searched or migrated. The renamed apps start with fresh settings and
+ask for a data location when no data has been selected. Android and iOS install
+as new apps with separate private storage and preferences. Data files remain
+named `tick.json`.

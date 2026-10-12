@@ -16,7 +16,7 @@ cat > "$app/Contents/Info.plist" <<'PLIST'
 <plist version="1.0"><dict>
 <key>CFBundleIconFile</key><string>Tick</string>
 <key>CFBundleExecutable</key><string>tick</string>
-<key>CFBundleIdentifier</key><string>org.nonprofithours.mac</string>
+<key>CFBundleIdentifier</key><string>org.timeisclearlykept.mac</string>
 <key>CFBundleName</key><string>Time is Clearly Kept</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>0.1.0</string>

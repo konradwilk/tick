@@ -5,10 +5,10 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 android {
-    namespace = "org.nonprofithours"
+    namespace = "org.timeisclearlykept"
     compileSdk = 35
     defaultConfig {
-        applicationId = "org.nonprofithours"
+        applicationId = "org.timeisclearlykept"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

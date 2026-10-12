@@ -39,7 +39,7 @@ def parse(value):
 def data_path():
     root = os.environ.get("XDG_DATA_HOME", "")
     base = Path(root) if root and Path(root).is_absolute() else Path.home() / ".local/share"
-    return base / "nonprofit-hours/tick.json"
+    return base / "time-is-clearly-kept/tick.json"
 
 
 def decode_data(raw):
@@ -320,7 +320,7 @@ class StorageLocation:
     def __init__(self, settings=None):
         root = os.environ.get("XDG_CONFIG_HOME", "")
         base = Path(root) if root and Path(root).is_absolute() else Path.home() / ".config"
-        self.settings = Path(settings) if settings else base / "nonprofit-hours/location.json"
+        self.settings = Path(settings) if settings else base / "time-is-clearly-kept/location.json"
 
     def open(self):
         if not self.settings.exists():

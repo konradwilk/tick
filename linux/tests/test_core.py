@@ -352,9 +352,9 @@ class TrackerTests(unittest.TestCase):
 
     def test_xdg_location_and_relative_fallback(self):
         with patch.dict("os.environ", {"XDG_DATA_HOME": self.directory.name}):
-            self.assertEqual(data_path(), Path(self.directory.name) / "nonprofit-hours/tick.json")
+            self.assertEqual(data_path(), Path(self.directory.name) / "time-is-clearly-kept/tick.json")
         with patch.dict("os.environ", {"XDG_DATA_HOME": "relative"}):
-            self.assertEqual(data_path(), Path.home() / ".local/share/nonprofit-hours/tick.json")
+            self.assertEqual(data_path(), Path.home() / ".local/share/time-is-clearly-kept/tick.json")
 
     def test_naive_timestamp_is_rejected(self):
         nonprofit = self.tracker.add_nonprofit("Kitchen")

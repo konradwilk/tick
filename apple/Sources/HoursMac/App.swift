@@ -29,7 +29,7 @@ import HoursCore
     init() {
         do {
             let folder = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-            let location = try storage.resolve(defaultURL: folder.appending(path: "NonprofitHours/tick.json"))
+            let location = try storage.resolve(defaultURL: folder.appending(path: "TimeIsClearlyKept/tick.json"))
             let file = location.selected ? location.url.appendingPathComponent("tick.json") : location.url
             guard FileManager.default.fileExists(atPath: file.path) else { needsDataLocation = true; return }
             dataLocation = file.deletingLastPathComponent().path

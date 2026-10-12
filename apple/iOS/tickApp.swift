@@ -29,7 +29,7 @@ import UIKit
     init() {
         do {
             let base = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-            let saved = try storage.resolve(defaultURL: base.appendingPathComponent("NonprofitHours/tick.json"))
+            let saved = try storage.resolve(defaultURL: base.appendingPathComponent("TimeIsClearlyKept/tick.json"))
             let file = saved.selected && !saved.isFile ? saved.url.appendingPathComponent("tick.json") : saved.url
             guard saved.selected || FileManager.default.fileExists(atPath: file.path) else { needsDataLocation = true; return }
             adopt(try Tracker(file: file, requireExisting: saved.selected))

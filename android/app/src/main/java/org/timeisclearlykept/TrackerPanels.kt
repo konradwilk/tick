@@ -1,4 +1,4 @@
-package org.nonprofithours
+package org.timeisclearlykept
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.selection.SelectionContainer

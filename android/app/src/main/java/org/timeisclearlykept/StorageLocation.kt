@@ -1,4 +1,4 @@
-package org.nonprofithours
+package org.timeisclearlykept
 
 import android.content.Context
 import android.content.Intent

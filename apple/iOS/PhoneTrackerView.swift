@@ -21,7 +21,7 @@ import UIKit
     @State private var chooseFolderAfterSettings = false
     @State private var exporting = false
     @State private var document = CSVDocument(text: "")
-    @State private var filename = "nonprofit-hours"
+    @State private var filename = "tick"
     @State private var copyStatus = ""
     @State private var editing: Session?
     @State private var editingTimes: Session?

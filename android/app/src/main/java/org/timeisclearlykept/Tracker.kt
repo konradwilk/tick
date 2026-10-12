@@ -1,4 +1,4 @@
-package org.nonprofithours
+package org.timeisclearlykept
 
 import kotlinx.serialization.Serializable
 import java.time.Instant
@@ -59,6 +59,7 @@ class Tracker(initial: TrackerState, private val reload: (() -> TrackerState)? =
     }
     var state = initial
         private set
+    fun reload() { reload?.let { state = it() } }
     private fun commit(next: TrackerState) { save(next); state = next }
     fun addNonprofit(input: String): String {
         val name = capitalizeEntries(input.trim())
@@ -68,7 +69,7 @@ class Tracker(initial: TrackerState, private val reload: (() -> TrackerState)? =
         return nonprofit.id
     }
     fun start(id: String, notes: String = "", now: Instant = Instant.now()) {
-        reload?.let { state = it() }
+        reload()
         check(state.active == null) { "Stop the current session first." }
         val nonprofit = requireNotNull(state.nonprofits.find { it.id == id }) { "Select a project." }
         val session = Session(projectId = id, project = nonprofit.name, startTimeUtc = now.toString(),
