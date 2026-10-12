@@ -141,8 +141,9 @@ public sealed class Tracker
             var seconds = session.DurationSeconds ?? 0;
             return names.Select((name, index) => (name, seconds / names.Length + (index < seconds % names.Length ? 1 : 0)));
         }
+        var projectNames = State.Nonprofits.ToDictionary(n => n.Id, n => n.Name);
         return string.Join("\n\n", ExportSessions(range, zone).GroupBy(s => s.ProjectId).Select(group =>
-            $"{group.First().Project} {Duration(group.Sum(s => s.DurationSeconds ?? 0))}:\n" +
+            $"{projectNames.GetValueOrDefault(group.Key, group.First().Project)} {Duration(group.Sum(s => s.DurationSeconds ?? 0))}:\n" +
             string.Join("\n", group.SelectMany(Activities).GroupBy(s => s.Name, StringComparer.Ordinal)
                 .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase).ThenBy(g => g.Key, StringComparer.Ordinal)
                 .Select(g => $"{g.Key}   {Duration(g.Sum(s => s.Seconds))}"))));

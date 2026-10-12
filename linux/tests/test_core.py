@@ -186,6 +186,22 @@ class TrackerTests(unittest.TestCase):
                 self.tracker.update_notes(session_id, notes)
                 self.assertEqual(self.tracker.clipboard_text(), f"NEST 00:23:43:\n{expected}")
                 self.assertEqual(self.tracker.state["sessions"][0]["notes"], notes)
+    def test_summary_uses_project_id_instead_of_stale_session_name(self):
+        family = self.tracker.add_nonprofit("Family")
+        volunteer = self.tracker.add_nonprofit("Volunteer")
+        self.tracker.add_session(family, "Cake", self.start, self.start + timedelta(seconds=60))
+        self.tracker.add_session(volunteer, "Donations", self.start + timedelta(seconds=60), self.start + timedelta(seconds=180))
+        stored = copy.deepcopy(self.tracker.state)
+        stored["sessions"][1]["project"] = "Family"
+        self.tracker.commit(stored)
+        restored = Tracker(FileStore(self.path))
+        before = self.path.read_bytes()
+        expected = "Family 00:01:00:\nCake   00:01:00\n\nVolunteer 00:02:00:\nDonations   00:02:00"
+        self.assertEqual(restored.clipboard_text(), expected)
+        self.assertEqual(restored.clipboard_text("Weekly", self.start.date(), timezone.utc), expected)
+        self.assertEqual(self.path.read_bytes(), before)
+        self.assertEqual(restored.state["sessions"][1]["project"], "Family")
+
     def test_clipboard_combines_descriptions_and_sorts_alphabetically(self):
         kitchen = self.tracker.add_nonprofit("Kitchen")
         garden = self.tracker.add_nonprofit("Garden")

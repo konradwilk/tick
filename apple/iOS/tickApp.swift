@@ -30,10 +30,10 @@ import UIKit
         do {
             let base = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
             let saved = try storage.resolve(defaultURL: base.appendingPathComponent("NonprofitHours/tick.json"))
-            let file = saved.selected ? saved.url.appendingPathComponent("tick.json") : saved.url
-            guard FileManager.default.fileExists(atPath: file.path) else { needsDataLocation = true; return }
+            let file = saved.selected && !saved.isFile ? saved.url.appendingPathComponent("tick.json") : saved.url
+            guard saved.selected || FileManager.default.fileExists(atPath: file.path) else { needsDataLocation = true; return }
             adopt(try Tracker(file: file, requireExisting: saved.selected))
-        } catch { self.error = "Could not load saved hours. " + error.localizedDescription }
+        } catch { needsDataLocation = true; self.error = "Could not load saved hours. " + error.localizedDescription }
     }
     private func adopt(_ next: Tracker) {
         needsDataLocation = false
@@ -41,13 +41,24 @@ import UIKit
         state = next.state
         selected = defaultProject
         notes = state.active?.notes ?? ""
-        location = next.file.deletingLastPathComponent().path
+        location = next.file.path
     }
     func perform(_ action: (Tracker) throws -> Void) {
         guard let tracker else { return }
         defer { state = tracker.state }
         do { try action(tracker); error = nil }
         catch { self.error = error.localizedDescription }
+    }
+    func selectFile(_ file: URL) {
+        let access = file.startAccessingSecurityScopedResource()
+        defer { if access { file.stopAccessingSecurityScopedResource() } }
+        do {
+            let next = try Tracker(file: file, requireExisting: true)
+            try storage.remember(file, isFile: true)
+            adopt(next)
+            location = file.path
+            error = nil
+        } catch { self.error = error.localizedDescription }
     }
     func selectFolder(_ folder: URL) {
         let access = folder.startAccessingSecurityScopedResource()

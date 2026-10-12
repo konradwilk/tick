@@ -1,35 +1,225 @@
 // !$*UTF8*$!
 {
- archiveVersion = 1;
- classes = {};
- objectVersion = 56;
- objects = {
-  A00000000000000000000001 = {isa = PBXProject; attributes = {LastUpgradeCheck = 1600;}; buildConfigurationList = A00000000000000000000010; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; knownRegions = (en, Base); mainGroup = A00000000000000000000002; productRefGroup = A00000000000000000000003; projectDirPath = ""; projectRoot = ""; targets = (A00000000000000000000004);};
-  A00000000000000000000002 = {isa = PBXGroup; children = (A00000000000000000000020, A00000000000000000000021, A00000000000000000000022, A00000000000000000000023, A00000000000000000000024, A00000000000000000000025, A00000000000000000000003); sourceTree = "<group>";};
-  A00000000000000000000003 = {isa = PBXGroup; children = (A00000000000000000000005); name = Products; sourceTree = "<group>";};
-  A00000000000000000000004 = {isa = PBXNativeTarget; buildConfigurationList = A00000000000000000000011; buildPhases = (A00000000000000000000006, A00000000000000000000007, A00000000000000000000008); buildRules = (); dependencies = (); name = tick; productName = tick; productReference = A00000000000000000000005; productType = "com.apple.product-type.application";};
-  A00000000000000000000005 = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = tick.app; sourceTree = BUILT_PRODUCTS_DIR;};
-  A00000000000000000000006 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000030, A00000000000000000000031, A00000000000000000000032, A00000000000000000000033, A00000000000000000000034); runOnlyForDeploymentPostprocessing = 0;};
-  A00000000000000000000007 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0;};
-  A00000000000000000000008 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000035); runOnlyForDeploymentPostprocessing = 0;};
-  A00000000000000000000020 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = tickApp.swift; sourceTree = "<group>";};
-  A00000000000000000000021 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Sources/HoursCore/Tracker.swift; sourceTree = "<group>";};
-  A00000000000000000000022 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Sources/HoursCore/PortableData.swift; sourceTree = "<group>";};
-  A00000000000000000000023 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Sources/HoursCore/StorageLocation.swift; sourceTree = "<group>";};
-  A00000000000000000000024 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneTrackerView.swift; sourceTree = "<group>";};
-  A00000000000000000000025 = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>";};
-  A00000000000000000000035 = {isa = PBXBuildFile; fileRef = A00000000000000000000025;};
-  A00000000000000000000034 = {isa = PBXBuildFile; fileRef = A00000000000000000000024;};
-  A00000000000000000000030 = {isa = PBXBuildFile; fileRef = A00000000000000000000020;};
-  A00000000000000000000031 = {isa = PBXBuildFile; fileRef = A00000000000000000000021;};
-  A00000000000000000000032 = {isa = PBXBuildFile; fileRef = A00000000000000000000022;};
-  A00000000000000000000033 = {isa = PBXBuildFile; fileRef = A00000000000000000000023;};
-  A00000000000000000000010 = {isa = XCConfigurationList; buildConfigurations = (A00000000000000000000040, A00000000000000000000041); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
-  A00000000000000000000011 = {isa = XCConfigurationList; buildConfigurations = (A00000000000000000000042, A00000000000000000000043); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
-  A00000000000000000000040 = {isa = XCBuildConfiguration; name = Debug; buildSettings = {SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SWIFT_VERSION = 5.0; CLANG_ENABLE_MODULES = YES; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;};};
-  A00000000000000000000041 = {isa = XCBuildConfiguration; name = Release; buildSettings = {SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SWIFT_VERSION = 5.0; CLANG_ENABLE_MODULES = YES; SWIFT_COMPILATION_MODE = wholemodule;};};
-  A00000000000000000000042 = {isa = XCBuildConfiguration; name = Debug; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; PRODUCT_BUNDLE_IDENTIFIER = org.nonprofithours.ios; PRODUCT_NAME = "$(TARGET_NAME)"; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_CFBundleDisplayName = "Time is Clearly Kept"; INFOPLIST_KEY_UILaunchScreen_Generation = YES; INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES; INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES; TARGETED_DEVICE_FAMILY = "1,2"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; MARKETING_VERSION = 0.1.0;};};
-  A00000000000000000000043 = {isa = XCBuildConfiguration; name = Release; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; PRODUCT_BUNDLE_IDENTIFIER = org.nonprofithours.ios; PRODUCT_NAME = "$(TARGET_NAME)"; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_CFBundleDisplayName = "Time is Clearly Kept"; INFOPLIST_KEY_UILaunchScreen_Generation = YES; INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES; INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES; TARGETED_DEVICE_FAMILY = "1,2"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; MARKETING_VERSION = 0.1.0;};};
- };
- rootObject = A00000000000000000000001;
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A00000000000000000000030 /* tickApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000020 /* tickApp.swift */; };
+		A00000000000000000000031 /* ../Sources/HoursCore/Tracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000021 /* ../Sources/HoursCore/Tracker.swift */; };
+		A00000000000000000000032 /* ../Sources/HoursCore/PortableData.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000022 /* ../Sources/HoursCore/PortableData.swift */; };
+		A00000000000000000000033 /* ../Sources/HoursCore/StorageLocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000023 /* ../Sources/HoursCore/StorageLocation.swift */; };
+		A00000000000000000000034 /* PhoneTrackerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000024 /* PhoneTrackerView.swift */; };
+		A00000000000000000000035 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000025 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A00000000000000000000005 /* tick.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = tick.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A00000000000000000000020 /* tickApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = tickApp.swift; sourceTree = "<group>"; };
+		A00000000000000000000021 /* ../Sources/HoursCore/Tracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Sources/HoursCore/Tracker.swift; sourceTree = "<group>"; };
+		A00000000000000000000022 /* ../Sources/HoursCore/PortableData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Sources/HoursCore/PortableData.swift; sourceTree = "<group>"; };
+		A00000000000000000000023 /* ../Sources/HoursCore/StorageLocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Sources/HoursCore/StorageLocation.swift; sourceTree = "<group>"; };
+		A00000000000000000000024 /* PhoneTrackerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneTrackerView.swift; sourceTree = "<group>"; };
+		A00000000000000000000025 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A00000000000000000000007 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A00000000000000000000002 = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000020 /* tickApp.swift */,
+				A00000000000000000000021 /* ../Sources/HoursCore/Tracker.swift */,
+				A00000000000000000000022 /* ../Sources/HoursCore/PortableData.swift */,
+				A00000000000000000000023 /* ../Sources/HoursCore/StorageLocation.swift */,
+				A00000000000000000000024 /* PhoneTrackerView.swift */,
+				A00000000000000000000025 /* Assets.xcassets */,
+				A00000000000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A00000000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000005 /* tick.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A00000000000000000000004 /* tick */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A00000000000000000000011 /* Build configuration list for PBXNativeTarget "tick" */;
+			buildPhases = (
+				A00000000000000000000006 /* Sources */,
+				A00000000000000000000007 /* Frameworks */,
+				A00000000000000000000008 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = tick;
+			productName = tick;
+			productReference = A00000000000000000000005 /* tick.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A00000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				KnownAssetTags = (
+					New,
+				);
+				LastUpgradeCheck = 1600;
+			};
+			buildConfigurationList = A00000000000000000000010 /* Build configuration list for PBXProject "tick" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A00000000000000000000002;
+			productRefGroup = A00000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A00000000000000000000004 /* tick */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A00000000000000000000008 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A00000000000000000000035 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A00000000000000000000006 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A00000000000000000000030 /* tickApp.swift in Sources */,
+				A00000000000000000000031 /* ../Sources/HoursCore/Tracker.swift in Sources */,
+				A00000000000000000000032 /* ../Sources/HoursCore/PortableData.swift in Sources */,
+				A00000000000000000000033 /* ../Sources/HoursCore/StorageLocation.swift in Sources */,
+				A00000000000000000000034 /* PhoneTrackerView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A00000000000000000000040 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		A00000000000000000000041 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		A00000000000000000000042 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 92X2Q2GS25;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Time is Clearly Kept";
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.nonprofithours.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A00000000000000000000043 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 92X2Q2GS25;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Time is Clearly Kept";
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.nonprofithours.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A00000000000000000000010 /* Build configuration list for PBXProject "tick" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A00000000000000000000040 /* Debug */,
+				A00000000000000000000041 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A00000000000000000000011 /* Build configuration list for PBXNativeTarget "tick" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A00000000000000000000042 /* Debug */,
+				A00000000000000000000043 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A00000000000000000000001 /* Project object */;
 }

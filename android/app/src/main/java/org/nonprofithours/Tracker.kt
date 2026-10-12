@@ -135,8 +135,9 @@ class Tracker(initial: TrackerState, private val reload: (() -> TrackerState)? =
         }
         fun duration(seconds: Long) = "%02d:%02d:%02d".format(java.util.Locale.ROOT,
             seconds / 3600, seconds % 3600 / 60, seconds % 60)
+        val projectNames = state.nonprofits.associate { it.id to it.name }
         return exportSessions(range, zone).groupBy { it.projectId }.values.joinToString("\n\n") { sessions ->
-            "${sessions.first().project} ${duration(sessions.sumOf { it.durationSeconds ?: 0 })}:\n" +
+            "${projectNames[sessions.first().projectId] ?: sessions.first().project} ${duration(sessions.sumOf { it.durationSeconds ?: 0 })}:\n" +
                 sessions.flatMap { activities(it) }.groupBy { it.first }.entries
                     .sortedWith(compareBy<Map.Entry<String, List<Pair<String, Long>>>> { it.key.lowercase(java.util.Locale.ROOT) }.thenBy { it.key })
                     .joinToString("\n") { "${it.key}   ${duration(it.value.sumOf { s -> s.second })}" }

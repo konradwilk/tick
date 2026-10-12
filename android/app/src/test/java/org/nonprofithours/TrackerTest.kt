@@ -158,6 +158,20 @@ class TrackerTest {
             assertEquals(notes, tracker.state.sessions.single().notes)
         }
     }
+    @Test fun summaryUsesProjectIdInsteadOfStaleSessionName() {
+        val tracker = Tracker(TrackerState()) {}
+        val family = tracker.addNonprofit("Family")
+        val volunteer = tracker.addNonprofit("Volunteer")
+        val start = Instant.EPOCH
+        tracker.addSession(family, "Cake", start, start.plusSeconds(60))
+        tracker.addSession(volunteer, "Donations", start.plusSeconds(60), start.plusSeconds(180))
+        val stored = tracker.state.copy(sessions = tracker.state.sessions.map { it.copy(project = "Family") })
+        val restored = Tracker(stored) { error("Summary must not save") }
+        val expected = "Family 00:01:00:\nCake   00:01:00\n\nVolunteer 00:02:00:\nDonations   00:02:00"
+        assertEquals(expected, restored.clipboardText())
+        assertEquals(expected, restored.clipboardText(ExportRange.forDate(ExportPeriod.Weekly, LocalDate.of(1970, 1, 1)), ZoneId.of("UTC")))
+        assertEquals("Family", restored.state.sessions[1].project)
+    }
     @Test fun clipboardCombinesDescriptionsAndSortsAlphabetically() {
         val tracker = Tracker(TrackerState()) {}
         val kitchen = tracker.addNonprofit("Kitchen")

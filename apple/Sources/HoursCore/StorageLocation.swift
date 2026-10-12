@@ -1,13 +1,13 @@
 import Foundation
 
-/// Retains security-scoped access for the lifetime of the selected data folder.
+/// Retains security-scoped access for the lifetime of the selected data folder or file.
 public final class StorageLocation {
     private let defaults: UserDefaults
     private var accessed: URL?
     public init(defaults: UserDefaults = .standard) { self.defaults = defaults }
     deinit { accessed?.stopAccessingSecurityScopedResource() }
-    public func resolve(defaultURL: URL) throws -> (url: URL, selected: Bool) {
-        guard let bookmark = defaults.data(forKey: "hours.dataFolder") else { return (defaultURL, false) }
+    public func resolve(defaultURL: URL) throws -> (url: URL, selected: Bool, isFile: Bool) {
+        guard let bookmark = defaults.data(forKey: "hours.dataFolder") else { return (defaultURL, false, false) }
         var stale = false
         #if os(macOS)
         let options: URL.BookmarkResolutionOptions = [.withSecurityScope, .withoutUI]
@@ -16,10 +16,11 @@ public final class StorageLocation {
         #endif
         let url = try URL(resolvingBookmarkData: bookmark, options: options, relativeTo: nil, bookmarkDataIsStale: &stale)
         if url.startAccessingSecurityScopedResource() { accessed = url }
-        if stale { try remember(url) }
-        return (url, true)
+        let isFile = defaults.bool(forKey: "hours.dataLocationIsFile")
+        if stale { try remember(url, isFile: isFile) }
+        return (url, true, isFile)
     }
-    public func remember(_ url: URL) throws {
+    public func remember(_ url: URL, isFile: Bool = false) throws {
         #if os(macOS)
         let options: URL.BookmarkCreationOptions = [.withSecurityScope]
         #else
@@ -30,6 +31,7 @@ public final class StorageLocation {
         accessed?.stopAccessingSecurityScopedResource()
         accessed = granted ? url : nil
         defaults.set(bookmark, forKey: "hours.dataFolder")
+        defaults.set(isFile, forKey: "hours.dataLocationIsFile")
     }
 }
 

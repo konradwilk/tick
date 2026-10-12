@@ -173,6 +173,21 @@ public class TrackerTests
         Assert.Equal($"NEST 00:23:43:\n{expected}", tracker.ClipboardText());
         Assert.Equal(notes, tracker.State.Sessions.Single().Notes);
     }
+    [Fact] public void SummaryUsesProjectIdInsteadOfStaleSessionName()
+    {
+        var tracker = new Tracker(TrackerState.Empty(), _ => {});
+        var family = tracker.AddNonprofit("Family");
+        var volunteer = tracker.AddNonprofit("Volunteer");
+        var start = DateTimeOffset.UnixEpoch;
+        tracker.AddSession(family, "Cake", start, start.AddSeconds(60));
+        tracker.AddSession(volunteer, "Donations", start.AddSeconds(60), start.AddSeconds(180));
+        var sessions = tracker.State.Sessions.Select(s => s with { Project = "Family" }).ToArray();
+        var restored = new Tracker(tracker.State with { Sessions = sessions }, _ => throw new Exception("Summary must not save"));
+        const string expected = "Family 00:01:00:\nCake   00:01:00\n\nVolunteer 00:02:00:\nDonations   00:02:00";
+        Assert.Equal(expected, restored.ClipboardText());
+        Assert.Equal(expected, restored.ClipboardText(ExportRange.For(ExportPeriod.Weekly, new DateOnly(1970, 1, 1)), TimeZoneInfo.Utc));
+        Assert.Equal("Family", restored.State.Sessions[1].Project);
+    }
     [Fact] public void ClipboardCombinesDescriptionsAndSortsAlphabetically()
     {
         var tracker = new Tracker(TrackerState.Empty(), _ => { });

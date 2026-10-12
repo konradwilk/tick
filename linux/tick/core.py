@@ -267,7 +267,8 @@ class Tracker:
         for session in self.export_sessions(period, day, zone):
             groups.setdefault(session["projectId"], []).append(session)
         summaries = []
-        for sessions in groups.values():
+        project_names = {project["id"]: project["name"] for project in self.state["nonprofits"]}
+        for project_id, sessions in groups.items():
             descriptions = {}
             for session in sessions:
                 names = activities(session["notes"])
@@ -276,7 +277,8 @@ class Tracker:
                     descriptions[name] = descriptions.get(name, 0) + share + (index < remainder)
             lines = [f"{name}   {elapsed(descriptions[name])}"
                      for name in sorted(descriptions, key=lambda name: (name.lower(), name))]
-            summaries.append(f"{sessions[0]['project']} {elapsed(sum(s['durationSeconds'] for s in sessions))}:\n" + "\n".join(lines))
+            project_name = project_names.get(project_id, sessions[0]["project"])
+            summaries.append(f"{project_name} {elapsed(sum(s['durationSeconds'] for s in sessions))}:\n" + "\n".join(lines))
         return "\n\n".join(summaries)
 
     def csv(self, period=None, day=None, zone=None):

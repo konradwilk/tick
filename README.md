@@ -57,7 +57,8 @@ full duration if it crosses midnight. Active sessions are excluded. Empty period
 disable export and copy.
 
 **Copy summary** groups the selected sessions by project. Each
-heading contains its name and total duration for the selected period, followed
+heading resolves the current project name by project ID and contains its total
+duration for the selected period, followed
 by descriptions in alphabetical order. Sessions with the same displayed
 description are combined into one entry with their durations added together:
 

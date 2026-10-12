@@ -17,6 +17,7 @@ import UIKit
     @State private var period = ExportPeriod.monthly
     @State private var date = Date()
     @State private var choosingFolder = false
+    @State private var selectingFile = false
     @State private var chooseFolderAfterSettings = false
     @State private var exporting = false
     @State private var document = CSVDocument(text: "")
@@ -33,7 +34,9 @@ import UIKit
             VStack(spacing: 12) {
                 if model.needsDataLocation {
                     Text("Choose where to save tick.json to get started.")
-                    Button("Choose data folder…") { choosingFolder = true }
+                    Button("Choose data folder…") { selectingFile = false; choosingFolder = true }
+                    Button("Open tick.json…") { selectingFile = true; choosingFolder = true }
+                    Text("For OneDrive, open an existing tick.json file.").font(.caption)
                 }
                 capture.padding(.horizontal)
                 Divider()
@@ -56,9 +59,11 @@ import UIKit
                 choosingFolder = true
             }
         }
-        .fileImporter(isPresented: $choosingFolder, allowedContentTypes: [.folder]) { result in
+        .fileImporter(isPresented: $choosingFolder, allowedContentTypes: selectingFile ? [.json] : [.folder]) { result in
             switch result {
-            case .success(let folder): model.selectFolder(folder)
+            case .success(let url):
+                if selectingFile { model.selectFile(url) }
+                else { model.selectFolder(url) }
             case .failure(let error): model.error = error.localizedDescription
             }
         }
@@ -243,7 +248,9 @@ import UIKit
                 }.disabled(model.tracker == nil || model.state.active != nil)
                 Section { manualSessionForm }
                 Section("Data location") {
-                    Button("Choose data folder…") { chooseFolderAfterSettings = true; settings = false }
+                    Button("Choose data folder…") { selectingFile = false; chooseFolderAfterSettings = true; settings = false }
+                    Button("Open tick.json…") { selectingFile = true; chooseFolderAfterSettings = true; settings = false }
+                    Text("For OneDrive, open an existing tick.json file.").font(.caption)
                     Text(model.location).font(.caption)
                     Text("All changes are saved here. Use one device at a time.").font(.caption)
                 }

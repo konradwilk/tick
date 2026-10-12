@@ -150,6 +150,27 @@ final class TrackerTests: XCTestCase {
             XCTAssertEqual(tracker.state.sessions.first?.notes, notes)
         }
     }
+    func testSummaryUsesProjectIDInsteadOfStaleSessionName() throws {
+        let file = location()
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+        let tracker = try Tracker(file: file)
+        let family = try tracker.addNonprofit("Family")
+        let volunteer = try tracker.addNonprofit("Volunteer")
+        let start = Date(timeIntervalSince1970: 0)
+        try tracker.addSession(projectId: family, notes: "Cake", start: start, end: start.addingTimeInterval(60))
+        try tracker.addSession(projectId: volunteer, notes: "Donations", start: start.addingTimeInterval(60), end: start.addingTimeInterval(180))
+        var stored = tracker.state
+        // Two different project IDs have the same cached session name.
+        stored.sessions[1].project = "Family"
+        try PortableData.encode(stored).write(to: file)
+        let restored = try Tracker(file: file)
+        let before = try Data(contentsOf: file)
+        let expected = "Family 00:01:00:\nCake   00:01:00\n\nVolunteer 00:02:00:\nDonations   00:02:00"
+        XCTAssertEqual(restored.clipboardText(), expected)
+        XCTAssertEqual(restored.clipboardText(range: ExportRange(period: .weekly, date: start, timeZone: TimeZone(secondsFromGMT: 0)!)), expected)
+        XCTAssertEqual(try Data(contentsOf: file), before)
+        XCTAssertEqual(restored.state.sessions[1].project, "Family")
+    }
     func testClipboardCombinesDescriptionsAndSortsAlphabetically() throws {
         let file = location()
         defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }

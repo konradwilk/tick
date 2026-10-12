@@ -141,10 +141,33 @@ public final class Tracker {
     public private(set) var state: TrackerState
     public let file: URL
     private var snapshot: Data?
+    // Coordinate access so cloud providers can download files and publish writes.
+    private static func read(_ file: URL, requireExisting: Bool = true) throws -> Data? {
+        if !requireExisting && !FileManager.default.fileExists(atPath: file.path) { return nil }
+        return try coordinate(file, writing: false) { url in
+            try Data(contentsOf: url)
+        }
+    }
+    private static func coordinate<T>(_ file: URL, writing: Bool, action: (URL) throws -> T) throws -> T {
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        var coordinationError: NSError?
+        var result: Result<T, Swift.Error>?
+        if writing {
+            coordinator.coordinate(writingItemAt: file, options: .forReplacing, error: &coordinationError) { url in
+                result = Result { try action(url) }
+            }
+        } else {
+            coordinator.coordinate(readingItemAt: file, options: [], error: &coordinationError) { url in
+                result = Result { try action(url) }
+            }
+        }
+        if let coordinationError { throw coordinationError }
+        guard let result else { throw CocoaError(.fileReadUnknown) }
+        return try result.get()
+    }
     public init(file: URL, requireExisting: Bool = false) throws {
         self.file = file
-        if FileManager.default.fileExists(atPath: file.path) {
-            let data = try Data(contentsOf: file)
+        if let data = try Self.read(file, requireExisting: requireExisting) {
             state = try PortableData.decode(data)
             snapshot = data
         } else {
@@ -153,11 +176,15 @@ public final class Tracker {
         }
     }
     private func save(_ next: TrackerState) throws {
-        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let current = FileManager.default.fileExists(atPath: file.path) ? try Data(contentsOf: file) : nil
-        guard current == snapshot else { throw PortableData.Error.changed }
+        if snapshot == nil {
+            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        }
         let data = try PortableData.encode(next)
-        try data.write(to: file, options: .atomic)
+        try Self.coordinate(file, writing: true) { url in
+            let current = FileManager.default.fileExists(atPath: url.path) ? try Data(contentsOf: url) : nil
+            guard current == snapshot else { throw PortableData.Error.changed }
+            try data.write(to: url, options: .atomic)
+        }
         snapshot = data
         state = next
     }
@@ -167,7 +194,9 @@ public final class Tracker {
             return self
         }
         let data = try PortableData.encode(state)
-        try data.write(to: destination, options: .atomic)
+        try Self.coordinate(destination, writing: true) { url in
+            try data.write(to: url, options: .atomic)
+        }
         return try Tracker(file: destination, requireExisting: true)
     }
     @discardableResult public func addNonprofit(_ name: String) throws -> UUID {
@@ -181,7 +210,7 @@ public final class Tracker {
     }
     public func start(projectId: UUID, notes: String = "", platform: String = "macos", now: Date = Date()) throws {
         // Read the shared file again before validating or adding a session.
-        let data = try Data(contentsOf: file)
+        guard let data = try Self.read(file) else { throw CocoaError(.fileNoSuchFile) }
         let latest = try PortableData.decode(data)
         state = latest
         snapshot = data
@@ -255,6 +284,7 @@ public final class Tracker {
         }
         let sessions = exportSessions(range: range)
         let groups = Dictionary(grouping: sessions, by: \.projectId)
+        let projectNames = Dictionary(uniqueKeysWithValues: state.nonprofits.map { ($0.id, $0.name) })
         var seen = Set<UUID>()
         return sessions.compactMap { session -> String? in
             guard seen.insert(session.projectId).inserted else { return nil }
@@ -272,7 +302,7 @@ public final class Tracker {
                 let left = $0.lowercased(), right = $1.lowercased()
                 return left == right ? $0 < $1 : left < right
             }
-            return "\(session.project) \(duration(total)):\n" + names.map { name in
+            return "\(projectNames[session.projectId] ?? session.project) \(duration(total)):\n" + names.map { name in
                 let seconds = descriptions[name]!
                 return "\(name)   \(duration(seconds))"
             }.joined(separator: "\n")
