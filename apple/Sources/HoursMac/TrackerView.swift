@@ -5,6 +5,7 @@ struct TrackerView: View {
     @Bindable var model: AppModel
     @State private var newName = ""
     @State private var settings = false
+    @State private var explainingDataLocation = false
     @State private var manualNonprofit: UUID?
     @State private var manualNotes = ""
     @State private var manualStart = Date().addingTimeInterval(-3600)
@@ -25,7 +26,7 @@ struct TrackerView: View {
                     .popover(isPresented: $settings) { settingsView }
             }
             if model.needsDataLocation {
-                Text("Choose where to save tick.json to get started.")
+                Text("Time is Clearkly Kept saves your projects and tracked hours in a JSON file named tick.json. Choose a folder where Time is Clearkly Kept can create this file, or select a folder containing your existing tick.json to continue using it. You can change the location later in Settings.")
                 Button("Choose data folder…") { model.chooseDataLocation() }
             }
             HStack(alignment: .bottom, spacing: 20) {
@@ -60,9 +61,13 @@ struct TrackerView: View {
         .task {
             if model.needsDataLocation && !model.promptedForDataLocation {
                 model.promptedForDataLocation = true
-                model.chooseDataLocation()
+                explainingDataLocation = true
             }
         }
+        .alert("Choose where to keep your data", isPresented: $explainingDataLocation) {
+            Button("Choose data folder…") { model.chooseDataLocation() }
+            Button("Later", role: .cancel) { }
+        } message: { Text("Time is Clearkly Kept saves your projects and tracked hours in a JSON file named tick.json. Choose a folder where Time is Clearkly Kept can create this file, or select a folder containing your existing tick.json to continue using it. You can change the location later in Settings.") }
         .onChange(of: model.needsDataLocation) { wasNeeded, isNeeded in
             if wasNeeded && !isNeeded && model.state.nonprofits.isEmpty {
                 settings = true

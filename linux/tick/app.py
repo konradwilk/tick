@@ -57,7 +57,17 @@ class HoursWindow(Gtk.ApplicationWindow):
             self.error.set_text("Could not reload saved hours. " + str(error))
 
     def prompt_for_data_location(self):
-        self.choose_data_location()
+        dialog = Gtk.MessageDialog(transient_for=self, modal=True,
+            message_type=Gtk.MessageType.INFO, text="Choose where to keep your data",
+            secondary_text="Time is Clearkly Kept saves your projects and tracked hours in a JSON file named tick.json. Choose a folder where Time is Clearkly Kept can create this file, or select a folder containing your existing tick.json to continue using it. You can change the location later in Settings.")
+        dialog.add_button("Later", Gtk.ResponseType.CANCEL)
+        dialog.add_button("Choose data folder…", Gtk.ResponseType.ACCEPT)
+        def respond(dialog, response):
+            dialog.destroy()
+            if response == Gtk.ResponseType.ACCEPT:
+                self.choose_data_location()
+        dialog.connect("response", respond)
+        dialog.present()
         return GLib.SOURCE_REMOVE
 
     def perform(self, operation):

@@ -75,10 +75,19 @@ public sealed partial class MainWindow : Window
         }
         catch (Exception e) { ErrorText.Text = "Could not reload saved hours. " + e.Message; }
     }
-    private void PromptForDataLocation(object sender, RoutedEventArgs args)
+    private async void PromptForDataLocation(object sender, RoutedEventArgs args)
     {
         ((FrameworkElement)Content).Loaded -= PromptForDataLocation;
-        ChooseDataLocation(sender, args);
+        var dialog = new ContentDialog
+        {
+            XamlRoot = Controls.XamlRoot,
+            Title = "Choose where to keep your data",
+            Content = new TextBlock { Text = "Time is Clearkly Kept saves your projects and tracked hours in a JSON file named tick.json. Choose a folder where Time is Clearkly Kept can create this file, or select a folder containing your existing tick.json to continue using it. You can change the location later in Settings.", TextWrapping = TextWrapping.Wrap },
+            PrimaryButtonText = "Choose data folder…",
+            CloseButtonText = "Later",
+            DefaultButton = ContentDialogButton.Primary
+        };
+        if (await dialog.ShowAsync() == ContentDialogResult.Primary) ChooseDataLocation(sender, args);
     }
     private void Perform(Action action)
     {

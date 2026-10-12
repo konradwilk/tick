@@ -41,7 +41,11 @@ Earlier unversioned files are accepted, including Apple timestamps represented
 as seconds since 2001-01-01. Invalid identities, duplicate sessions, multiple
 active sessions, unsupported versions, and inconsistent durations are rejected.
 
-If `tick.json` is missing at startup, the app opens a folder picker. Choosing a
+If `tick.json` is missing at startup, all five apps first explain that the file
+stores projects and tracked hours, how to create or reuse it, and that its location
+can be changed later in Settings. Choose data folder opens the folder picker;
+iOS also offers Open tick.json for providers such as OneDrive. Later dismisses
+the explanation and leaves the data-location controls available. Choosing a
 folder creates and saves an empty `tick.json` immediately, or loads the existing
 file there. Canceling leaves tracking disabled until a folder is chosen through
 Data location. The chosen location is remembered for subsequent launches.

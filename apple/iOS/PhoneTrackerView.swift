@@ -6,6 +6,7 @@ import UIKit
     @Bindable var model: PhoneModel
     @State private var newName = ""
     @State private var settings = false
+    @State private var explainingDataLocation = false
     @State private var manualNonprofit: UUID?
     @State private var manualNotes = ""
     @State private var manualStart = Date().addingTimeInterval(-3600)
@@ -33,7 +34,7 @@ import UIKit
         NavigationStack {
             VStack(spacing: 12) {
                 if model.needsDataLocation {
-                    Text("Choose where to save tick.json to get started.")
+                    Text("Time is Clearkly Kept saves your projects and tracked hours in a JSON file named tick.json. Choose a folder where Time is Clearkly Kept can create this file, or select a folder containing your existing tick.json to continue using it. You can change the location later in Settings.")
                     Button("Choose data folder…") { selectingFile = false; choosingFolder = true }
                     Button("Open tick.json…") { selectingFile = true; choosingFolder = true }
                     Text("For OneDrive, open an existing tick.json file.").font(.caption)
@@ -56,9 +57,14 @@ import UIKit
         .task {
             if model.needsDataLocation && !model.promptedForDataLocation {
                 model.promptedForDataLocation = true
-                choosingFolder = true
+                explainingDataLocation = true
             }
         }
+        .alert("Choose where to keep your data", isPresented: $explainingDataLocation) {
+            Button("Choose data folder…") { selectingFile = false; choosingFolder = true }
+            Button("Open tick.json…") { selectingFile = true; choosingFolder = true }
+            Button("Later", role: .cancel) { }
+        } message: { Text("Time is Clearkly Kept saves your projects and tracked hours in a JSON file named tick.json. Choose a folder where Time is Clearkly Kept can create this file, or select a folder containing your existing tick.json to continue using it. You can change the location later in Settings. For OneDrive, open an existing tick.json file.") }
         .fileImporter(isPresented: $choosingFolder, allowedContentTypes: selectingFile ? [.json] : [.folder]) { result in
             switch result {
             case .success(let url):

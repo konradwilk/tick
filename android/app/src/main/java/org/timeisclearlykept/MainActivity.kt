@@ -57,11 +57,24 @@ class MainActivity : ComponentActivity() {
                 }
             }
             var promptedForFolder by rememberSaveable { mutableStateOf(false) }
+            var explainingDataLocation by rememberSaveable { mutableStateOf(false) }
             LaunchedEffect(Unit) {
                 if (!promptedForFolder && loaded.isSuccess && tracker == null) {
                     promptedForFolder = true
-                    chooseFolder.launch(null)
+                    explainingDataLocation = true
                 }
+            }
+            if (explainingDataLocation) {
+                AlertDialog(
+                    onDismissRequest = { explainingDataLocation = false },
+                    title = { Text("Choose where to keep your data") },
+                    text = { Text("Time is Clearkly Kept saves your projects and tracked hours in a JSON file named tick.json. Choose a folder where Time is Clearkly Kept can create this file, or select a folder containing your existing tick.json to continue using it. You can change the location later in Settings.") },
+                    confirmButton = { TextButton(onClick = {
+                        explainingDataLocation = false
+                        chooseFolder.launch(null)
+                    }) { Text("Choose data folder…") } },
+                    dismissButton = { TextButton(onClick = { explainingDataLocation = false }) { Text("Later") } }
+                )
             }
             Surface(Modifier.fillMaxSize()) {
                 Column(Modifier.safeDrawingPadding()) {
@@ -70,7 +83,7 @@ class MainActivity : ComponentActivity() {
                         val current = tracker
                         if (current != null) key(current) { TrackerScreen(current, location, openSettingsOnLoad, focusGeneration) { chooseFolder.launch(null) } }
                         else Column(Modifier.padding(20.dp)) {
-                            Text("Choose where to save tick.json, or select a folder containing an existing tick.json.")
+                            Text("Time is Clearkly Kept saves your projects and tracked hours in a JSON file named tick.json. Choose a folder where Time is Clearkly Kept can create this file, or select a folder containing your existing tick.json to continue using it. You can change the location later in Settings.")
                             OutlinedButton(onClick = { chooseFolder.launch(null) }) { Text("Data location…") }
                         }
                     }
