@@ -204,7 +204,15 @@ import UIKit
                     ForEach(conflicts) { conflict in Text(conflict.description).font(.caption) }
                 }
                 Button(manualConfirmation == nil ? "Save session" : "Save anyway") {
-                    // Recheck the current tracker state immediately before saving.
+                    // Reload before checking overlap so manual entry uses shared history too.
+                    guard let tracker = model.tracker else { return }
+                    do {
+                        try tracker.reload()
+                        model.state = tracker.state
+                    } catch {
+                        model.error = "Could not reload saved hours. " + error.localizedDescription
+                        return
+                    }
                     let latest = sessionConflicts(sessions: model.tracker?.state.sessions ?? [], start: manualStart, end: manualEnd)
                     let signature = "\(manualStart.timeIntervalSince1970)|\(manualEnd.timeIntervalSince1970)|\(manualNotes)|\(String(describing: manualNonprofit))|" + latest.map { "\($0.id)|\($0.session.startTimeUtc)|\(String(describing: $0.session.endTimeUtc))" }.joined(separator: ";")
                     if !latest.isEmpty && manualConfirmation != signature {

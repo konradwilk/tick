@@ -12,6 +12,37 @@ from tick.core import StorageLocation, FileStore, Tracker, data_path, elapsed, p
 
 
 class TrackerTests(unittest.TestCase):
+    def test_manual_entry_after_reload_preserves_shared_history(self):
+        project = self.tracker.add_nonprofit("Kitchen")
+        other = Tracker(FileStore(self.tracker.store.path))
+        end = self.start + timedelta(seconds=60)
+        other.add_session(project, "Remote", self.start, end)
+        self.tracker.reload()
+        self.assertEqual(len(self.tracker.session_conflicts(self.start, end)), 1)
+        self.tracker.add_session(project, "By hand", end, end + timedelta(seconds=60))
+        saved = Tracker(FileStore(self.tracker.store.path))
+        self.assertEqual([s["notes"] for s in saved.state["sessions"]], ["Remote", "By hand"])
+
+    def test_reload_reads_changes_and_keeps_state_on_failure(self):
+        project = self.tracker.add_nonprofit("Kitchen")
+        other = Tracker(FileStore(self.tracker.store.path))
+        other.start(project, "Remote", self.start)
+        before = self.tracker.store.path.read_bytes()
+        self.tracker.reload()
+        self.assertEqual(self.tracker.active, other.active)
+        self.assertEqual(self.tracker.store.path.read_bytes(), before)
+        self.tracker.stop(self.start + timedelta(seconds=60))
+        self.assertEqual(Tracker(FileStore(self.tracker.store.path)).state["sessions"][0]["durationSeconds"], 60)
+        previous = copy.deepcopy(self.tracker.state)
+        self.tracker.store.path.write_text("invalid")
+        with self.assertRaises(ValueError):
+            self.tracker.reload()
+        self.assertEqual(self.tracker.state, previous)
+        self.tracker.store.path.unlink()
+        with self.assertRaises(FileNotFoundError):
+            self.tracker.reload()
+        self.assertEqual(self.tracker.state, previous)
+
     def test_session_conflicts(self):
         first = self.tracker.add_nonprofit("Kitchen")
         second = self.tracker.add_nonprofit("Board")

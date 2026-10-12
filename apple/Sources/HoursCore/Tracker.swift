@@ -208,12 +208,15 @@ public final class Tracker {
         try save(next)
         return nonprofit.id
     }
-    public func start(projectId: UUID, notes: String = "", platform: String = "macos", now: Date = Date()) throws {
-        // Read the shared file again before validating or adding a session.
+    public func reload() throws {
+        // Decode before replacing the state and the snapshot used to detect conflicting writes.
         guard let data = try Self.read(file) else { throw CocoaError(.fileNoSuchFile) }
         let latest = try PortableData.decode(data)
         state = latest
         snapshot = data
+    }
+    public func start(projectId: UUID, notes: String = "", platform: String = "macos", now: Date = Date()) throws {
+        try reload()
         guard state.active == nil else { throw TrackerError.activeSession }
         guard let nonprofit = state.nonprofits.first(where: { $0.id == projectId }) else { throw TrackerError.invalidNonprofit }
         var next = state

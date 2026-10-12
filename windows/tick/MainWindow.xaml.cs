@@ -35,6 +35,10 @@ public sealed partial class MainWindow : Window
         timer.Tick += (_, _) => UpdateClock();
         timer.Start();
         Closed += (_, _) => timer.Stop();
+        Activated += (_, args) =>
+        {
+            if (args.WindowActivationState != WindowActivationState.Deactivated) Reload();
+        };
         try
         {
             tracker = location.Open();
@@ -54,6 +58,22 @@ public sealed partial class MainWindow : Window
             }
             else ErrorText.Text = "Could not load saved hours. Your file was not changed. " + e.Message;
         }
+    }
+    private void Reload()
+    {
+        if (tracker == null) return;
+        try
+        {
+            var previousActive = tracker.State.Active;
+            var selected = (Nonprofits.SelectedItem as Nonprofit)?.Id;
+            tracker.Reload();
+            Refresh();
+            Nonprofits.SelectedItem = tracker.State.Active != null
+                ? DefaultProject()
+                : tracker.State.Nonprofits.FirstOrDefault(n => n.Id == selected) ?? DefaultProject();
+            if (previousActive != tracker.State.Active) Notes.Text = tracker.State.Active?.Notes ?? "";
+        }
+        catch (Exception e) { ErrorText.Text = "Could not reload saved hours. " + e.Message; }
     }
     private void PromptForDataLocation(object sender, RoutedEventArgs args)
     {
@@ -197,6 +217,8 @@ public sealed partial class MainWindow : Window
             try
             {
                 if (nonprofit.SelectedItem is not Nonprofit selected) throw new InvalidOperationException("Select a project. Add one in Settings first if needed.");
+                tracker.Reload();
+                Refresh();
                 var conflicts = Conflicts();
                 var signature = $"{selected.Id}|{activity.Text}|{LocalTime(startDate, startTime):O}|{LocalTime(endDate, endTime):O}|" + string.Join(";", conflicts.Select(c => $"{c.Session.SessionId}|{c.Session.StartTimeUtc:O}|{c.Session.EndTimeUtc:O}"));
                 warning.Text = conflicts.Length == 0 ? "" : "Time overlap detected\n\n" + string.Join("\n\n", conflicts.Select(c => c.ToString()));

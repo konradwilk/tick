@@ -4,7 +4,13 @@ import UIKit
 
 @main @MainActor struct TickApp: App {
     @State private var model = PhoneModel()
-    var body: some Scene { WindowGroup { PhoneTrackerView(model: model) } }
+    @Environment(\.scenePhase) private var scenePhase
+    var body: some Scene {
+        WindowGroup { PhoneTrackerView(model: model) }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { model.reload() }
+            }
+    }
 }
 
 @MainActor @Observable final class PhoneModel {
@@ -42,6 +48,17 @@ import UIKit
         selected = defaultProject
         notes = state.active?.notes ?? ""
         location = next.file.path
+    }
+    func reload() {
+        guard let tracker else { return }
+        do {
+            let previousActive = state.active
+            try tracker.reload()
+            state = tracker.state
+            if let active = state.active { selected = active.projectId }
+            else if !state.nonprofits.contains(where: { $0.id == selected }) { selected = defaultProject }
+            if previousActive?.sessionId != state.active?.sessionId || previousActive?.notes != state.active?.notes { notes = state.active?.notes ?? "" }
+        } catch { self.error = "Could not reload saved hours. " + error.localizedDescription }
     }
     func perform(_ action: (Tracker) throws -> Void) {
         guard let tracker else { return }

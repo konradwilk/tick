@@ -15,6 +15,17 @@ existing file is read before adopting it. A new folder receives a copy of the
 current state. Folder selection is remembered using platform settings (Apple
 security-scoped bookmarks and Android persistable document-tree permissions).
 Use one device at a time and let cloud synchronization finish before switching.
+Opening or returning to the app rereads `tick.json` on macOS, iOS, Windows,
+Android, and Linux. The displayed projects, history, reports, and running session
+update from the file. Draft notes are preserved unless the running session changes;
+a removed selected project falls back to an available project. If reloading fails,
+the app shows an error and keeps its last successfully loaded state without writing
+to the file.
+
+Saving a session entered by hand also rereads the file before checking for time
+overlaps, so newly shared history is included in the confirmation. Manual draft
+fields are preserved when returning to the app.
+
 Pressing Start rereads the file before checking the selected project and active
 session, preserving updates saved by another instance. If another session is
 already running, it is shown instead of creating a second session. Missing or

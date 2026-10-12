@@ -40,6 +40,17 @@ import HoursCore
             notes = state.active?.notes ?? ""
         } catch { self.error = "Could not load saved hours: \(error.localizedDescription) Your saved file has not been changed." }
     }
+    func reload() {
+        guard let tracker else { return }
+        do {
+            let previousActive = state.active
+            try tracker.reload()
+            state = tracker.state
+            if let active = state.active { selected = active.projectId }
+            else if !state.nonprofits.contains(where: { $0.id == selected }) { selected = defaultProject }
+            if previousActive?.sessionId != state.active?.sessionId || previousActive?.notes != state.active?.notes { notes = state.active?.notes ?? "" }
+        } catch { self.error = "Could not reload saved hours. " + error.localizedDescription }
+    }
     func perform(_ action: (Tracker) throws -> Void) {
         guard let tracker else { return }
         defer { state = tracker.state }
@@ -112,10 +123,15 @@ import HoursCore
 @main struct HoursApp: App {
     @State private var model = AppModel()
     var body: some Scene {
-        Window("Time is Clearly Kept", id: "main") { TrackerView(model: model) }
+        Window("Time is Clearly Kept", id: "main") {
+            TrackerView(model: model)
+                .onAppear { model.reload() }
+                .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in model.reload() }
+                .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in model.reload() }
+        }
             .defaultSize(width: 1000, height: 760)
         MenuBarExtra {
-            MenuBarTrackerView(model: model)
+            MenuBarTrackerView(model: model).onAppear { model.reload() }
         } label: {
             Label(model.state.active == nil ? "Time is Clearly Kept" : "Tracking hours",
                   systemImage: model.state.active == nil ? "clock" : "record.circle.fill")

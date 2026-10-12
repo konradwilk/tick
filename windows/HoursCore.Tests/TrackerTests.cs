@@ -3,6 +3,20 @@ using Xunit;
 namespace HoursCore.Tests;
 public class TrackerTests
 {
+    [Fact] public void ReloadUpdatesStateWithoutSavingAndPreservesStateOnFailure()
+    {
+        var initial = TrackerState.Empty();
+        var latest = initial with { Nonprofits = [new Nonprofit(Guid.NewGuid(), "Remote")] };
+        var fail = false;
+        var saves = 0;
+        var tracker = new Tracker(initial, _ => saves++, () => fail ? throw new IOException("Unavailable") : latest);
+        tracker.Reload();
+        Assert.Same(latest, tracker.State);
+        Assert.Equal(0, saves);
+        fail = true;
+        Assert.Throws<IOException>(() => tracker.Reload());
+        Assert.Same(latest, tracker.State);
+    }
     [Fact] public void SessionConflictsCoverBoundariesAndProjects()
     {
         var tracker = new Tracker(TrackerState.Empty(), _ => {});

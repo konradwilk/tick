@@ -19,6 +19,7 @@ class HoursWindow(Gtk.ApplicationWindow):
         self.location = StorageLocation()
         self.connect("close-request", self.on_close)
         build_layout(self)
+        self.connect("notify::is-active", self.on_activation)
         try:
             self.tracker = Tracker(FileStore(path)) if path else self.location.open()
             active = self.tracker.active
@@ -35,6 +36,25 @@ class HoursWindow(Gtk.ApplicationWindow):
                 GLib.idle_add(self.prompt_for_data_location)
             else:
                 self.error.set_text("Could not load saved hours. Your file was not changed. " + str(error))
+
+    def on_activation(self, *_):
+        if self.is_active():
+            self.reload()
+
+    def reload(self):
+        if not self.tracker:
+            return
+        try:
+            previous_active = self.tracker.active
+            self.tracker.reload()
+            active = self.tracker.active
+            if active or not any(n["id"] == self.selected_id for n in self.tracker.state["nonprofits"]):
+                self.selected_id = self.default_project()
+            if previous_active != active:
+                self.notes.set_text(active["notes"] if active else "")
+            self.refresh()
+        except Exception as error:
+            self.error.set_text("Could not reload saved hours. " + str(error))
 
     def prompt_for_data_location(self):
         self.choose_data_location()
@@ -284,6 +304,8 @@ class HoursWindow(Gtk.ApplicationWindow):
                     index = nonprofit.get_selected()
                     if index >= len(nonprofits):
                         raise ValueError("Select a project.")
+                    self.tracker.reload()
+                    self.refresh()
                     conflicts = self.tracker.session_conflicts(local_time(entries[1]), local_time(entries[2]))
                     signature = (tuple(e.get_text() for e in entries), index,
                                  tuple((c["session"]["sessionId"], c["session"]["startTimeUtc"], c["session"].get("endTimeUtc")) for c in conflicts))
@@ -300,6 +322,12 @@ class HoursWindow(Gtk.ApplicationWindow):
                     error.set_text(str(problem))
                     return
             dialog.destroy()
+        def on_manual_activation(*_):
+            if dialog.is_active():
+                self.reload()
+                check_conflicts()
+
+        dialog.connect("notify::is-active", on_manual_activation)
         dialog.connect("response", respond)
         dialog.present()
         return dialog
@@ -533,4 +561,5 @@ class HoursApplication(Gtk.Application):
             provider.load_from_data(b"button.start { background: #16733b; color: white; } button.stop { background: #b3261e; color: white; }")
             Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
             window = HoursWindow(self)
+        window.reload()
         window.present()

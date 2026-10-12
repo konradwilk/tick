@@ -53,6 +53,7 @@ public sealed class Tracker
     private readonly Func<TrackerState>? reload;
     public Tracker(TrackerState initial, Action<TrackerState> save, Func<TrackerState>? reload = null)
     { State = initial; this.save = save; this.reload = reload; }
+    public void Reload() { if (reload != null) State = reload(); }
     private void Commit(TrackerState next) { save(next); State = next; }
     public Guid AddNonprofit(string input)
     {
@@ -65,7 +66,7 @@ public sealed class Tracker
     }
     public void Start(Guid id, string notes = "", DateTimeOffset? now = null)
     {
-        if (reload != null) State = reload();
+        Reload();
         if (State.Active != null) throw new InvalidOperationException("Stop the current session first.");
         var nonprofit = State.Nonprofits.FirstOrDefault(n => n.Id == id) ?? throw new InvalidOperationException("Select a project.");
         var date = (now ?? DateTimeOffset.UtcNow).ToUniversalTime();

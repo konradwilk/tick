@@ -26,6 +26,11 @@ import android.content.Context
 class MainActivity : ComponentActivity() {
     private var focusGeneration by mutableStateOf(0)
 
+    override fun onResume() {
+        super.onResume()
+        focusGeneration++
+    }
+
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) focusGeneration++
@@ -199,6 +204,8 @@ class MainActivity : ComponentActivity() {
             } },
             confirmButton = { TextButton(onClick = {
                 try {
+                    tracker.reload()
+                    state = tracker.state
                     val latest = tracker.sessionConflicts(localTime(manualStart), localTime(manualEnd))
                     val signature = "$manualId|$manualNotes|$manualStart|$manualEnd|" + latest.joinToString(";") { "${it.session.sessionId}|${it.session.startTimeUtc}|${it.session.endTimeUtc}" }
                     if (latest.isNotEmpty() && manualConfirmation != signature) {

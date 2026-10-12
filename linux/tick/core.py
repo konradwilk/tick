@@ -161,8 +161,11 @@ class Tracker:
         self.commit(state)
         return nonprofit["id"]
 
-    def start(self, project_id, notes="", now=None):
+    def reload(self):
         self.state = self.store.load(require_existing=True)
+
+    def start(self, project_id, notes="", now=None):
+        self.reload()
         if self.active:
             raise ValueError("Stop the current session first.")
         nonprofit = next((n for n in self.state["nonprofits"] if n["id"] == project_id), None)

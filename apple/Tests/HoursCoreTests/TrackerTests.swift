@@ -2,6 +2,39 @@ import XCTest
 @testable import HoursCore
 
 final class TrackerTests: XCTestCase {
+    func testManualEntryAfterReloadPreservesSharedHistory() throws {
+        let file = location()
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+        let tracker = try Tracker(file: file)
+        let id = try tracker.addNonprofit("Kitchen")
+        let other = try Tracker(file: file)
+        let start = Date(timeIntervalSince1970: 0)
+        try other.addSession(projectId: id, notes: "Remote", start: start, end: start.addingTimeInterval(60))
+        try tracker.reload()
+        XCTAssertEqual(sessionConflicts(sessions: tracker.state.sessions, start: start, end: start.addingTimeInterval(30)).count, 1)
+        try tracker.addSession(projectId: id, notes: "By hand", start: start.addingTimeInterval(120), end: start.addingTimeInterval(180))
+        XCTAssertEqual(try Tracker(file: file).state.sessions.map(\.notes), ["Remote", "By hand"])
+    }
+    func testReloadReadsChangesAndKeepsStateOnFailure() throws {
+        let file = location()
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+        let tracker = try Tracker(file: file)
+        let id = try tracker.addNonprofit("Kitchen")
+        let other = try Tracker(file: file)
+        try other.start(projectId: id, notes: "Remote", now: Date(timeIntervalSince1970: 0))
+        let bytes = try Data(contentsOf: file)
+        try tracker.reload()
+        XCTAssertEqual(tracker.state.active?.sessionId, other.state.active?.sessionId)
+        XCTAssertEqual(try Data(contentsOf: file), bytes)
+        try tracker.stop(now: Date(timeIntervalSince1970: 60))
+        XCTAssertEqual(try Tracker(file: file).state.sessions.first?.durationSeconds, 60)
+        try Data("invalid".utf8).write(to: file)
+        XCTAssertThrowsError(try tracker.reload())
+        XCTAssertEqual(tracker.state.sessions.first?.durationSeconds, 60)
+        try FileManager.default.removeItem(at: file)
+        XCTAssertThrowsError(try tracker.reload())
+        XCTAssertEqual(tracker.state.sessions.count, 1)
+    }
     func testStartReloadsRemoteHistoryAndActiveSession() throws {
         let file = location()
         defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
