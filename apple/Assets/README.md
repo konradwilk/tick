@@ -4,11 +4,14 @@
 `4de13dd409aac99ab8a6b298c735a3bb2ecaa30b` for Windows.
 The macOS bundle uses `Tick.icns`; iOS uses `Assets.xcassets/AppIcon.appiconset`.
 
-To regenerate both from the SVG, run from the repository root on macOS:
+To regenerate both from the folder-clock vector paths, run from the repository root on macOS:
 
 ```sh
 swift apple/scripts/generate-icons.swift
 ```
 
-The generator uses AppKit and iconutil. It adds a white background, rounded for
+For iOS only, append `--ios-only` to the command.
+
+The generator draws the vector paths directly with Core Graphics and uses
+AppKit to encode PNGs and iconutil to package the macOS icon. It adds a white background, rounded for
 macOS and opaque square for iOS (where the system applies the icon mask).
