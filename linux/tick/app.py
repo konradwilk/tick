@@ -121,11 +121,32 @@ class HoursWindow(Gtk.ApplicationWindow):
             self.history.remove(child)
         if not state["sessions"]:
             self.history.append(Gtk.Label(label="Sessions will appear here.", xalign=0))
+        previous_week = None
         for session in sorted(state["sessions"], key=lambda s: parse(s["startTimeUtc"]), reverse=True):
+            day = parse(session["startTimeUtc"]).astimezone().date()
+            week_start, week_end = period_bounds("Weekly", day)
+            if week_start != previous_week:
+                last_day = week_end - timedelta(days=1)
+                first_label = f"{week_start:%b} {week_start.day}"
+                if week_start.year != last_day.year:
+                    first_label += f", {week_start.year}"
+                week_label = f"{first_label} – {last_day:%b} {last_day.day}, {last_day.year}"
+                divider = Gtk.Box(spacing=12, margin_top=8, margin_bottom=4)
+                heading = Gtk.Label(label=week_label, xalign=0, wrap=True)
+                heading.add_css_class("heading")
+                divider.append(heading)
+                divider.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL, hexpand=True, valign=Gtk.Align.CENTER))
+                week_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12,
+                                   margin_top=12, margin_bottom=12, margin_start=12, margin_end=12)
+                week_frame = Gtk.Frame()
+                week_frame.set_child(week_box)
+                week_box.append(divider)
+                self.history.append(week_frame)
+            previous_week = week_start
             duration = elapsed(session["durationSeconds"]) if session.get("endTimeUtc") else "In progress"
             date = parse(session["startTimeUtc"]).astimezone().strftime("%Y-%m-%d %H:%M")
             label = Gtk.Label(label=f"{session['project']} — {date}\n{duration}\n{session['notes']}", xalign=0, wrap=True, selectable=True)
-            self.history.append(label)
+            week_box.append(label)
             if session.get("endTimeUtc"):
                 edit = Gtk.Button(label="Edit notes", halign=Gtk.Align.START)
                 edit.connect("clicked", lambda _, selected=session: self.edit_notes(selected))
@@ -138,7 +159,7 @@ class HoursWindow(Gtk.ApplicationWindow):
                     delete = Gtk.Button(label="Delete")
                     delete.connect("clicked", lambda _, selected=session: self.perform(lambda: self.tracker.delete_session(selected["sessionId"])))
                     actions.append(delete)
-                self.history.append(actions)
+                week_box.append(actions)
         self.update_clock()
 
     def add_manual_session(self):

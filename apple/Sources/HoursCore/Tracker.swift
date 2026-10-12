@@ -23,6 +23,32 @@ public struct ExportRange: Sendable {
     }
 }
 
+/// History weeks follow the same local Monday–Sunday boundaries as reports.
+public struct HistoryWeek: Identifiable, Sendable {
+    public var id: Date { start }
+    public let start: Date
+    public let lastDay: Date
+    public let sessions: [Session]
+    public var label: String {
+        let formatter = DateIntervalFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter.string(from: start, to: lastDay)
+    }
+}
+
+public func historyWeeks(sessions: [Session], timeZone: TimeZone = .current) -> [HistoryWeek] {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = timeZone
+    let grouped = Dictionary(grouping: sessions) {
+        ExportRange(period: .weekly, date: $0.startTimeUtc, timeZone: timeZone).start
+    }
+    return grouped.keys.sorted(by: >).map { start in
+        HistoryWeek(start: start, lastDay: calendar.date(byAdding: .day, value: 6, to: start)!,
+                    sessions: grouped[start]!.sorted { $0.startTimeUtc > $1.startTimeUtc })
+    }
+}
+
 public struct Nonprofit: Codable, Identifiable, Equatable, Sendable {
     public var id: UUID
     public var name: String

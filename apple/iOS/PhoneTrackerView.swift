@@ -111,24 +111,34 @@ import UIKit
             Text("History").font(.title2.bold())
             Text("Completed: \(Double(model.state.sessions.compactMap(\.durationSeconds).reduce(0, +)) / 3600, specifier: "%.2f") hours").font(.subheadline)
             if model.state.sessions.isEmpty { Text("Sessions will appear here.").foregroundStyle(.secondary) }
-            ForEach(model.state.sessions.sorted { $0.startTimeUtc > $1.startTimeUtc }) { session in
-                GroupBox {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(session.project).font(.headline)
-                        Text(session.startTimeUtc.formatted(date: .abbreviated, time: .shortened)).font(.caption)
-                        Text(session.durationSeconds.map(duration) ?? "In progress").monospacedDigit()
-                        Text(session.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "No notes" : session.notes)
-                        if session.endTimeUtc != nil {
-                            HStack {
-                                Button("Edit notes") { editing = session }
-                                Button("Edit times") { editingTimes = session }
-                                if let seconds = session.durationSeconds, seconds >= 0, seconds < 60 {
-                                    Button("Delete", role: .destructive) { model.perform { try $0.deleteSession(sessionId: session.sessionId); copyStatus = "" } }
+            ForEach(historyWeeks(sessions: model.state.sessions)) { week in
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 12) {
+                        Text(week.label).font(.subheadline.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
+                        Rectangle().fill(.separator).frame(maxWidth: .infinity).frame(height: 1)
+                    }.accessibilityAddTraits(.isHeader)
+                    ForEach(week.sessions) { session in
+                        GroupBox {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(session.project).font(.headline)
+                                Text(session.startTimeUtc.formatted(date: .abbreviated, time: .shortened)).font(.caption)
+                                Text(session.durationSeconds.map(duration) ?? "In progress").monospacedDigit()
+                                Text(session.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "No notes" : session.notes)
+                                if session.endTimeUtc != nil {
+                                    HStack {
+                                        Button("Edit notes") { editing = session }
+                                        Button("Edit times") { editingTimes = session }
+                                        if let seconds = session.durationSeconds, seconds >= 0, seconds < 60 {
+                                            Button("Delete", role: .destructive) { model.perform { try $0.deleteSession(sessionId: session.sessionId); copyStatus = "" } }
+                                        }
+                                    }
                                 }
-                            }
+                            }.frame(maxWidth: .infinity, alignment: .leading)
                         }
-                    }.frame(maxWidth: .infinity, alignment: .leading)
-                }
+                    }
+                }.padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.separator, lineWidth: 1))
             }
         }
     }

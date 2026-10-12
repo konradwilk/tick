@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
@@ -44,18 +46,34 @@ import java.time.format.DateTimeFormatter
         Text("History", style = MaterialTheme.typography.headlineSmall)
         Text("Completed: %.2f hours".format(state.sessions.sumOf { it.durationSeconds ?: 0 } / 3600.0))
         if (state.sessions.isEmpty()) Text("Sessions will appear here.")
-        state.sessions.sortedByDescending { Instant.parse(it.startTimeUtc) }.forEach { session ->
+        val weeks = state.sessions.sortedByDescending { Instant.parse(it.startTimeUtc) }.groupBy { session ->
+            val day = Instant.parse(session.startTimeUtc).atZone(ZoneId.systemDefault()).toLocalDate()
+            ExportRange.forDate(ExportPeriod.Weekly, day).start
+        }
+        weeks.forEach { (start, sessions) ->
+            val lastDay = start.plusDays(6)
+            val firstFormat = DateTimeFormatter.ofPattern(if (start.year == lastDay.year) "MMM d" else "MMM d, uuuu")
+            val label = "${start.format(firstFormat)} – ${lastDay.format(DateTimeFormatter.ofPattern("MMM d, uuuu"))}"
             OutlinedCard(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(session.project, style = MaterialTheme.typography.titleMedium)
-                    Text(Instant.parse(session.startTimeUtc).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("MMM d, yyyy HH:mm")), style = MaterialTheme.typography.bodySmall)
-                    Text(session.durationSeconds?.let(::displayDuration) ?: "In progress")
-                    Text(session.notes.ifBlank { "No notes" })
-                    if (session.endTimeUtc != null) Row {
-                        TextButton(onClick = { onEdit(session) }) { Text("Edit notes") }
-                        TextButton(onClick = { onEditTimes(session) }) { Text("Edit times") }
-                        if (session.durationSeconds != null && session.durationSeconds in 0L..59L)
-                            TextButton(onClick = { onDelete(session) }) { Text("Delete") }
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(label, modifier = Modifier.semantics { heading() }, style = MaterialTheme.typography.titleSmall)
+                    HorizontalDivider()
+                    sessions.forEachIndexed { index, session ->
+                        if (index > 0) HorizontalDivider()
+                        Column(Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(session.project, style = MaterialTheme.typography.titleMedium)
+                                Text(Instant.parse(session.startTimeUtc).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("MMM d, yyyy HH:mm")), style = MaterialTheme.typography.bodySmall)
+                                Text(session.durationSeconds?.let(::displayDuration) ?: "In progress")
+                                Text(session.notes.ifBlank { "No notes" })
+                                if (session.endTimeUtc != null) Row {
+                                    TextButton(onClick = { onEdit(session) }) { Text("Edit notes") }
+                                    TextButton(onClick = { onEditTimes(session) }) { Text("Edit times") }
+                                    if (session.durationSeconds != null && session.durationSeconds in 0L..59L)
+                                        TextButton(onClick = { onDelete(session) }) { Text("Delete") }
+                                }
+                            }
+                        }
                     }
                 }
             }

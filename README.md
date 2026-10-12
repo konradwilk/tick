@@ -77,7 +77,10 @@ and durations longer than 24 hours are not wrapped. A confirmation appears after
 copying. iOS and macOS compile the same tracking and export implementation.
 
 Session history displays entries by start time, newest first,
-including newly added backdated sessions.
+including newly added backdated sessions. All five clients separate history with
+an outlined box around each week's date heading and entries. Weeks run Monday–Sunday in the device's
+local timezone; sessions are grouped by their start date, including sessions that
+cross midnight. Empty weeks are omitted.
 
 In session history, choose **Edit notes** on a completed session in Windows,
 macOS, iOS, Android, or Linux. Completed sessions under one minute also show

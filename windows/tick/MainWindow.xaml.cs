@@ -96,12 +96,19 @@ public sealed partial class MainWindow : Window
         Toggle.Background = new SolidColorBrush(active ? Colors.Firebrick : Colors.ForestGreen);
         Total.Text = $"Completed: {state.Sessions.Sum(s => s.DurationSeconds ?? 0) / 3600.0:F2} hours";
         UpdateReport();
-        History.ItemsSource = state.Sessions.OrderByDescending(s => s.StartTimeUtc).Select(s => new HistoryEntry(s.SessionId,
-            $"{s.Project} — {s.StartTimeUtc.ToLocalTime():g}\n{(s.DurationSeconds is long seconds ? Elapsed(seconds) : "In progress")}\n{s.Notes}", s.EndTimeUtc != null,
-            s.EndTimeUtc != null && s.DurationSeconds is >= 0 and < 60 ? Visibility.Visible : Visibility.Collapsed)).ToArray();
+        History.ItemsSource = state.Sessions.OrderByDescending(s => s.StartTimeUtc)
+            .GroupBy(s => ExportRange.For(ExportPeriod.Weekly, DateOnly.FromDateTime(s.StartTimeUtc.LocalDateTime)).Start)
+            .Select(group => {
+                var lastDay = group.Key.AddDays(6);
+                var firstLabel = group.Key.Year == lastDay.Year ? group.Key.ToString("MMM d") : group.Key.ToString("MMM d, yyyy");
+                return new HistoryWeekEntries($"{firstLabel} – {lastDay:MMM d, yyyy}", group.Select(s => new HistoryEntry(s.SessionId,
+                    $"{s.Project} — {s.StartTimeUtc.ToLocalTime():g}\n{(s.DurationSeconds is long seconds ? Elapsed(seconds) : "In progress")}\n{s.Notes}", s.EndTimeUtc != null,
+                    s.EndTimeUtc != null && s.DurationSeconds is >= 0 and < 60 ? Visibility.Visible : Visibility.Collapsed)).ToArray());
+            }).ToArray();
         UpdateClock();
     }
     public record HistoryEntry(Guid SessionId, string Summary, bool CanEdit, Visibility DeleteVisibility);
+    public record HistoryWeekEntries(string WeekLabel, HistoryEntry[] Entries);
     private void DeleteSession(object sender, RoutedEventArgs args)
     {
         if (tracker != null && sender is Button { Tag: Guid id }) Perform(() => tracker.DeleteSession(id));
