@@ -49,3 +49,9 @@ the explanation and leaves the data-location controls available. Choosing a
 folder creates and saves an empty `tick.json` immediately, or loads the existing
 file there. Canceling leaves tracking disabled until a folder is chosen through
 Data location. The chosen location is remembered for subsequent launches.
+
+After a manual session is saved successfully, all apps keep manual entry open
+and prepare the next entry: start one minute after the saved end, end fifteen
+minutes after the saved end (for example, 18:00–19:00 becomes 19:01–19:15).
+The project stays selected and activity notes are cleared. Validation errors or
+unconfirmed overlap warnings leave the entered times unchanged.

@@ -239,6 +239,22 @@ public sealed partial class MainWindow : Window
                     return;
                 }
                 tracker.AddSession(selected.Id, activity.Text, LocalTime(startDate, startTime), LocalTime(endDate, endTime));
+                var savedEnd = endDate.Date!.Value.Date + endTime.Time;
+                var nextStart = savedEnd.AddMinutes(1);
+                var nextEnd = savedEnd.AddMinutes(15);
+                endEdited = true;
+                updatingEnd = true;
+                startDate.Date = nextStart;
+                startTime.Time = nextStart.TimeOfDay;
+                endDate.Date = nextEnd;
+                endTime.Time = nextEnd.TimeOfDay;
+                updatingEnd = false;
+                endEdited = false;
+                activity.Text = "";
+                confirmation = null;
+                dialog.PrimaryButtonText = "Save";
+                error.Text = "Session saved.";
+                eventArgs.Cancel = true;
                 ErrorText.Text = "";
                 Refresh();
             }

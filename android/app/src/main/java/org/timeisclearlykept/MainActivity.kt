@@ -229,7 +229,12 @@ class MainActivity : ComponentActivity() {
                     tracker.addSession(requireNotNull(manualId) { "Select a project." }, manualNotes, localTime(manualStart), localTime(manualEnd))
                     state = tracker.state
                     manualNotes = ""
-                    manual = false
+                    val savedEnd = LocalDateTime.parse(manualEnd, manualFormat)
+                    manualStart = savedEnd.plusMinutes(1).format(manualFormat)
+                    manualEnd = savedEnd.plusMinutes(15).format(manualFormat)
+                    manualEndEdited = false
+                    manualConfirmation = null
+                    manualError = null
                     error = null
                     copyStatus = ""
                 } catch (e: Exception) { manualError = e.message ?: "Could not save session." }

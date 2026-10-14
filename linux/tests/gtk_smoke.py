@@ -103,6 +103,27 @@ with tempfile.TemporaryDirectory() as directory:
     assert len(reopened.tracker.state["sessions"]) == count
     dialog.response(Gtk.ResponseType.ACCEPT)
     assert len(reopened.tracker.state["sessions"]) == count + 1
+    assert entries[0].get_text() == ""
+    # Successful saves advance the open form, including across midnight.
+    entries[0].set_text("Late activity")
+    entries[1].set_text("2020-01-02 23:00")
+    entries[2].set_text("2020-01-02 23:59")
+    dialog.response(Gtk.ResponseType.ACCEPT)
+    assert len(reopened.tracker.state["sessions"]) == count + 2
+    assert entries[1].get_text() == "2020-01-03 00:00"
+    assert entries[2].get_text() == "2020-01-03 00:14"
+    assert entries[0].get_text() == ""
+    entries[0].set_text("Next activity")
+    dialog.response(Gtk.ResponseType.ACCEPT)
+    assert len(reopened.tracker.state["sessions"]) == count + 3
+    assert entries[1].get_text() == "2020-01-03 00:15"
+    assert entries[2].get_text() == "2020-01-03 00:29"
+    # Invalid entries do not advance the form.
+    dialog.response(Gtk.ResponseType.ACCEPT)
+    assert len(reopened.tracker.state["sessions"]) == count + 3
+    assert entries[1].get_text() == "2020-01-03 00:15"
+    assert entries[2].get_text() == "2020-01-03 00:29"
+    dialog.response(Gtk.ResponseType.CANCEL)
     reopened.on_close()
     reopened.destroy()
     assert restored.export.get_sensitive()

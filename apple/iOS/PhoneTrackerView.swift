@@ -229,6 +229,10 @@ import UIKit
                     model.perform { tracker in
                         guard let id = manualNonprofit else { throw TrackerError.invalidNonprofit }
                         try tracker.addSession(projectId: id, notes: manualNotes, start: manualStart, end: manualEnd, platform: "ios")
+                        let savedEnd = manualEnd
+                        manualStart = savedEnd.addingTimeInterval(60)
+                        manualEnd = savedEnd.addingTimeInterval(900)
+                        manualEndEdited = false
                         manualConfirmation = nil
                         manualNotes = ""
                         manualStatus = "Session saved."

@@ -308,7 +308,7 @@ class HoursWindow(Gtk.ApplicationWindow):
         check_conflicts()
 
         def respond(_, response):
-            nonlocal confirmation
+            nonlocal confirmation, end_edited, updating_end
             if response == Gtk.ResponseType.ACCEPT:
                 try:
                     index = nonprofit.get_selected()
@@ -326,8 +326,19 @@ class HoursWindow(Gtk.ApplicationWindow):
                         dialog.get_widget_for_response(Gtk.ResponseType.ACCEPT).set_label("Save anyway")
                         return
                     self.tracker.add_session(nonprofits[index]["id"], entries[0].get_text(), local_time(entries[1]), local_time(entries[2]))
+                    saved_end = datetime.strptime(entries[2].get_text(), "%Y-%m-%d %H:%M")
+                    end_edited = True
+                    updating_end = True
+                    entries[1].set_text((saved_end + timedelta(minutes=1)).strftime("%Y-%m-%d %H:%M"))
+                    entries[2].set_text((saved_end + timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M"))
+                    updating_end = False
+                    end_edited = False
+                    entries[0].set_text("")
+                    confirmation = None
+                    error.set_text("Session saved.")
                     self.refresh()
                     self.error.set_text("")
+                    return
                 except Exception as problem:
                     error.set_text(str(problem))
                     return
