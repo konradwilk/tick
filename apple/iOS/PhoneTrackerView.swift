@@ -195,6 +195,8 @@ import UIKit
                     Text("Choose a project").tag(nil as UUID?)
                     ForEach(model.state.nonprofits) { Text($0.name).tag(Optional($0.id)) }
                 }
+                // These controls share a Form row; avoid a navigation picker's row-wide tap target.
+                .pickerStyle(.menu)
                 TextField("What did you work on?", text: $manualNotes, axis: .vertical)
                 DatePicker("Started", selection: Binding(get: { manualStart }, set: {
                     manualStart = $0
@@ -237,7 +239,9 @@ import UIKit
                         manualNotes = ""
                         manualStatus = "Session saved."
                     }
-                }.disabled(manualNonprofit == nil || manualNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || manualEnd <= manualStart)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(manualNonprofit == nil || manualNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || manualEnd <= manualStart)
                 if manualEnd <= manualStart { Text("End must be after start.").foregroundStyle(.red) }
                 if model.state.nonprofits.isEmpty { Text("Add a project in Settings first.").font(.caption) }
                 if let error = model.error { Text(error).foregroundStyle(.red) }
