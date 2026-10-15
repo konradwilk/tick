@@ -3,7 +3,10 @@ package org.timeisclearlykept
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
+import android.system.Os
+import android.system.OsConstants
 import android.util.AtomicFile
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
@@ -85,7 +88,7 @@ class StorageLocation(private val context: Context) {
         }
         return tracker(::read) { bytes ->
             val stream = file.startWrite()
-            try { stream.write(bytes); file.finishWrite(stream) }
+            try { stream.write(bytes); stream.flush(); stream.fd.sync(); file.finishWrite(stream) }
             catch (error: Exception) { file.failWrite(stream); throw error }
         }
     }
@@ -120,7 +123,13 @@ class StorageLocation(private val context: Context) {
     }
     private fun readDocument(file: Uri): ByteArray = requireNotNull(context.contentResolver.openInputStream(file)) { "Could not read data file." }.use { it.readBytes() }
     private fun writeDocument(file: Uri, bytes: ByteArray) {
-        requireNotNull(context.contentResolver.openOutputStream(file, "wt")) { "Could not write data file." }.use { it.write(bytes); it.flush() }
+        val descriptor = requireNotNull(context.contentResolver.openFileDescriptor(file, "wt")) { "Could not write data file." }
+        ParcelFileDescriptor.AutoCloseOutputStream(descriptor).use { stream ->
+            stream.write(bytes)
+            stream.flush()
+            // Cloud providers may return a pipe; only regular files support a disk flush.
+            if (OsConstants.S_ISREG(Os.fstat(stream.fd).st_mode)) stream.fd.sync()
+        }
     }
     private fun documentTracker(file: Uri): Tracker = tracker({ readDocument(file) }) { bytes ->
         val original = readDocument(file)

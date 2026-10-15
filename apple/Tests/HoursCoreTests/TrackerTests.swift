@@ -2,6 +2,31 @@ import XCTest
 @testable import HoursCore
 
 final class TrackerTests: XCTestCase {
+    func testEveryChangeIsReadableImmediatelyWhileTrackerRemainsOpen() throws {
+        let file = location()
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+        let tracker = try Tracker(file: file)
+        func saved() throws -> TrackerState { try PortableData.decode(Data(contentsOf: file)) }
+        let project = try tracker.addNonprofit("Kitchen")
+        XCTAssertEqual(try saved().nonprofits.first?.id, project)
+        let start = Date(timeIntervalSince1970: 1000)
+        try tracker.start(projectId: project, notes: "Timer", now: start)
+        XCTAssertNotNil(try saved().active)
+        try tracker.stop(now: start.addingTimeInterval(30))
+        XCTAssertNil(try saved().active)
+        let session = try XCTUnwrap(tracker.state.sessions.first?.id)
+        try tracker.updateNotes(sessionId: session, notes: "Edited")
+        XCTAssertEqual(try saved().sessions.first?.notes, "Edited")
+        try tracker.updateTimes(sessionId: session, start: start, end: start.addingTimeInterval(45))
+        XCTAssertEqual(try saved().sessions.first?.durationSeconds, 45)
+        try tracker.deleteSession(sessionId: session)
+        XCTAssertTrue(try saved().sessions.isEmpty)
+        try tracker.addSession(projectId: project, notes: "Manual", start: start, end: start.addingTimeInterval(60))
+        XCTAssertEqual(try saved().sessions.first?.notes, "Manual")
+        let copy = file.deletingLastPathComponent().appendingPathComponent("copy.json")
+        _ = try tracker.saveAs(copy)
+        XCTAssertEqual(try Data(contentsOf: copy), try Data(contentsOf: file))
+    }
     func testManualEntryAfterReloadPreservesSharedHistory() throws {
         let file = location()
         defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }

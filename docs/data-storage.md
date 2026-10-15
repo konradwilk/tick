@@ -37,6 +37,18 @@ AtomicFile for private storage. Android document-provider writes depend on the
 provider and cannot guarantee atomic replacement; a failed write attempts to
 restore the original bytes. Back up the shared file before using a new provider.
 
+Every committed change (projects, Start/Stop, manual sessions, edits, and deletions)
+writes `tick.json` synchronously before reporting success. Apple explicitly flushes
+and closes the replaced file within coordinated access; Windows uses
+`FileStream.Flush(true)` before replacement; Linux flushes and calls `fsync` before
+replacement. Android flushes and synchronizes private files and regular files
+returned by document providers, and closes provider streams before returning.
+Providers that return pipes receive the bytes and stream closure; they control
+when those bytes reach their storage. These guarantees also apply when creating
+or copying the data file to a newly selected location. Unsaved form drafts are
+not written. Cloud upload and availability on another device remain controlled
+by iCloud Drive, OneDrive, or the selected provider and network connection.
+
 Earlier unversioned files are accepted, including Apple timestamps represented
 as seconds since 2001-01-01. Invalid identities, duplicate sessions, multiple
 active sessions, unsupported versions, and inconsistent durations are rejected.

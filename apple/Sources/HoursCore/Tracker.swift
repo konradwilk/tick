@@ -126,7 +126,7 @@ public enum TrackerError: LocalizedError {
     }
 }
 
-/// Each change is saved atomically before it becomes visible to the caller.
+/// Each change is saved atomically and flushed before it becomes visible to the caller.
 public final class Tracker {
     private func capitalizeEntries(_ value: String) -> String {
         var first = true
@@ -183,10 +183,22 @@ public final class Tracker {
         try Self.coordinate(file, writing: true) { url in
             let current = FileManager.default.fileExists(atPath: url.path) ? try Data(contentsOf: url) : nil
             guard current == snapshot else { throw PortableData.Error.changed }
-            try data.write(to: url, options: .atomic)
+            try Self.writeAndFlush(data, to: url)
         }
         snapshot = data
         state = next
+    }
+    // Keep the flush and close inside coordinated access, before notifying file providers.
+    private static func writeAndFlush(_ data: Data, to url: URL) throws {
+        try data.write(to: url, options: .atomic)
+        let handle = try FileHandle(forWritingTo: url)
+        do {
+            try handle.synchronize()
+        } catch {
+            try? handle.close()
+            throw error
+        }
+        try handle.close()
     }
     public func saveAs(_ destination: URL) throws -> Tracker {
         if destination.standardizedFileURL == file.standardizedFileURL {
@@ -195,7 +207,7 @@ public final class Tracker {
         }
         let data = try PortableData.encode(state)
         try Self.coordinate(destination, writing: true) { url in
-            try data.write(to: url, options: .atomic)
+            try Self.writeAndFlush(data, to: url)
         }
         return try Tracker(file: destination, requireExisting: true)
     }
