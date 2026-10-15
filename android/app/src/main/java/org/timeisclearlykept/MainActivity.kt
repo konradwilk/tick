@@ -177,6 +177,7 @@ class MainActivity : ComponentActivity() {
                 Text(location, style = MaterialTheme.typography.bodySmall)
                 Text("All changes are saved here. Use one device at a time.", style = MaterialTheme.typography.bodySmall)
                 Text("Timing continues when the app closes. Reopen and press Stop to finish.", style = MaterialTheme.typography.bodySmall)
+                Text("This is version ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodySmall)
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             } }, confirmButton = { TextButton(onClick = { settings = false }) { Text("Done") } }
         )

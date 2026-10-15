@@ -20,3 +20,4 @@ windows/publish/
 # Python
 __pycache__/
 *.py[cod]
+linux/tick/_version.txt

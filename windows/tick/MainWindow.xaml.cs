@@ -30,6 +30,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        VersionText.Text = "This is version " + BuildVersion.Current;
         AppWindow.Resize(new Windows.Graphics.SizeInt32(1100, 800));
         ReportDate.Date = DateTimeOffset.Now;
         timer.Tick += (_, _) => UpdateClock();

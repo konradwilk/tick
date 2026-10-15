@@ -11,6 +11,9 @@ the edit. Session times and recorded hours stay unchanged.
 
 ## Build on Windows
 
+Install Git and Python 3.9+ (`python` on PATH) to generate the Settings version
+from release tags. See [versioning](../docs/versioning.md).
+
 Install Visual Studio 2022 with Windows application development tools, .NET 8 SDK,
 and Windows SDK 10.0.26100. Open `tick/tick.csproj` in Visual
 Studio and select x64, or run from the repository root:

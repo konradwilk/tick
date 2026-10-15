@@ -4,6 +4,10 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
 }
+val sourceVersion = providers.exec {
+    commandLine(if (System.getProperty("os.name").startsWith("Windows")) "python" else "python3",
+        rootProject.file("../linux/tick/version.py").absolutePath)
+}.standardOutput.asText.get().trim()
 android {
     namespace = "org.timeisclearlykept"
     compileSdk = 35
@@ -12,10 +16,10 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = sourceVersion
     }
     sourceSets.getByName("test").resources.srcDir("../../fixtures")
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

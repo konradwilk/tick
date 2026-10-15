@@ -1,5 +1,8 @@
 # iPhone and iPad
 
+Builds require Git and Python 3.9+ (`python3` on PATH) to generate the Settings
+version from release tags. See [versioning](../../docs/versioning.md).
+
 Open `tick.xcodeproj` in Xcode 16 or later on a Mac. Select the
 tick target, choose your development team under Signing & Capabilities,
 and run on an iOS 17+ device or simulator. No third-party packages are required.

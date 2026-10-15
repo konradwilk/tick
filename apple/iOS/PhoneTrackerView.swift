@@ -277,6 +277,7 @@ import UIKit
                     Text("All changes are saved here. Use one device at a time.").font(.caption)
                 }
                 Text("Timing continues when the app closes. Reopen and press Stop to finish.").font(.caption)
+                Text("This is version \(BuildVersion.current)").font(.caption).textSelection(.enabled)
                 if let error = model.error { Text(error).foregroundStyle(.red) }
             }.navigationTitle("Settings")
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { settings = false } } }

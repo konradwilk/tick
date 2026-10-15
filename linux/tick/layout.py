@@ -1,6 +1,7 @@
 """Capture-first layout, with a report beside history when space allows."""
 from datetime import date
 from gi.repository import Gtk
+from .version import source_version
 
 
 def build_layout(window):
@@ -63,6 +64,7 @@ def build_layout(window):
     panel.append(window.location_label)
     panel.append(Gtk.Label(label="All changes are saved in this folder. Use one device at a time.", xalign=0, wrap=True))
     panel.append(Gtk.Label(label="Timing continues when the app closes. Reopen and press Stop to finish.", xalign=0, wrap=True))
+    panel.append(Gtk.Label(label="This is version " + source_version(), xalign=0, selectable=True))
     done = Gtk.Button(label="Done")
     done.connect("clicked", lambda *_: window.settings_panel.set_reveal_child(False))
     panel.append(done)

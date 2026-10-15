@@ -13,6 +13,7 @@
 		A00000000000000000000033 /* ../Sources/HoursCore/StorageLocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000023 /* ../Sources/HoursCore/StorageLocation.swift */; };
 		A00000000000000000000034 /* PhoneTrackerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000024 /* PhoneTrackerView.swift */; };
 		A00000000000000000000035 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000025 /* Assets.xcassets */; };
+		A00000000000000000000036 /* BuildVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000026 /* BuildVersion.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -23,6 +24,7 @@
 		A00000000000000000000023 /* ../Sources/HoursCore/StorageLocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Sources/HoursCore/StorageLocation.swift; sourceTree = "<group>"; };
 		A00000000000000000000024 /* PhoneTrackerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneTrackerView.swift; sourceTree = "<group>"; };
 		A00000000000000000000025 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A00000000000000000000026 /* BuildVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildVersion.swift; sourceTree = DERIVED_FILE_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -45,6 +47,7 @@
 				A00000000000000000000023 /* ../Sources/HoursCore/StorageLocation.swift */,
 				A00000000000000000000024 /* PhoneTrackerView.swift */,
 				A00000000000000000000025 /* Assets.xcassets */,
+				A00000000000000000000026 /* BuildVersion.swift */,
 				A00000000000000000000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -64,6 +67,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = A00000000000000000000011 /* Build configuration list for PBXNativeTarget "tick" */;
 			buildPhases = (
+				A00000000000000000000009 /* Generate version */,
 				A00000000000000000000006 /* Sources */,
 				A00000000000000000000007 /* Frameworks */,
 				A00000000000000000000008 /* Resources */,
@@ -127,10 +131,26 @@
 				A00000000000000000000032 /* ../Sources/HoursCore/PortableData.swift in Sources */,
 				A00000000000000000000033 /* ../Sources/HoursCore/StorageLocation.swift in Sources */,
 				A00000000000000000000034 /* PhoneTrackerView.swift in Sources */,
+				A00000000000000000000036 /* BuildVersion.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		A00000000000000000000009 /* Generate version */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = ();
+			inputPaths = ();
+			name = "Generate version";
+			outputPaths = ("$(DERIVED_FILE_DIR)/BuildVersion.swift",);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "python3 \"$SRCROOT/../../linux/tick/version.py\" --format swift --output \"$DERIVED_FILE_DIR/BuildVersion.swift\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
 		A00000000000000000000040 /* Debug */ = {

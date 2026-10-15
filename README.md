@@ -120,7 +120,9 @@ See `docs/session-schema.md`.
 
 ## Run the macOS app
 
-Requires macOS 14 or later and Swift 6. Build the app from the repository root:
+Requires macOS 14 or later, Swift 6, Git, and Python 3.9+ (`python3` on PATH).
+All clients derive their Settings version from release tags; see
+[versioning](docs/versioning.md). Build the app from the repository root:
 
 ```sh
 sh apple/scripts/build-macos.sh

@@ -222,6 +222,7 @@ struct TrackerView: View {
             Button("Data location…") { model.chooseDataLocation() }
             Text(model.dataLocation).font(.caption).textSelection(.enabled)
             Text("All changes are saved in this folder. Use one device at a time.").font(.caption)
+            Text("This is version \(BuildVersion.current)").font(.caption).textSelection(.enabled)
             Button("Done") { settings = false }
         }.padding(20).frame(width: 440)
         }.frame(maxHeight: 560)

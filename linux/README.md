@@ -1,5 +1,9 @@
 # Linux GTK
 
+Settings shows the version derived from Git release tags. When distributing
+without Git metadata, include a generated version stamp as described in
+[versioning](../docs/versioning.md).
+
 Native GTK 4 application written in Python with PyGObject. Includes nonprofit
 creation/selection, green Start/red Stop, notes, persisted sessions, elapsed time,
 history, total completed hours, and CSV export through a native save dialog.

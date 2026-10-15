@@ -7,6 +7,9 @@ Import exported CSV in Google Sheets using File → Import. Automatic sync is no
 
 ## Build
 
+Builds also require Git and Python 3.9+ on PATH to generate the Settings version
+from release tags. See [versioning](../docs/versioning.md).
+
 Install JDK 17, Android SDK platform 35, and Gradle 8.11.1. Open this directory
 in Android Studio, set the Gradle JDK to 17, and use the installed Gradle distribution.
 A Gradle wrapper binary is not bundled. To generate the standard wrapper with your
