@@ -22,8 +22,8 @@
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.4654" />
     <ProjectReference Include="../HoursCore/HoursCore.csproj" />
   </ItemGroup>
-  <!-- The .NET publish pipeline does not automatically include these WinUI outputs. -->
-  <Target Name="GenerateBuildVersion" BeforeTargets="BeforeCompile">
+  <!-- WinUI compiles a preliminary assembly before BeforeCompile runs. -->
+  <Target Name="GenerateBuildVersion" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <VersionPython Condition="'$(VersionPython)' == ''">python</VersionPython>
       <VersionSource>$(IntermediateOutputPath)BuildVersion.g.cs</VersionSource>
@@ -33,6 +33,7 @@
       <Compile Include="$(VersionSource)" />
     </ItemGroup>
   </Target>
+  <!-- The .NET publish pipeline does not automatically include these WinUI outputs. -->
   <Target Name="IncludeWinUIResourcesInPublish" AfterTargets="ComputeFilesToPublish">
     <ItemGroup>
       <_WinUIResource Include="$(TargetDir)$(AssemblyName).pri;$(TargetDir)**\*.xbf" />
