@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.IntentSenderRequest
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -14,6 +15,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -24,6 +30,8 @@ import android.content.ClipboardManager
 import android.content.Context
 
 class MainActivity : ComponentActivity() {
+    private val storageMutex = Mutex()
+    private suspend fun <T> storageOperation(block: () -> T): T = withContext(Dispatchers.IO) { storageMutex.withLock { block() } }
     private var focusGeneration by mutableStateOf(0)
 
     override fun onResume() {
@@ -39,16 +47,19 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val storage = StorageLocation(this)
-        val loaded = runCatching { storage.open() }
+        val googleAccount = GoogleAccount(this)
+        val googleAPI = GoogleSheetsAPI(googleAccount::accessToken)
         setContent { MaterialTheme {
-            var tracker by remember { mutableStateOf(loaded.getOrNull()) }
-            var storageError by remember { mutableStateOf(loaded.exceptionOrNull()?.message) }
+            val scope = rememberCoroutineScope()
+            var loading by remember { mutableStateOf(true) }
+            var tracker by remember { mutableStateOf<Tracker?>(null) }
+            var storageError by remember { mutableStateOf<String?>(null) }
             var location by remember { mutableStateOf(storage.label) }
             var openSettingsOnLoad by rememberSaveable { mutableStateOf(false) }
             val chooseFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
-                if (uri != null) {
+                if (uri != null) scope.launch {
                     try {
-                        val next = storage.select(uri, tracker)
+                        val next = storageOperation { storage.select(uri, tracker) }
                         openSettingsOnLoad = tracker == null && next.state.nonprofits.isEmpty()
                         tracker = next
                         location = storage.label
@@ -56,9 +67,63 @@ class MainActivity : ComponentActivity() {
                     } catch (error: Exception) { storageError = error.message }
                 }
             }
+            var sheetsDialog by rememberSaveable { mutableStateOf(false) }
+            var sheetsName by rememberSaveable { mutableStateOf("Time is Clearly Kept") }
+            var sheetId by rememberSaveable { mutableStateOf("") }
+            var googleFiles by remember { mutableStateOf<List<GoogleSpreadsheet>>(emptyList()) }
+            var googleSignedIn by remember { mutableStateOf(false) }
+            var googleBusy by remember { mutableStateOf(false) }
+            var sheetsError by remember { mutableStateOf<String?>(null) }
+            val googleConsent = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+                scope.launch {
+                    try {
+                        googleBusy = true
+                        googleFiles = storageOperation { googleAccount.accept(result.data); googleAPI.spreadsheets() }
+                        googleSignedIn = true; sheetsError = null
+                    } catch (error: Exception) { sheetsError = error.message }
+                    finally { googleBusy = false }
+                }
+            }
+            if (sheetsDialog) AlertDialog(
+                onDismissRequest = { if (!googleBusy) sheetsDialog = false }, title = { Text("Google Sheets") },
+                text = { Column(Modifier.verticalScroll(rememberScrollState())) {
+                    Text("Sign in, then create a spreadsheet or open one Tick can access. Internet is required.")
+                    if (googleSignedIn) {
+                        TextButton(onClick = { sheetId = "" }, enabled = !googleBusy) { Text(if (sheetId.isEmpty()) "✓ Create a new spreadsheet" else "Create a new spreadsheet") }
+                        googleFiles.forEach { file -> TextButton(onClick = { sheetId = file.id }, enabled = !googleBusy) { Text((if (sheetId == file.id) "✓ " else "") + file.name) } }
+                        if (sheetId.isEmpty()) OutlinedTextField(sheetsName, { sheetsName = it }, label = { Text("Spreadsheet name") }, enabled = !googleBusy)
+                        Text("New spreadsheets receive your current data. Existing Tick data opens without merging. Use one device at a time.")
+                    }
+                    if (googleBusy) CircularProgressIndicator()
+                    sheetsError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                } },
+                confirmButton = { TextButton(enabled = !googleBusy, onClick = { scope.launch {
+                    googleBusy = true; sheetsError = null
+                    try {
+                        if (!googleSignedIn) {
+                            googleFiles = storageOperation { googleAccount.authorize(); googleAPI.spreadsheets() }
+                            googleSignedIn = true
+                        } else {
+                            val next = storageOperation {
+                                val store = if (sheetId.isEmpty()) googleAPI.create(sheetsName) else SheetsStore(googleAPI, sheetId, googleFiles.first { it.id == sheetId }.name)
+                                storage.selectSheets(store, tracker)
+                            }
+                            tracker = next; location = storage.label; storageError = null
+                            openSettingsOnLoad = next.state.nonprofits.isEmpty(); sheetsDialog = false
+                        }
+                    } catch (required: GoogleAuthorizationRequired) {
+                        googleConsent.launch(IntentSenderRequest.Builder(required.pendingIntent.intentSender).build())
+                    } catch (error: Exception) { sheetsError = error.message }
+                    finally { googleBusy = false }
+                } }) { Text(if (googleSignedIn) "Connect" else "Sign in with Google") } },
+                dismissButton = { TextButton(onClick = { sheetsDialog = false }, enabled = !googleBusy) { Text("Cancel") } }
+            )
             var promptedForFolder by rememberSaveable { mutableStateOf(false) }
             var explainingDataLocation by rememberSaveable { mutableStateOf(false) }
             LaunchedEffect(Unit) {
+                val loaded = runCatching { storageOperation { storage.open() } }
+                tracker = loaded.getOrNull(); storageError = loaded.exceptionOrNull()?.message
+                location = storage.label; loading = false
                 if (!promptedForFolder && loaded.isSuccess && tracker == null) {
                     promptedForFolder = true
                     explainingDataLocation = true
@@ -68,12 +133,12 @@ class MainActivity : ComponentActivity() {
                 AlertDialog(
                     onDismissRequest = { explainingDataLocation = false },
                     title = { Text("Choose where to keep your data") },
-                    text = { Text("Time is Clearkly Kept saves your projects and tracked hours in a JSON file named tick.json. Choose a folder where Time is Clearkly Kept can create this file, or select a folder containing your existing tick.json to continue using it. You can change the location later in Settings.") },
+                    text = { Text("Choose Local file (tick.json) for offline storage in a folder, or Google Sheets to share data across devices over the internet. You can switch in Settings. An empty destination receives your current data; an existing destination is opened without merging.") },
                     confirmButton = { TextButton(onClick = {
                         explainingDataLocation = false
                         chooseFolder.launch(null)
-                    }) { Text("Choose data folder…") } },
-                    dismissButton = { TextButton(onClick = { explainingDataLocation = false }) { Text("Later") } }
+                    }) { Text("Local file (tick.json)…") } },
+                    dismissButton = { Column { TextButton(onClick = { explainingDataLocation = false; sheetsDialog = true }) { Text("Google Sheets…") }; TextButton(onClick = { explainingDataLocation = false }) { Text("Later") } } }
                 )
             }
             Surface(Modifier.fillMaxSize()) {
@@ -81,10 +146,12 @@ class MainActivity : ComponentActivity() {
                     storageError?.let { Text(it, Modifier.padding(20.dp), color = MaterialTheme.colorScheme.error) }
                     Box(Modifier.weight(1f)) {
                         val current = tracker
-                        if (current != null) key(current) { TrackerScreen(current, location, openSettingsOnLoad, focusGeneration) { chooseFolder.launch(null) } }
+                        if (current != null) key(current) { TrackerScreen(current, location, openSettingsOnLoad, focusGeneration, chooseSheets = { sheetsDialog = true }) { chooseFolder.launch(null) } }
+                        else if (loading) CircularProgressIndicator()
                         else Column(Modifier.padding(20.dp)) {
-                            Text("Time is Clearkly Kept saves your projects and tracked hours in a JSON file named tick.json. Choose a folder where Time is Clearkly Kept can create this file, or select a folder containing your existing tick.json to continue using it. You can change the location later in Settings.")
-                            OutlinedButton(onClick = { chooseFolder.launch(null) }) { Text("Data location…") }
+                            Text("Choose Local file (tick.json) for offline storage in a folder, or Google Sheets to share data across devices over the internet. You can switch in Settings. An empty destination receives your current data; an existing destination is opened without merging.")
+                            OutlinedButton(onClick = { chooseFolder.launch(null) }) { Text("Local file (tick.json)…") }
+                            OutlinedButton(onClick = { sheetsDialog = true }) { Text("Google Sheets…") }
                         }
                     }
                 }
@@ -92,7 +159,8 @@ class MainActivity : ComponentActivity() {
         } }
     }
 
-    @Composable private fun TrackerScreen(tracker: Tracker, location: String, initialSettings: Boolean, focusGeneration: Int, chooseFolder: () -> Unit) {
+    @Composable private fun TrackerScreen(tracker: Tracker, location: String, initialSettings: Boolean, focusGeneration: Int, chooseSheets: () -> Unit, chooseFolder: () -> Unit) {
+        val scope = rememberCoroutineScope()
         var state by remember { mutableStateOf(tracker.state) }
         val projectPreferences = remember { getSharedPreferences("hours-project", MODE_PRIVATE) }
         var selected by rememberSaveable {
@@ -109,7 +177,7 @@ class MainActivity : ComponentActivity() {
         LaunchedEffect(tracker, focusGeneration) {
             try {
                 val previousActive = state.active
-                tracker.reload()
+                storageOperation { tracker.reload() }
                 state = tracker.state
                 selected = state.active?.projectId
                     ?: state.nonprofits.find { it.id == selected }?.id
@@ -150,10 +218,12 @@ class MainActivity : ComponentActivity() {
         var manualError by remember { mutableStateOf<String?>(null) }
         val reportRange = runCatching { ExportRange.forDate(ExportPeriod.valueOf(reportPeriod), LocalDate.parse(reportDate)) }.getOrNull()
         val reportCount = reportRange?.let { tracker.exportSessions(it).size } ?: 0
-        fun action(block: () -> Unit) {
-            try { block(); error = null }
-            catch (e: Exception) { error = e.message ?: "Unable to save hours." }
-            finally { state = tracker.state }
+        fun action(block: suspend () -> Unit) {
+            scope.launch {
+                try { block(); error = null }
+                catch (e: Exception) { error = e.message ?: "Unable to save hours." }
+                finally { state = tracker.state }
+            }
         }
         val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
             if (uri != null) action {
@@ -169,8 +239,10 @@ class MainActivity : ComponentActivity() {
             onDismissRequest = { settings = false }, title = { Text("Settings") },
             text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(name, { name = it }, label = { Text("New project") }, enabled = active == null)
-                Button(onClick = { action { selected = tracker.addNonprofit(name); name = "" } }, enabled = active == null && name.isNotBlank()) { Text("Add nonprofit") }
-                OutlinedButton(onClick = chooseFolder) { Text("Data location…") }
+                Button(onClick = { action { selected = storageOperation { tracker.addNonprofit(name) }; name = "" } }, enabled = active == null && name.isNotBlank()) { Text("Add nonprofit") }
+                Text("Data storage: Local file works offline; Google Sheets shares data online.")
+                OutlinedButton(onClick = chooseFolder) { Text("Local file (tick.json)…") }
+                OutlinedButton(onClick = { settings = false; chooseSheets() }) { Text("Google Sheets…") }
                 OutlinedButton(onClick = { settings = false
                     manualId = state.nonprofits.find { it.id == projectPreferences.getString("lastManualProject", null) }?.id
                     manual = true; manualError = null; manualConfirmation = null }) { Text("Add session by hand…") }
@@ -216,18 +288,18 @@ class MainActivity : ComponentActivity() {
                 }
                 manualError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             } },
-            confirmButton = { TextButton(onClick = {
+            confirmButton = { TextButton(onClick = { scope.launch {
                 try {
-                    tracker.reload()
+                    storageOperation { tracker.reload() }
                     state = tracker.state
                     val latest = tracker.sessionConflicts(localTime(manualStart), localTime(manualEnd))
                     val signature = "$manualId|$manualNotes|$manualStart|$manualEnd|" + latest.joinToString(";") { "${it.session.sessionId}|${it.session.startTimeUtc}|${it.session.endTimeUtc}" }
                     if (latest.isNotEmpty() && manualConfirmation != signature) {
                         manualConfirmation = signature
                         manualError = "Review the conflicts. Choose Save anyway to confirm intentional overlap."
-                        return@TextButton
+                        return@launch
                     }
-                    tracker.addSession(requireNotNull(manualId) { "Select a project." }, manualNotes, localTime(manualStart), localTime(manualEnd))
+                    storageOperation { tracker.addSession(requireNotNull(manualId) { "Select a project." }, manualNotes, localTime(manualStart), localTime(manualEnd)) }
                     state = tracker.state
                     manualNotes = ""
                     val savedEnd = LocalDateTime.parse(manualEnd, manualFormat)
@@ -239,7 +311,7 @@ class MainActivity : ComponentActivity() {
                     error = null
                     copyStatus = ""
                 } catch (e: Exception) { manualError = e.message ?: "Could not save session." }
-            }) { Text(if (manualConflicts.isNotEmpty() && manualConfirmation == manualSignature) "Save anyway" else "Save") } },
+            } }) { Text(if (manualConflicts.isNotEmpty() && manualConfirmation == manualSignature) "Save anyway" else "Save") } },
             dismissButton = { TextButton(onClick = { manual = false }) { Text("Cancel") } }
         )
         editingId?.let { sessionId ->
@@ -254,14 +326,14 @@ class MainActivity : ComponentActivity() {
                         label = { Text("What did you work on?") }, minLines = 3, maxLines = 8)
                     editError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 } },
-                confirmButton = { TextButton(onClick = {
+                confirmButton = { TextButton(onClick = { scope.launch {
                     try {
-                        tracker.updateNotes(sessionId, editedNotes)
+                        storageOperation { tracker.updateNotes(sessionId, editedNotes) }
                         state = tracker.state
                         editingId = null
                         error = null
                     } catch (e: Exception) { editError = e.message ?: "Could not save notes." }
-                }) { Text("Save") } },
+                } }) { Text("Save") } },
                 dismissButton = { TextButton(onClick = { editingId = null }) { Text("Cancel") } }
             )
         }
@@ -274,7 +346,7 @@ class MainActivity : ComponentActivity() {
                     OutlinedTextField(editedEnd, { editedEnd = it }, label = { Text("Ended") }, singleLine = true)
                     timeError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 } },
-                confirmButton = { TextButton(onClick = {
+                confirmButton = { TextButton(onClick = { scope.launch {
                     try {
                         val original = requireNotNull(state.sessions.find { it.sessionId == sessionId }) { "The session could not be found." }
                         fun localTime(text: String, saved: String): Instant {
@@ -286,17 +358,17 @@ class MainActivity : ComponentActivity() {
                             require(offsets.size == 1) { "This local time is missing or repeated due to a clock change. Choose an unambiguous time." }
                             return local.toInstant(offsets.single())
                         }
-                        tracker.updateTimes(sessionId, localTime(editedStart, original.startTimeUtc), localTime(editedEnd, requireNotNull(original.endTimeUtc)))
+                        storageOperation { tracker.updateTimes(sessionId, localTime(editedStart, original.startTimeUtc), localTime(editedEnd, requireNotNull(original.endTimeUtc))) }
                         state = tracker.state
                         timeEditingId = null
                         copyStatus = ""
                         error = null
                     } catch (e: Exception) { timeError = e.message ?: "Could not save times." }
-                }) { Text("Save") } },
+                } }) { Text("Save") } },
                 dismissButton = { TextButton(onClick = { timeEditingId = null }) { Text("Cancel") } })
         }
         val history: @Composable () -> Unit = {
-            HistoryPanel(state, onDelete = { session -> action { tracker.deleteSession(session.sessionId); copyStatus = "" } }, onEditTimes = { session ->
+            HistoryPanel(state, onDelete = { session -> action { storageOperation { tracker.deleteSession(session.sessionId) }; copyStatus = "" } }, onEditTimes = { session ->
                 editedStart = Instant.parse(session.startTimeUtc).atZone(ZoneId.systemDefault()).format(timeFormat)
                 editedEnd = Instant.parse(session.endTimeUtc).atZone(ZoneId.systemDefault()).format(timeFormat)
                 timeError = null
@@ -323,7 +395,7 @@ class MainActivity : ComponentActivity() {
                 TextButton(onClick = { settings = true }) { Text("Settings") }
             }
             CapturePanel(state, selected, notes, now, { selected = it }, { notes = it },
-                onToggle = { action { if (active != null) { tracker.stop(); notes = "" } else selected?.let { tracker.start(it, notes) } } },
+                onToggle = { action { if (active != null) { storageOperation { tracker.stop() }; notes = "" } else selected?.let { storageOperation { tracker.start(it, notes) } } } },
                 onSettings = { settings = true })
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             HorizontalDivider()

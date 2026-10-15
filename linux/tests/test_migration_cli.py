@@ -1,0 +1,81 @@
+"""Run the real CLI path with fake Google sign-in and a real direct-API store."""
+import copy
+import importlib.util
+import io
+import json
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import patch
+from tick.core import FileStore,Tracker
+from tick.sheets import GoogleSheetsAPI
+
+spec=importlib.util.spec_from_file_location('migration_cli',Path(__file__).resolve().parents[2]/'tools/migrate_to_sheets.py')
+migration=importlib.util.module_from_spec(spec);spec.loader.exec_module(migration)
+
+class Account:
+    def __init__(self):self.signed_in=False;self.sign_ins=0
+    def access_token(self):
+        if not self.signed_in:raise ValueError('Sign in required')
+        return 'fake-token'
+    def sign_in(self):self.signed_in=True;self.sign_ins+=1;return self
+
+class MigrationCLITests(unittest.TestCase):
+    def test_new_browser_flow_default_and_custom_name(self):
+        for custom in (None,'My work hours'):
+            with self.subTest(name=custom), tempfile.TemporaryDirectory() as folder:
+                path=Path(folder)/'tick.json';tracker=Tracker(FileStore(path));tracker.add_nonprofit('Kitchen 🍲');original=path.read_bytes()
+                account=Account();rows=[];created=[];tables={};ids={0:"TickLog"}
+                def request(method,url,body=None):
+                    if method=='POST' and url.endswith('/spreadsheets'):
+                        created.append(body['properties']['title']);return {'spreadsheetId':'new-sheet'}
+                    if '?fields=' in url:return {'properties':{'title':created[0]},'sheets':[{'properties':{'title':'TickLog'}}]}
+                    if method=='GET':
+                        title=url.split('/values/')[1].split('!')[0]
+                        return {'values':copy.deepcopy(rows if title=='TickLog' else tables[title])}
+                    if ':batchUpdate' in url:
+                        for request in body['requests']:
+                            if 'addSheet' in request:
+                                props=request['addSheet']['properties'];ids[props['sheetId']]=props['title']
+                            if 'updateCells' in request:
+                                p=request['updateCells'];tables[ids[p['range']['sheetId']]]=[[next(iter(c['userEnteredValue'].values())) for c in row['values']] for row in p['rows']]
+                            if 'appendCells' in request: rows.extend([[next(iter(c['userEnteredValue'].values())) for c in row['values']] for row in request['appendCells']['rows']])
+                        return {}
+                    raise AssertionError((method,url))
+                api=GoogleSheetsAPI(account)
+                argv=[str(path)]+(['--name',custom] if custom else [])
+                output=io.StringIO()
+                with patch.object(migration,'GoogleAccount',return_value=account),patch.object(migration,'GoogleSheetsAPI',return_value=api),patch.object(api,'request',side_effect=request),patch('sys.stdout',output):
+                    self.assertEqual(migration.main(argv),0)
+                self.assertEqual(created,[custom or 'Time is Clearly Kept']);self.assertEqual(account.sign_ins,1)
+                self.assertEqual(path.read_bytes(),original)
+                self.assertIn('Migrated and verified',output.getvalue());self.assertIn('new-sheet/edit',output.getvalue())
+                self.assertEqual(json.loads(''.join(r[5] for r in rows)),tracker.state)
+
+    def test_dry_run_and_invalid_source_never_sign_in(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'tick.json';tracker=Tracker(FileStore(path));tracker.add_nonprofit('Kitchen')
+            with patch.object(migration,'GoogleAccount') as account,patch('sys.stdout',io.StringIO()):
+                self.assertEqual(migration.main([str(path),'--dry-run']),0);account.assert_not_called()
+            path.write_text('invalid')
+            with patch.object(migration,'GoogleAccount') as account,patch('sys.stderr',io.StringIO()):
+                self.assertEqual(migration.main([str(path)]),1);account.assert_not_called()
+
+    def test_upgrade_existing_needs_no_source_and_keeps_history(self):
+        from test_sheets import FakeAPI
+        from tick.sheets import SheetsStore
+        with tempfile.TemporaryDirectory() as folder:
+            tracker=Tracker(FileStore(Path(folder)/'tick.json'));tracker.add_nonprofit('Kitchen')
+            api=FakeAPI();SheetsStore(api,'existing').save(tracker.state)
+            history=copy.deepcopy(api.rows);api.tables.clear()
+            account=Account();account.signed_in=True
+            with patch.object(migration,'GoogleAccount',return_value=account),patch.object(migration,'GoogleSheetsAPI',return_value=api),patch('sys.stdout',io.StringIO()) as output:
+                self.assertEqual(migration.main(['--upgrade-existing','--spreadsheet','existing']),0)
+            self.assertEqual(api.rows,history)
+            self.assertEqual(api.tables['Projects'][1],['Kitchen',0,0])
+            self.assertIn('history is unchanged',output.getvalue())
+
+    def test_invalid_upgrade_arguments_never_sign_in(self):
+        for argv in ([],['--upgrade-existing'],['--upgrade-existing','--spreadsheet','sheet','--dry-run'],['source.json','--upgrade-existing','--spreadsheet','sheet']):
+            with self.subTest(args=argv),patch.object(migration,'GoogleAccount') as account,patch('sys.stderr',io.StringIO()):
+                self.assertEqual(migration.main(argv),1);account.assert_not_called()

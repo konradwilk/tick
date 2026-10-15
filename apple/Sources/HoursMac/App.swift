@@ -28,17 +28,29 @@ import HoursCore
     private let storage = StorageLocation()
     init() {
         do {
+            if let next = try storage.openSheets() {
+                tracker = next; state = next.state; selected = defaultProject
+                notes = state.active?.notes ?? ""; dataLocation = next.storageLabel
+                return
+            }
             let folder = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
             let location = try storage.resolve(defaultURL: folder.appending(path: "TimeIsClearlyKept/tick.json"))
             let file = location.selected ? location.url.appendingPathComponent("tick.json") : location.url
             guard FileManager.default.fileExists(atPath: file.path) else { needsDataLocation = true; return }
-            dataLocation = file.deletingLastPathComponent().path
+            dataLocation = "Local file: " + file.path
             let tracker = try Tracker(file: file, requireExisting: location.selected)
             self.tracker = tracker
             state = tracker.state
             selected = defaultProject
             notes = state.active?.notes ?? ""
         } catch { self.error = "Could not load saved hours: \(error.localizedDescription) Your saved file has not been changed." }
+    }
+    func connectSheets(store: SheetsStore) async throws {
+        let next = try await storage.selectSheets(store: store, current: tracker)
+        tracker = next; state = next.state; needsDataLocation = false
+        selected = defaultProject; notes = state.active?.notes ?? ""
+        dataLocation = next.storageLabel
+        error = nil
     }
     func reload() {
         guard let tracker else { return }
@@ -89,7 +101,7 @@ import HoursCore
             needsDataLocation = false
             tracker = next
             state = next.state
-            dataLocation = folder.path
+            dataLocation = next.storageLabel
             selected = defaultProject
             notes = state.active?.notes ?? ""
             error = nil

@@ -204,8 +204,24 @@ public sealed class StorageLocation(string settingsPath, string defaultPath)
 {
     private readonly string defaultDataPath = defaultPath;
     public string CurrentPath { get; private set; } = defaultPath;
+    private string SheetsSettingsPath => settingsPath + ".sheets";
+    public string Label => File.Exists(SheetsSettingsPath) ? "Google Sheets (online)" : "Local file: " + CurrentPath;
+    public Tracker SelectSheets(SheetsStore store, TrackerState? copy = null)
+    {
+        var state = store.Load(false);
+        if (state == null) { state = copy ?? TrackerState.Empty(); store.Save(state); }
+        var tracker = new Tracker(state, store.Save, () => store.Load()!);
+        FileStore.WriteAtomically(SheetsSettingsPath, JsonSerializer.SerializeToUtf8Bytes(store.Configuration));
+        return tracker;
+    }
     public Tracker Open()
     {
+        if (File.Exists(SheetsSettingsPath)) {
+            var config = JsonSerializer.Deserialize<SheetsConfiguration>(File.ReadAllText(SheetsSettingsPath)) ?? throw new InvalidDataException("Invalid Sheets settings.");
+            var sheets = new SheetsStore(config);
+            return new Tracker(sheets.Load()!, sheets.Save, () => sheets.Load()!);
+        }
+
         var selected = File.Exists(settingsPath);
         var path = selected ? JsonSerializer.Deserialize<string>(File.ReadAllText(settingsPath)) ?? throw new InvalidDataException("Invalid location setting.") : defaultDataPath;
         if (selected) path = Path.Combine(Path.GetDirectoryName(path)!, "tick.json");
@@ -221,6 +237,7 @@ public sealed class StorageLocation(string settingsPath, string defaultPath)
         var store = new FileStore(path);
         var next = new Tracker(store.Load(true), store.Save, () => store.Load(true));
         FileStore.WriteAtomically(settingsPath, JsonSerializer.SerializeToUtf8Bytes(path));
+        if (File.Exists(SheetsSettingsPath)) File.Delete(SheetsSettingsPath);
         CurrentPath = path;
         return next;
     }

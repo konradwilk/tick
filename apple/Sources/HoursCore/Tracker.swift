@@ -141,6 +141,8 @@ public final class Tracker {
     public private(set) var state: TrackerState
     public let file: URL
     private var snapshot: Data?
+    private var sheets: SheetsStore?
+    public var storageLabel: String { sheets == nil ? "Local file: " + file.path : "Google Sheets (online)" }
     // Coordinate access so cloud providers can download files and publish writes.
     private static func read(_ file: URL, requireExisting: Bool = true) throws -> Data? {
         if !requireExisting && !FileManager.default.fileExists(atPath: file.path) { return nil }
@@ -175,7 +177,23 @@ public final class Tracker {
             state = TrackerState()
         }
     }
+    /// Adopt a state already loaded and verified by SheetsStore on a worker task.
+    public init(sheets: SheetsStore, adopting state: TrackerState) throws {
+        _ = try PortableData.encode(state)
+        self.sheets = sheets; self.file = URL(fileURLWithPath: "/google-sheets"); self.state = state
+    }
+    public init(sheets: SheetsStore, copying current: TrackerState? = nil, requireExisting: Bool = false) throws {
+        self.sheets = sheets
+        self.file = URL(fileURLWithPath: "/google-sheets")
+        if let saved = try sheets.load(requireExisting: requireExisting, connect: !requireExisting) { state = saved }
+        else {
+            state = current ?? TrackerState()
+            try sheets.save(state)
+        }
+    }
     private func save(_ next: TrackerState) throws {
+        if let sheets { try sheets.save(next); state = next; return }
+
         if snapshot == nil {
             try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         }
@@ -201,7 +219,7 @@ public final class Tracker {
         try handle.close()
     }
     public func saveAs(_ destination: URL) throws -> Tracker {
-        if destination.standardizedFileURL == file.standardizedFileURL {
+        if sheets == nil && destination.standardizedFileURL == file.standardizedFileURL {
             try save(state)
             return self
         }
@@ -221,6 +239,7 @@ public final class Tracker {
         return nonprofit.id
     }
     public func reload() throws {
+        if let sheets { state = try sheets.load()!; return }
         // Decode before replacing the state and the snapshot used to detect conflicting writes.
         guard let data = try Self.read(file) else { throw CocoaError(.fileNoSuchFile) }
         let latest = try PortableData.decode(data)

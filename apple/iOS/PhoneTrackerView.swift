@@ -6,6 +6,7 @@ import UIKit
     @Bindable var model: PhoneModel
     @State private var newName = ""
     @State private var settings = false
+    @State private var connectingGoogle = false
     @State private var explainingDataLocation = false
     @State private var manualNonprofit: UUID?
     @State private var manualNotes = ""
@@ -34,8 +35,9 @@ import UIKit
         NavigationStack {
             VStack(spacing: 12) {
                 if model.needsDataLocation {
-                    Text("Time is Clearkly Kept saves your projects and tracked hours in a JSON file named tick.json. Choose a folder where Time is Clearkly Kept can create this file, or select a folder containing your existing tick.json to continue using it. You can change the location later in Settings.")
-                    Button("Choose data folder…") { selectingFile = false; choosingFolder = true }
+                    Text("Choose Local file (tick.json) for offline storage in a folder, or Google Sheets to share data across devices over the internet. You can switch in Settings. An empty destination receives your current data; an existing destination is opened without merging.")
+                    Button("Local file (tick.json)…") { selectingFile = false; choosingFolder = true }
+            Button("Google Sheets…") { settings = true }
                     Button("Open tick.json…") { selectingFile = true; choosingFolder = true }
                     Text("For OneDrive, open an existing tick.json file.").font(.caption)
                 }
@@ -61,10 +63,11 @@ import UIKit
             }
         }
         .alert("Choose where to keep your data", isPresented: $explainingDataLocation) {
-            Button("Choose data folder…") { selectingFile = false; choosingFolder = true }
+            Button("Local file (tick.json)…") { selectingFile = false; choosingFolder = true }
+            Button("Google Sheets…") { settings = true }
             Button("Open tick.json…") { selectingFile = true; choosingFolder = true }
             Button("Later", role: .cancel) { }
-        } message: { Text("Time is Clearkly Kept saves your projects and tracked hours in a JSON file named tick.json. Choose a folder where Time is Clearkly Kept can create this file, or select a folder containing your existing tick.json to continue using it. You can change the location later in Settings. For OneDrive, open an existing tick.json file.") }
+        } message: { Text("Choose Local file (tick.json) for offline storage in a folder, or Google Sheets to share data across devices over the internet. You can switch in Settings. An empty destination receives your current data; an existing destination is opened without merging. For OneDrive, open an existing tick.json file.") }
         .fileImporter(isPresented: $choosingFolder, allowedContentTypes: selectingFile ? [.json] : [.folder]) { result in
             switch result {
             case .success(let url):
@@ -269,17 +272,23 @@ import UIKit
                         .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }.disabled(model.tracker == nil || model.state.active != nil)
                 Section { manualSessionForm }
-                Section("Data location") {
-                    Button("Choose data folder…") { selectingFile = false; chooseFolderAfterSettings = true; settings = false }
+                Section("Data storage") {
+                    Text("Local file: works offline. Google Sheets: shared online storage.").font(.caption)
+            Button("Sign in with Google…") { connectingGoogle = true }
+            Text("Create a spreadsheet or open your existing Tick data. Internet is required.").font(.caption)
+
+
+                    Button("Local file (tick.json)…") { selectingFile = false; chooseFolderAfterSettings = true; settings = false }
                     Button("Open tick.json…") { selectingFile = true; chooseFolderAfterSettings = true; settings = false }
                     Text("For OneDrive, open an existing tick.json file.").font(.caption)
                     Text(model.location).font(.caption)
-                    Text("All changes are saved here. Use one device at a time.").font(.caption)
+                    Text("Use one device at a time; reload after a conflict.").font(.caption)
                 }
                 Text("Timing continues when the app closes. Reopen and press Stop to finish.").font(.caption)
                 Text("This is version \(BuildVersion.current)").font(.caption).textSelection(.enabled)
                 if let error = model.error { Text(error).foregroundStyle(.red) }
             }.navigationTitle("Settings")
+                .sheet(isPresented: $connectingGoogle) { GoogleSheetsConnectView { try await model.connectSheets(store: $0) } }
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { settings = false } } }
 
         }

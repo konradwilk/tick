@@ -54,7 +54,7 @@ public sealed partial class MainWindow : Window
                 Toggle.IsEnabled = ExportButton.IsEnabled = CopyButton.IsEnabled = false;
             if (e is FileNotFoundException or DirectoryNotFoundException)
             {
-                ErrorText.Text = "Choose where to save tick.json (Settings → Data location).";
+                ErrorText.Text = "Choose Local file or Google Sheets (Settings → Data storage).";
                 ((FrameworkElement)Content).Loaded += PromptForDataLocation;
             }
             else ErrorText.Text = "Could not load saved hours. Your file was not changed. " + e.Message;
@@ -83,12 +83,64 @@ public sealed partial class MainWindow : Window
         {
             XamlRoot = Controls.XamlRoot,
             Title = "Choose where to keep your data",
-            Content = new TextBlock { Text = "Time is Clearkly Kept saves your projects and tracked hours in a JSON file named tick.json. Choose a folder where Time is Clearkly Kept can create this file, or select a folder containing your existing tick.json to continue using it. You can change the location later in Settings.", TextWrapping = TextWrapping.Wrap },
-            PrimaryButtonText = "Choose data folder…",
+            Content = new TextBlock { Text = "Choose Local file (tick.json) for offline storage in a folder, or Google Sheets to share data across devices over the internet. You can switch in Settings. An empty destination receives your current data; an existing destination is opened without merging.", TextWrapping = TextWrapping.Wrap },
+            PrimaryButtonText = "Local file (tick.json)…",
+            SecondaryButtonText = "Google Sheets…",
             CloseButtonText = "Later",
             DefaultButton = ContentDialogButton.Primary
         };
-        if (await dialog.ShowAsync() == ContentDialogResult.Primary) ChooseDataLocation(sender, args);
+        var result = await dialog.ShowAsync();
+        if (result == ContentDialogResult.Primary) ChooseDataLocation(sender, args);
+        else if (result == ContentDialogResult.Secondary) ChooseSheets(sender, args);
+    }
+    private async void ChooseSheets(object sender, RoutedEventArgs args)
+    {
+        var account = new GoogleAccount(); var api = new GoogleSheetsAPI(account);
+        using var cancel = new CancellationTokenSource();
+        var choices = new ComboBox { Header = "Spreadsheet", Visibility = Visibility.Collapsed };
+        choices.Items.Add(new GoogleSpreadsheet("", "Create a new spreadsheet")); choices.SelectedIndex = 0;
+        var name = new TextBox { Text = "Time is Clearly Kept", Header = "Spreadsheet name", Visibility = Visibility.Collapsed };
+        choices.SelectionChanged += (_, _) => name.Visibility = choices.SelectedIndex == 0 ? Visibility.Visible : Visibility.Collapsed;
+        var error = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        var panel = new StackPanel { Spacing = 12 };
+        panel.Children.Add(new TextBlock { Text = "Sign in, then create a spreadsheet or open one Tick can access. New spreadsheets receive your current data. Existing Tick data opens without merging. Use one device at a time.", TextWrapping = TextWrapping.Wrap });
+        panel.Children.Add(choices); panel.Children.Add(name); panel.Children.Add(error);
+        var dialog = new ContentDialog { XamlRoot = Controls.XamlRoot, Title = "Google Sheets", Content = panel, PrimaryButtonText = "Sign in with Google", CloseButtonText = "Cancel" };
+        Tracker? next = null; bool signedIn = false;
+        dialog.CloseButtonClick += (_, _) => cancel.Cancel();
+        dialog.PrimaryButtonClick += async (_, eventArgs) => {
+            var deferral = eventArgs.GetDeferral();
+            try {
+                dialog.IsPrimaryButtonEnabled = false; error.Text = "Connecting to Google…";
+                if (!signedIn) {
+                    await account.SignInAsync(cancel.Token);
+                    var files = await Task.Run(api.List, cancel.Token);
+                    foreach (var file in files) choices.Items.Add(file);
+                    signedIn = true; choices.Visibility = name.Visibility = Visibility.Visible;
+                    dialog.PrimaryButtonText = "Connect"; dialog.SecondaryButtonText = "Sign out";
+                    eventArgs.Cancel = true;
+                } else {
+                    var file = (GoogleSpreadsheet)choices.SelectedItem; var title = name.Text; var state = tracker?.State;
+                    next = await Task.Run(() => {
+                        var store = file.Id.Length == 0 ? api.Create(title) : new SheetsStore(new SheetsConfiguration(file.Id,file.Name),api);
+                        return location.SelectSheets(store,state);
+                    },cancel.Token);
+                }
+                error.Text = "";
+            } catch (Exception problem) { eventArgs.Cancel = true; error.Text = problem.Message; }
+            finally { dialog.IsPrimaryButtonEnabled = true; deferral.Complete(); }
+        };
+        dialog.SecondaryButtonClick += (_, eventArgs) => {
+            eventArgs.Cancel = true;
+            try { account.SignOut(); signedIn = false; choices.Items.Clear(); choices.Items.Add(new GoogleSpreadsheet("","Create a new spreadsheet")); choices.SelectedIndex=0;
+                choices.Visibility = name.Visibility = Visibility.Collapsed; dialog.PrimaryButtonText="Sign in with Google"; dialog.SecondaryButtonText=""; }
+            catch (Exception problem) { error.Text=problem.Message; }
+        };
+        await dialog.ShowAsync(); cancel.Cancel();
+        if (next == null) return;
+        tracker = next; Refresh(); Nonprofits.SelectedItem = DefaultProject();
+        Notes.Text = tracker.State.Active?.Notes ?? ""; ErrorText.Text = "";
+        SettingsPanel.Visibility = Visibility.Visible;
     }
     private void Perform(Action action)
     {
@@ -111,7 +163,7 @@ public sealed partial class MainWindow : Window
     private void Refresh()
     {
         Toggle.IsEnabled = true;
-        DataLocation.Text = Path.GetDirectoryName(location.CurrentPath);
+        DataLocation.Text = location.Label;
         var state = tracker!.State;
         FirstRun.Visibility = state.Nonprofits.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
         EmptyHistory.Visibility = state.Sessions.Length == 0 ? Visibility.Visible : Visibility.Collapsed;

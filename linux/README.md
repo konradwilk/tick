@@ -16,7 +16,7 @@ compilation are needed. Use the system Python that provides the GTK bindings.
 Ubuntu 22.04+ / Debian 12+:
 
 ```sh
-sudo apt install python3 python3-gi gir1.2-gtk-4.0
+sudo apt install python3 python3-gi gir1.2-gtk-4.0 libsecret-tools
 ```
 
 Fedora:
@@ -48,7 +48,9 @@ local data. Dates are UTC ISO-8601 and sessions use `platform: linux`.
 
 Export includes completed sessions only, handles quotes/newlines, and neutralizes
 spreadsheet formulas in text fields. In Google Sheets use File → Import to load
-the CSV. Automatic sync, tray integration, an installer, and signing are not included.
+the CSV. Direct Google Sheets storage is available through Google sign-in; see
+[Google Sheets setup](../docs/google-sheets.md). Tray integration, an installer,
+and signing are not included.
 Changing the system clock affects elapsed time; stopping before the start is rejected.
 
 ## Tests
@@ -67,7 +69,8 @@ cd linux
 PYTHONPATH=. xvfb-run -a dbus-run-session -- /usr/bin/python3 tests/gtk_smoke.py
 ```
 
-The Native clients workflow runs both and uploads the Linux source package.
+The Native clients workflow runs both on Ubuntu and tests the Python code on
+Windows and macOS as well.
 The smoke test covers window creation, Start/Stop, selection locking, and restart
 recovery. The interactive export dialog still needs a manual desktop check.
 

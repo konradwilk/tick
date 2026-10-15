@@ -1,0 +1,74 @@
+name: Native clients
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  python:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      PYTHONPATH: linux
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m unittest discover -s linux/tests -v
+      - run: python tools/migrate_to_sheets.py --help
+  apple:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: swift test --package-path apple
+      - run: xcodebuild -quiet -project apple/iOS/tick.xcodeproj -scheme tick -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - run: dotnet test windows/HoursCore.Tests/HoursCore.Tests.csproj
+      - run: dotnet publish windows/tick/tick.csproj -c Release -p:Platform=x64 -r win-x64 -o windows/publish
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tick-windows-x64
+          path: windows/publish
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - run: gradle -p android testDebugUnitTest assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tick-android-debug
+          path: android/app/build/outputs/apk/debug/*.apk
+  linux-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y python3-gi gir1.2-gtk-4.0 xvfb dbus-x11 libsecret-tools
+      - run: PYTHONPATH=linux xvfb-run -a dbus-run-session -- /usr/bin/python3 linux/tests/gtk_smoke.py

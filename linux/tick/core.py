@@ -328,7 +328,18 @@ class StorageLocation:
     def open(self):
         if not self.settings.exists():
             return Tracker(FileStore(data_path(), require_existing=True))
-        path = Path(json.loads(self.settings.read_text(encoding="utf-8"))["path"]).parent / "tick.json"
+        config = json.loads(self.settings.read_text(encoding="utf-8"))
+        if config.get("kind") == "googleSheets":
+            from .sheets import GoogleSheetsAPI, SheetsStore
+            from .google_auth import GoogleAccount
+            if "sheetId" not in config:
+                raise ValueError("Reconnect with Google sign-in in Settings. Your previous spreadsheet is unchanged.")
+            store = SheetsStore(GoogleSheetsAPI(GoogleAccount()), config["sheetId"], config.get("spreadsheetName", "Time is Clearly Kept"))
+            state = store.load(require_existing=True)
+            tracker = Tracker.__new__(Tracker)
+            tracker.store, tracker.state = store, state
+            return tracker
+        path = Path(config["path"]).parent / "tick.json"
         return Tracker(FileStore(path, require_existing=True))
 
     def select(self, folder, current=None):
@@ -352,3 +363,21 @@ class StorageLocation:
             if temporary and os.path.exists(temporary):
                 os.unlink(temporary)
         return next_tracker
+
+
+    def select_sheets(self, store, current=None):
+        state = store.load()
+        if state is None:
+            state = copy.deepcopy(current.state) if current else {"schemaVersion": 1, "deviceId": str(uuid4()), "nonprofits": [], "sessions": []}
+            store.save(state)
+        tracker = Tracker.__new__(Tracker)
+        tracker.store, tracker.state = store, state
+        self.settings.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=self.settings.parent, delete=False) as stream:
+            temporary = stream.name
+            json.dump({"kind": "googleSheets", "sheetId": store.sheet_id, "spreadsheetName": store.spreadsheet_name}, stream)
+            stream.flush(); os.fsync(stream.fileno())
+        try: os.replace(temporary, self.settings)
+        finally:
+            if os.path.exists(temporary): os.unlink(temporary)
+        return tracker

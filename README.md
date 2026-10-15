@@ -1,6 +1,6 @@
 # Time is Clearly Kept (TICK)
 
-Native time-tracking apps for Android, iPhone, macOS, Windows, and Linux that save data in a local JSON file (`tick.json`), with optional CSV export.
+Native time-tracking apps for Android, iPhone, macOS, Windows, and Linux with a choice of local JSON (`tick.json`) or Google Sheets API storage, plus CSV export.
 
 ## Goals
 - One-tap Start / Stop time tracking
@@ -24,7 +24,7 @@ first project is selected.
 History and **Export & copy** sit side by side in wide windows and stack on
 phones or narrow windows. Capture stays visible while the workspace scrolls.
 The report panel previews the exact summary produced by **Copy summary**.
-Use **Settings** for adding project and choosing the data folder.
+Use **Settings** for adding projects and choosing **Local file** or **Google Sheets** storage.
 
 In all five apps, choose **Settings → Add session by hand** to record completed
 work. Manual entry remembers its last selected project across app launches,
@@ -178,21 +178,26 @@ smoke test on Ubuntu.
 
 ## Configure where data is stored
 
-On first launch, if `tick.json` is missing, the app prompts you to choose where
-to save it. Choose a folder to create `tick.json`, or open an existing `tick.json`
-by choosing its folder. Canceling leaves tracking disabled; use **Data location**
-to choose a folder when ready. The new file is saved immediately, even before
-you record any hours.
+On first launch and in Settings, all five apps offer two choices:
 
-Use **Data location** to change the folder later. The app remembers it and automatically
-reads and saves `tick.json` there on every launch and change. If the file
-already exists, its data is loaded; otherwise the current data is copied into the
-folder, preserving the original. This is a persistent setting, not an import/export
-step. Select the corresponding shared folder on your other devices.
+- **Local file (tick.json)**: choose a folder or existing file; local folders work offline.
+- **Google Sheets**: sign in with Google, then create or open a spreadsheet. Internet is required; no Apps Script setup or access key is needed.
 
-All five clients use the same versioned JSON format and accept the earlier Apple
-and Android formats. Use one device at a time and let any cloud synchronization
-finish before switching devices. See [storage behavior and compatibility](docs/data-storage.md).
+The app remembers your choice. An empty destination receives your current data;
+an existing destination opens without merging. The previous destination is preserved.
+Use one device at a time; stale Sheets saves are rejected, and concurrent revisions are retained for recovery.
+
+See [Google Sheets setup and Python migration](docs/google-sheets.md). The separate
+migration tool validates, uploads, and verifies an existing `tick.json`, leaving
+its source untouched:
+
+```sh
+python3 tools/migrate_to_sheets.py /path/to/tick.json --dry-run
+python3 tools/migrate_to_sheets.py /path/to/tick.json --name "Time is Clearly Kept"
+```
+
+Use `python` on Windows. The tool opens your browser for Google sign-in and verifies the upload. See
+[storage behavior and compatibility](docs/data-storage.md) for local file details.
 
 [iPhone/iPad build instructions](apple/iOS/README.md).
 

@@ -34,6 +34,10 @@ import UIKit
 
     init() {
         do {
+            if let next = try storage.openSheets() {
+                adopt(next)
+                return
+            }
             let base = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
             let saved = try storage.resolve(defaultURL: base.appendingPathComponent("TimeIsClearlyKept/tick.json"))
             let file = saved.selected && !saved.isFile ? saved.url.appendingPathComponent("tick.json") : saved.url
@@ -47,7 +51,12 @@ import UIKit
         state = next.state
         selected = defaultProject
         notes = state.active?.notes ?? ""
-        location = next.file.path
+        location = next.storageLabel
+    }
+    func connectSheets(store: SheetsStore) async throws {
+        let next = try await storage.selectSheets(store: store, current: tracker)
+        adopt(next)
+        error = nil
     }
     func reload() {
         guard let tracker else { return }

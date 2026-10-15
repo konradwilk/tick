@@ -1,5 +1,10 @@
 # Shared data storage
 
+All clients offer Local file and Google Sheets in Settings and on first launch.
+See [Google Sheets setup and migration](google-sheets.md) for the API backend,
+network requirements, conflict handling, and the separate Python migration tool.
+The file-specific behavior below applies to Local file mode.
+
 Each client stores UTF-8 JSON with `schemaVersion: 1`, a device UUID, a
 `nonprofits` array (`id`, `name`), and a `sessions` array following
 [the session schema](session-schema.md). Timestamps include a timezone; writers

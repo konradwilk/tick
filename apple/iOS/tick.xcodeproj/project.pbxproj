@@ -14,6 +14,10 @@
 		A00000000000000000000034 /* PhoneTrackerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000024 /* PhoneTrackerView.swift */; };
 		A00000000000000000000035 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000025 /* Assets.xcassets */; };
 		A00000000000000000000036 /* BuildVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000026 /* BuildVersion.swift */; };
+		A00000000000000000000037 /* SheetsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000027 /* SheetsStore.swift */; };
+		A00000000000000000000038 /* ../Sources/HoursCore/GoogleAccount.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000028; };
+		A00000000000000000000039 /* ../Sources/HoursCore/GoogleSheetsConnectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000029; };
+		A0000000000000000000003A /* GoogleDesktopClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000002A; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -25,6 +29,10 @@
 		A00000000000000000000024 /* PhoneTrackerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneTrackerView.swift; sourceTree = "<group>"; };
 		A00000000000000000000025 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A00000000000000000000026 /* BuildVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildVersion.swift; sourceTree = DERIVED_FILE_DIR; };
+		A00000000000000000000027 /* SheetsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Sources/HoursCore/SheetsStore.swift; sourceTree = "<group>"; };
+		A00000000000000000000028 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Sources/HoursCore/GoogleAccount.swift; sourceTree = "<group>"; };
+		A00000000000000000000029 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Sources/HoursCore/GoogleSheetsConnectView.swift; sourceTree = "<group>"; };
+		A0000000000000000000002A = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleDesktopClient.swift; sourceTree = DERIVED_FILE_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -45,6 +53,10 @@
 				A00000000000000000000021 /* ../Sources/HoursCore/Tracker.swift */,
 				A00000000000000000000022 /* ../Sources/HoursCore/PortableData.swift */,
 				A00000000000000000000023 /* ../Sources/HoursCore/StorageLocation.swift */,
+                A00000000000000000000027 /* SheetsStore.swift */,
+                A0000000000000000000002A,
+                A00000000000000000000029,
+                A00000000000000000000028,
 				A00000000000000000000024 /* PhoneTrackerView.swift */,
 				A00000000000000000000025 /* Assets.xcassets */,
 				A00000000000000000000026 /* BuildVersion.swift */,
@@ -130,6 +142,10 @@
 				A00000000000000000000031 /* ../Sources/HoursCore/Tracker.swift in Sources */,
 				A00000000000000000000032 /* ../Sources/HoursCore/PortableData.swift in Sources */,
 				A00000000000000000000033 /* ../Sources/HoursCore/StorageLocation.swift in Sources */,
+                A00000000000000000000037 /* SheetsStore.swift in Sources */,
+                A0000000000000000000003A,
+                A00000000000000000000039,
+                A00000000000000000000038,
 				A00000000000000000000034 /* PhoneTrackerView.swift in Sources */,
 				A00000000000000000000036 /* BuildVersion.swift in Sources */,
 			);
@@ -145,10 +161,10 @@
 			files = ();
 			inputPaths = ();
 			name = "Generate version";
-			outputPaths = ("$(DERIVED_FILE_DIR)/BuildVersion.swift",);
+			outputPaths = ("$(DERIVED_FILE_DIR)/BuildVersion.swift", "$(DERIVED_FILE_DIR)/GoogleDesktopClient.swift",);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "python3 \"$SRCROOT/../../linux/tick/version.py\" --format swift --output \"$DERIVED_FILE_DIR/BuildVersion.swift\"\n";
+			shellScript = "python3 \"$SRCROOT/../../linux/tick/version.py\" --format swift --output \"$DERIVED_FILE_DIR/BuildVersion.swift\"\npython3 \"$SRCROOT/../../tools/configure_google.py\" --format swift --allow-unconfigured --output \"$DERIVED_FILE_DIR/GoogleDesktopClient.swift\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -183,7 +199,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 92X2Q2GS25;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+                INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Time is Clearly Kept";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -204,7 +221,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 92X2Q2GS25;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+                INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Time is Clearly Kept";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

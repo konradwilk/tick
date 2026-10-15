@@ -18,6 +18,16 @@ android {
         versionCode = 1
         versionName = sourceVersion
     }
+    // Keep locally registered Google OAuth debug signing stable; never commit the keystore.
+    val localDebugKey = rootProject.file("../tick-credentials/android-debug.keystore")
+    if (localDebugKey.isFile) {
+        signingConfigs.getByName("debug") {
+            storeFile = localDebugKey
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
     sourceSets.getByName("test").resources.srcDir("../../fixtures")
     buildFeatures { compose = true; buildConfig = true }
     compileOptions {
@@ -27,6 +37,7 @@ android {
     kotlinOptions { jvmTarget = "17" }
 }
 dependencies {
+    implementation("com.google.android.gms:play-services-auth:22.0.0")
     implementation(platform("androidx.compose:compose-bom:2025.04.01"))
     implementation("androidx.activity:activity-compose:1.10.1")
     implementation("androidx.compose.material3:material3")

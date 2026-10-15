@@ -32,7 +32,7 @@ class HoursWindow(Gtk.ApplicationWindow):
             self.name.set_sensitive(False)
             self.add.set_sensitive(False)
             if isinstance(error, FileNotFoundError):
-                self.error.set_text("Choose where to save tick.json to get started (Settings → Data location).")
+                self.error.set_text("Choose Local file or Google Sheets to get started (Settings → Data storage).")
                 GLib.idle_add(self.prompt_for_data_location)
             else:
                 self.error.set_text("Could not load saved hours. Your file was not changed. " + str(error))
@@ -59,13 +59,16 @@ class HoursWindow(Gtk.ApplicationWindow):
     def prompt_for_data_location(self):
         dialog = Gtk.MessageDialog(transient_for=self, modal=True,
             message_type=Gtk.MessageType.INFO, text="Choose where to keep your data",
-            secondary_text="Time is Clearkly Kept saves your projects and tracked hours in a JSON file named tick.json. Choose a folder where Time is Clearkly Kept can create this file, or select a folder containing your existing tick.json to continue using it. You can change the location later in Settings.")
+            secondary_text="Choose Local file (tick.json) for offline storage in a folder, or Google Sheets to share data across devices over the internet. You can switch in Settings. An empty destination receives your current data; an existing destination is opened without merging.")
         dialog.add_button("Later", Gtk.ResponseType.CANCEL)
-        dialog.add_button("Choose data folder…", Gtk.ResponseType.ACCEPT)
+        dialog.add_button("Local file (tick.json)…", Gtk.ResponseType.ACCEPT)
+        dialog.add_button("Google Sheets…", Gtk.ResponseType.APPLY)
         def respond(dialog, response):
             dialog.destroy()
             if response == Gtk.ResponseType.ACCEPT:
                 self.choose_data_location()
+            elif response == Gtk.ResponseType.APPLY:
+                self.choose_sheets()
         dialog.connect("response", respond)
         dialog.present()
         return GLib.SOURCE_REMOVE
@@ -125,7 +128,7 @@ class HoursWindow(Gtk.ApplicationWindow):
 
     def refresh(self):
         self.controls.set_sensitive(True)
-        self.location_label.set_text(str(self.tracker.store.path.parent))
+        self.location_label.set_text("Local file: " + str(self.tracker.store.path) if self.tracker.store.path else "Google Sheets (online)")
         state = self.tracker.state
         self.first_run.set_visible(not state["nonprofits"])
         selected = self.selected_id
@@ -451,6 +454,76 @@ class HoursWindow(Gtk.ApplicationWindow):
         else:
             self.clock.set_text("Ready when you are")
         return GLib.SOURCE_CONTINUE
+
+    def choose_sheets(self):
+        import threading
+        from .google_auth import GoogleAccount
+        from .sheets import GoogleSheetsAPI, SheetsStore
+        account = GoogleAccount()
+        api = GoogleSheetsAPI(account)
+        cancelled = threading.Event()
+        files = []
+        signed_in = False
+        dialog = Gtk.Dialog(title="Google Sheets", transient_for=self, modal=True)
+        dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        connect_button = dialog.add_button("Sign in with Google", Gtk.ResponseType.ACCEPT)
+        content = dialog.get_content_area(); content.set_spacing(12)
+        content.append(Gtk.Label(label="Sign in, then create a spreadsheet or open one Tick can access. Internet is required.", wrap=True))
+        choices = Gtk.DropDown(model=Gtk.StringList.new(["Create a new spreadsheet"]))
+        choices.set_visible(False); content.append(choices)
+        name = Gtk.Entry(text="Time is Clearly Kept", placeholder_text="Spreadsheet name")
+        name.set_visible(False); content.append(name)
+        choices.connect("notify::selected", lambda *_: name.set_visible(choices.get_selected() == 0))
+        status = Gtk.Label(wrap=True); content.append(status)
+        def run(operation, success, allow_cancel=True):
+            dialog.get_widget_for_response(Gtk.ResponseType.CANCEL).set_sensitive(allow_cancel)
+            dialog.set_deletable(allow_cancel)
+            connect_button.set_sensitive(False)
+            status.set_text("Connecting to Google…")
+            def work():
+                try:
+                    result = operation()
+                    GLib.idle_add(deliver, result, None)
+                except Exception as error: GLib.idle_add(deliver, None, str(error))
+            def deliver(result, error):
+                if cancelled.is_set(): return GLib.SOURCE_REMOVE
+                connect_button.set_sensitive(True); status.set_text(error or "")
+                dialog.get_widget_for_response(Gtk.ResponseType.CANCEL).set_sensitive(True)
+                dialog.set_deletable(True)
+                if error is None: success(result)
+                return GLib.SOURCE_REMOVE
+            threading.Thread(target=work, daemon=True).start()
+        def logged_in(result):
+            nonlocal files, signed_in
+            files = result; signed_in = True
+            choices.set_model(Gtk.StringList.new(["Create a new spreadsheet"] + [f["name"] for f in files]))
+            choices.set_visible(True); name.set_visible(True)
+            connect_button.set_label("Connect")
+            status.set_text("New spreadsheets receive your current data. Existing Tick data opens without merging. Use one device at a time.")
+        def connected(next_tracker):
+            self.tracker = next_tracker; self.selected_id = self.default_project()
+            self.notes.set_text(self.tracker.active["notes"] if self.tracker.active else "")
+            self.refresh()
+            if self.timer is None: self.timer = GLib.timeout_add_seconds(1, self.update_clock)
+            self.error.set_text(""); self.settings_panel.set_reveal_child(True)
+            dialog.destroy()
+        def respond(dialog, response):
+            if response != Gtk.ResponseType.ACCEPT:
+                cancelled.set(); dialog.destroy(); return
+            if not signed_in:
+                def login():
+                    account.sign_in(cancelled=cancelled)
+                    return api.list_spreadsheets()
+                run(login, logged_in)
+            else:
+                index = choices.get_selected(); title = name.get_text(); current = self.tracker
+                def connect():
+                    store = api.create(title) if index == 0 else SheetsStore(api, files[index-1]["id"], files[index-1]["name"])
+                    return self.location.select_sheets(store, current)
+                run(connect, connected, allow_cancel=False)
+        dialog.connect("response", respond)
+        dialog.connect("close-request", lambda *_: cancelled.set() or False)
+        dialog.present()
 
     def choose_data_location(self):
         if self.chooser:

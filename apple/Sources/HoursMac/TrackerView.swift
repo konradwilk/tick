@@ -5,6 +5,7 @@ struct TrackerView: View {
     @Bindable var model: AppModel
     @State private var newName = ""
     @State private var settings = false
+    @State private var connectingGoogle = false
     @State private var explainingDataLocation = false
     @State private var manualNonprofit: UUID?
     @State private var manualNotes = ""
@@ -26,8 +27,9 @@ struct TrackerView: View {
                     .popover(isPresented: $settings) { settingsView }
             }
             if model.needsDataLocation {
-                Text("Time is Clearkly Kept saves your projects and tracked hours in a JSON file named tick.json. Choose a folder where Time is Clearkly Kept can create this file, or select a folder containing your existing tick.json to continue using it. You can change the location later in Settings.")
-                Button("Choose data folder…") { model.chooseDataLocation() }
+                Text("Choose Local file (tick.json) for offline storage in a folder, or Google Sheets to share data across devices over the internet. You can switch in Settings. An empty destination receives your current data; an existing destination is opened without merging.")
+                Button("Local file (tick.json)…") { model.chooseDataLocation() }
+            Button("Google Sheets…") { settings = true }
             }
             HStack(alignment: .bottom, spacing: 20) {
                 Picker("Project", selection: $model.selected) {
@@ -65,9 +67,10 @@ struct TrackerView: View {
             }
         }
         .alert("Choose where to keep your data", isPresented: $explainingDataLocation) {
-            Button("Choose data folder…") { model.chooseDataLocation() }
+            Button("Local file (tick.json)…") { model.chooseDataLocation() }
+            Button("Google Sheets…") { settings = true }
             Button("Later", role: .cancel) { }
-        } message: { Text("Time is Clearkly Kept saves your projects and tracked hours in a JSON file named tick.json. Choose a folder where Time is Clearkly Kept can create this file, or select a folder containing your existing tick.json to continue using it. You can change the location later in Settings.") }
+        } message: { Text("Choose Local file (tick.json) for offline storage in a folder, or Google Sheets to share data across devices over the internet. You can switch in Settings. An empty destination receives your current data; an existing destination is opened without merging.") }
         .onChange(of: model.needsDataLocation) { wasNeeded, isNeeded in
             if wasNeeded && !isNeeded && model.state.nonprofits.isEmpty {
                 settings = true
@@ -219,13 +222,20 @@ struct TrackerView: View {
                     .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }.disabled(active != nil || model.tracker == nil)
             manualSessionForm
-            Button("Data location…") { model.chooseDataLocation() }
+            Text("Data storage").font(.headline)
+            Text("Local file: works offline. Google Sheets: shared online storage.").font(.caption)
+            Button("Local file (tick.json)…") { model.chooseDataLocation() }
+            Button("Sign in with Google…") { connectingGoogle = true }
+            Text("Create a spreadsheet or open your existing Tick data. Internet is required.").font(.caption)
+
+
             Text(model.dataLocation).font(.caption).textSelection(.enabled)
-            Text("All changes are saved in this folder. Use one device at a time.").font(.caption)
+            Text("Current storage is shown below. Use one device at a time; reload after a conflict.").font(.caption)
             Text("This is version \(BuildVersion.current)").font(.caption).textSelection(.enabled)
             Button("Done") { settings = false }
         }.padding(20).frame(width: 440)
         }.frame(maxHeight: 560)
+        .sheet(isPresented: $connectingGoogle) { GoogleSheetsConnectView { try await model.connectSheets(store: $0) } }
     }
     private func elapsed(_ seconds: Double) -> String {
         let value = max(0, Int(seconds))

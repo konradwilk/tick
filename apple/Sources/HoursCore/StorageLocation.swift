@@ -6,6 +6,23 @@ public final class StorageLocation {
     private var accessed: URL?
     public init(defaults: UserDefaults = .standard) { self.defaults = defaults }
     deinit { accessed?.stopAccessingSecurityScopedResource() }
+    public func openSheets() throws -> Tracker? {
+        guard let data = defaults.data(forKey: "hours.googleSheets") else { return nil }
+        let config = try JSONDecoder().decode(SheetsConfiguration.self, from: data)
+        return try Tracker(sheets: SheetsStore(configuration: config), requireExisting: true)
+    }
+    @MainActor public func selectSheets(store: SheetsStore, current: Tracker?) async throws -> Tracker {
+        let snapshot = current?.state
+        let state = try await Task.detached {
+            if let saved = try store.load(requireExisting: false) { return saved }
+            let initial = snapshot ?? TrackerState()
+            try store.save(initial)
+            return initial
+        }.value
+        let tracker = try Tracker(sheets: store, adopting: state)
+        defaults.set(try JSONEncoder().encode(store.configuration), forKey: "hours.googleSheets")
+        return tracker
+    }
     public func resolve(defaultURL: URL) throws -> (url: URL, selected: Bool, isFile: Bool) {
         guard let bookmark = defaults.data(forKey: "hours.dataFolder") else { return (defaultURL, false, false) }
         var stale = false
@@ -32,6 +49,7 @@ public final class StorageLocation {
         accessed = granted ? url : nil
         defaults.set(bookmark, forKey: "hours.dataFolder")
         defaults.set(isFile, forKey: "hours.dataLocationIsFile")
+        defaults.removeObject(forKey: "hours.googleSheets")
     }
 }
 

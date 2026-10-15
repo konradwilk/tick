@@ -72,7 +72,22 @@ class StorageLocation(private val context: Context) {
     var label: String = "Private app storage"
         private set
 
+    internal fun selectSheets(store: SheetsStore, current: Tracker?): Tracker {
+        val loaded = store.load(false)
+        val state = loaded ?: (current?.state ?: TrackerState()).also { store.save(it) }
+        val next = Tracker(state, reload = { requireNotNull(store.load()) }, save = store::save)
+        check(preferences.edit().putString("sheetId", store.sheetId).putString("sheetsName", store.spreadsheetName).remove("sheetsEndpoint").remove("sheetsKey").commit()) { "Could not remember your spreadsheet." }
+        label = "Google Sheets (online)"; return next
+    }
     fun open(): Tracker? {
+        preferences.getString("sheetId", null)?.let { id ->
+            val account = GoogleAccount(context)
+            val store = SheetsStore(GoogleSheetsAPI(account::accessToken), id, preferences.getString("sheetsName", "Time is Clearly Kept")!!)
+            val next = Tracker(requireNotNull(store.load()), reload = { requireNotNull(store.load()) }, save = store::save)
+            label = "Google Sheets (online)"; return next
+        }
+        check(!preferences.contains("sheetsEndpoint")) { "Reconnect with Google sign-in in Settings. Your previous spreadsheet is unchanged." }
+
         val saved = preferences.getString("tree", null)
         if (saved != null) {
             val tree = Uri.parse(saved)
@@ -106,7 +121,7 @@ class StorageLocation(private val context: Context) {
             created
         }
         val next = documentTracker(file)
-        check(preferences.edit().putString("tree", tree.toString()).commit()) { "Could not remember the data folder." }
+        check(preferences.edit().putString("tree", tree.toString()).remove("sheetId").remove("sheetsEndpoint").remove("sheetsKey").commit()) { "Could not remember the data folder." }
         label = tree.toString()
         return next
     }

@@ -21,3 +21,7 @@ windows/publish/
 __pycache__/
 *.py[cod]
 linux/tick/_version.txt
+
+# Maintainer Google OAuth downloads and generated installed-app configuration
+tick-credentials/
+linux/tick/google-client.json

@@ -1,3 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+  <Target Name="GenerateGoogleConfiguration" BeforeTargets="BeforeCompile">
+    <PropertyGroup><GooglePython Condition="'$(GooglePython)' == ''">python</GooglePython><GoogleSource>$(IntermediateOutputPath)GoogleDesktopClient.g.cs</GoogleSource></PropertyGroup>
+    <Exec Command="&quot;$(GooglePython)&quot; &quot;$(MSBuildProjectDirectory)/../../tools/configure_google.py&quot; --format csharp --allow-unconfigured --output &quot;$(GoogleSource)&quot;" />
+    <ItemGroup><Compile Include="$(GoogleSource)" /></ItemGroup>
+  </Target>
 </Project>

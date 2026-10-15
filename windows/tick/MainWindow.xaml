@@ -18,7 +18,7 @@
 <TextBlock Text="Settings" FontSize="20" FontWeight="SemiBold"/>
 <TextBox x:Name="NewName" Header="New project"/><Button x:Name="AddButton" Content="Add nonprofit" Click="AddNonprofit"/>
 <Button x:Name="ManualButton" Content="Add session by hand…" Click="AddManualSession"/>
-<Button Content="Data location…" Click="ChooseDataLocation"/><TextBlock x:Name="DataLocation" TextWrapping="Wrap" IsTextSelectionEnabled="True"/>
+<TextBlock Text="Data storage: Local file works offline; Google Sheets shares data online." TextWrapping="Wrap"/><Button Content="Local file (tick.json)…" Click="ChooseDataLocation"/><Button Content="Google Sheets…" Click="ChooseSheets"/><TextBlock x:Name="DataLocation" TextWrapping="Wrap" IsTextSelectionEnabled="True"/>
 <TextBlock Text="All changes are saved in this folder. Use one device at a time." TextWrapping="Wrap"/>
 <TextBlock Text="Closing this window hides it to the system tray. Timing continues until you press Stop." TextWrapping="Wrap"/>
 <TextBlock x:Name="VersionText" TextWrapping="Wrap" IsTextSelectionEnabled="True"/>
