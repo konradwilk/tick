@@ -7,6 +7,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.IntentSenderRequest
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -146,7 +149,7 @@ class MainActivity : ComponentActivity() {
                     storageError?.let { Text(it, Modifier.padding(20.dp), color = MaterialTheme.colorScheme.error) }
                     Box(Modifier.weight(1f)) {
                         val current = tracker
-                        if (current != null) key(current) { TrackerScreen(current, location, openSettingsOnLoad, focusGeneration, chooseSheets = { sheetsDialog = true }) { chooseFolder.launch(null) } }
+                        if (current != null) key(current) { TrackerScreen(current, location, storage.usesGoogleSheets, openSettingsOnLoad, focusGeneration, chooseSheets = { sheetsDialog = true }) { chooseFolder.launch(null) } }
                         else if (loading) CircularProgressIndicator()
                         else Column(Modifier.padding(20.dp)) {
                             Text("Choose Local file (tick.json) for offline storage in a folder, or Google Sheets to share data across devices over the internet. You can switch in Settings. An empty destination receives your current data; an existing destination is opened without merging.")
@@ -159,7 +162,22 @@ class MainActivity : ComponentActivity() {
         } }
     }
 
-    @Composable private fun TrackerScreen(tracker: Tracker, location: String, initialSettings: Boolean, focusGeneration: Int, chooseSheets: () -> Unit, chooseFolder: () -> Unit) {
+    @Composable private fun StorageOptionButton(title: String, active: Boolean, onClick: () -> Unit) {
+        val green = if (isSystemInDarkTheme()) Color(0xFF81C784) else Color(0xFF1B5E20)
+        OutlinedButton(
+            onClick = onClick, modifier = Modifier.fillMaxWidth(),
+            border = BorderStroke(if (active) 2.dp else 1.dp, if (active) green else MaterialTheme.colorScheme.outline),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = if (active) green.copy(alpha = 0.14f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
+                contentColor = MaterialTheme.colorScheme.onSurface
+            )
+        ) {
+            Text(title, modifier = Modifier.weight(1f))
+            Text(if (active) "✓ Active" else "Not active", color = if (active) green else MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+
+    @Composable private fun TrackerScreen(tracker: Tracker, location: String, usesGoogleSheets: Boolean, initialSettings: Boolean, focusGeneration: Int, chooseSheets: () -> Unit, chooseFolder: () -> Unit) {
         val scope = rememberCoroutineScope()
         var state by remember { mutableStateOf(tracker.state) }
         val projectPreferences = remember { getSharedPreferences("hours-project", MODE_PRIVATE) }
@@ -241,8 +259,8 @@ class MainActivity : ComponentActivity() {
                 OutlinedTextField(name, { name = it }, label = { Text("New project") }, enabled = active == null)
                 Button(onClick = { action { selected = storageOperation { tracker.addNonprofit(name) }; name = "" } }, enabled = active == null && name.isNotBlank()) { Text("Add nonprofit") }
                 Text("Data storage: Local file works offline; Google Sheets shares data online.")
-                OutlinedButton(onClick = chooseFolder) { Text("Local file (tick.json)…") }
-                OutlinedButton(onClick = { settings = false; chooseSheets() }) { Text("Google Sheets…") }
+                StorageOptionButton("Local file (tick.json)…", active = !usesGoogleSheets, onClick = chooseFolder)
+                StorageOptionButton("Google Sheets…", active = usesGoogleSheets, onClick = { settings = false; chooseSheets() })
                 OutlinedButton(onClick = { settings = false
                     manualId = state.nonprofits.find { it.id == projectPreferences.getString("lastManualProject", null) }?.id
                     manual = true; manualError = null; manualConfirmation = null }) { Text("Add session by hand…") }

@@ -205,7 +205,8 @@ public sealed class StorageLocation(string settingsPath, string defaultPath)
     private readonly string defaultDataPath = defaultPath;
     public string CurrentPath { get; private set; } = defaultPath;
     private string SheetsSettingsPath => settingsPath + ".sheets";
-    public string Label => File.Exists(SheetsSettingsPath) ? "Google Sheets (online)" : "Local file: " + CurrentPath;
+    public bool UsesGoogleSheets => File.Exists(SheetsSettingsPath);
+    public string Label => UsesGoogleSheets ? "Google Sheets (online)" : "Local file: " + CurrentPath;
     public Tracker SelectSheets(SheetsStore store, TrackerState? copy = null)
     {
         var state = store.Load(false);

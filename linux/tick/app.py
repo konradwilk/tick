@@ -56,6 +56,16 @@ class HoursWindow(Gtk.ApplicationWindow):
         except Exception as error:
             self.error.set_text("Could not reload saved hours. " + str(error))
 
+    def refresh_storage_choices(self):
+        uses_sheets = self.tracker is not None and self.tracker.store.path is None
+        for button, title, active in (
+            (self.local_storage_button, "Local file (tick.json)…", self.tracker is not None and not uses_sheets),
+            (self.sheets_storage_button, "Google Sheets…", uses_sheets),
+        ):
+            button.set_label(title + (" — ✓ Active" if active else " — Not active"))
+            button.remove_css_class("tick-storage-inactive" if active else "tick-storage-active")
+            button.add_css_class("tick-storage-active" if active else "tick-storage-inactive")
+
     def prompt_for_data_location(self):
         dialog = Gtk.MessageDialog(transient_for=self, modal=True,
             message_type=Gtk.MessageType.INFO, text="Choose where to keep your data",
@@ -128,6 +138,7 @@ class HoursWindow(Gtk.ApplicationWindow):
 
     def refresh(self):
         self.controls.set_sensitive(True)
+        self.refresh_storage_choices()
         self.location_label.set_text("Local file: " + str(self.tracker.store.path) if self.tracker.store.path else "Google Sheets (online)")
         state = self.tracker.state
         self.first_run.set_visible(not state["nonprofits"])

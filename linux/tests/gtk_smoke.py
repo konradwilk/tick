@@ -1,6 +1,7 @@
 """Run on Linux with a display (or xvfb-run); never touches real user data."""
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import os
 import gi
 
@@ -17,6 +18,21 @@ with tempfile.TemporaryDirectory() as directory:
     window = HoursWindow(app, path)
     window.present()
     assert window.error.get_text() == ""
+    assert window.local_storage_button.has_css_class("tick-storage-active")
+    assert "✓ Active" in window.local_storage_button.get_label()
+    assert window.sheets_storage_button.has_css_class("tick-storage-inactive")
+    # Show only the store actually in use, including before a location is chosen.
+    current = window.tracker
+    window.tracker = SimpleNamespace(store=SimpleNamespace(path=None))
+    window.refresh_storage_choices()
+    assert window.sheets_storage_button.has_css_class("tick-storage-active")
+    assert window.local_storage_button.has_css_class("tick-storage-inactive")
+    window.tracker = None
+    window.refresh_storage_choices()
+    assert window.local_storage_button.has_css_class("tick-storage-inactive")
+    assert window.sheets_storage_button.has_css_class("tick-storage-inactive")
+    window.tracker = current
+    window.refresh_storage_choices()
     assert not window.toggle.get_sensitive()
     assert not window.settings_panel.get_reveal_child()
     assert window.first_run.get_visible()

@@ -224,10 +224,9 @@ struct TrackerView: View {
             manualSessionForm
             Text("Data storage").font(.headline)
             Text("Local file: works offline. Google Sheets: shared online storage.").font(.caption)
-            Button("Local file (tick.json)…") { model.chooseDataLocation() }
-            Button("Sign in with Google…") { connectingGoogle = true }
-            Text("Create a spreadsheet or open your existing Tick data. Internet is required.").font(.caption)
-
+            StorageOptionButton("Local file (tick.json)…", symbol: "doc", isActive: model.tracker?.usesGoogleSheets == false) { model.chooseDataLocation() }
+            Text("Google Sheets requires internet access and Google sign-in. After signing in, create a spreadsheet or open your existing Tick data.").font(.caption)
+            StorageOptionButton("Sign in with Google…", symbol: "cloud", isActive: model.tracker?.usesGoogleSheets == true) { connectingGoogle = true }
 
             Text(model.dataLocation).font(.caption).textSelection(.enabled)
             Text("Current storage is shown below. Use one device at a time; reload after a conflict.").font(.caption)

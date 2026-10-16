@@ -58,10 +58,28 @@ def build_layout(window):
     manual.connect("clicked", lambda *_: window.add_manual_session())
     panel.append(manual)
     panel.append(Gtk.Label(label="Data storage: Local file works offline; Google Sheets shares data online.", xalign=0, wrap=True))
-    sheets = Gtk.Button(label="Google Sheets…")
+    provider = Gtk.CssProvider()
+    provider.load_from_data(b"""
+        button.tick-storage-active {
+            background-image: none;
+            background-color: rgba(46, 160, 67, 0.16);
+            border: 2px solid #2ea043;
+        }
+        button.tick-storage-inactive {
+            background-image: none;
+            background-color: rgba(128, 128, 128, 0.08);
+            border: 1px solid rgba(128, 128, 128, 0.4);
+        }
+    """)
+    Gtk.StyleContext.add_provider_for_display(window.get_display(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+    sheets = Gtk.Button(label="Google Sheets… — Not active")
+    window.sheets_storage_button = sheets
+    sheets.add_css_class("tick-storage-inactive")
     sheets.connect("clicked", lambda *_: window.choose_sheets())
     panel.append(sheets)
-    location = Gtk.Button(label="Local file (tick.json)…")
+    location = Gtk.Button(label="Local file (tick.json)… — Not active")
+    window.local_storage_button = location
+    location.add_css_class("tick-storage-inactive")
     location.connect("clicked", lambda *_: window.choose_data_location())
     panel.append(location)
     window.location_label = Gtk.Label(xalign=0, wrap=True, selectable=True)

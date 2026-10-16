@@ -30,6 +30,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        RefreshStorageChoices();
         VersionText.Text = "This is version " + BuildVersion.Current;
         AppWindow.Resize(new Windows.Graphics.SizeInt32(1100, 800));
         ReportDate.Date = DateTimeOffset.Now;
@@ -160,10 +161,29 @@ public sealed partial class MainWindow : Window
         else if (Nonprofits.SelectedItem is Nonprofit nonprofit) tracker.Start(nonprofit.Id, Notes.Text);
         else throw new InvalidOperationException("Select a project first.");
     });
+    private void RefreshStorageChoices()
+    {
+        void Update(Button button, string title, bool active)
+        {
+            button.Content = title + (active ? " — ✓ Active" : " — Not active");
+            button.Background = new SolidColorBrush(active
+                ? Windows.UI.Color.FromArgb(36, 46, 160, 67)
+                : Windows.UI.Color.FromArgb(18, 128, 128, 128));
+            button.BorderBrush = new SolidColorBrush(active
+                ? Windows.UI.Color.FromArgb(255, 46, 160, 67)
+                : Windows.UI.Color.FromArgb(100, 128, 128, 128));
+            button.BorderThickness = new Thickness(active ? 2 : 1);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetHelpText(button, active ? "Active storage" : "Not active");
+        }
+        Update(LocalStorageButton, "Local file (tick.json)…", tracker != null && !location.UsesGoogleSheets);
+        Update(SheetsStorageButton, "Google Sheets…", tracker != null && location.UsesGoogleSheets);
+    }
+
     private void Refresh()
     {
         Toggle.IsEnabled = true;
         DataLocation.Text = location.Label;
+        RefreshStorageChoices();
         var state = tracker!.State;
         FirstRun.Visibility = state.Nonprofits.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
         EmptyHistory.Visibility = state.Sessions.Length == 0 ? Visibility.Visible : Visibility.Collapsed;

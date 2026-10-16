@@ -274,11 +274,10 @@ import UIKit
                 Section { manualSessionForm }
                 Section("Data storage") {
                     Text("Local file: works offline. Google Sheets: shared online storage.").font(.caption)
-            Button("Sign in with Google…") { connectingGoogle = true }
-            Text("Create a spreadsheet or open your existing Tick data. Internet is required.").font(.caption)
+                    Text("Google Sheets requires internet access and Google sign-in. After signing in, create a spreadsheet or open your existing Tick data.").font(.caption)
+                    StorageOptionButton("Sign in with Google…", symbol: "cloud", isActive: model.tracker?.usesGoogleSheets == true) { connectingGoogle = true }
 
-
-                    Button("Local file (tick.json)…") { selectingFile = false; chooseFolderAfterSettings = true; settings = false }
+                    StorageOptionButton("Local file (tick.json)…", symbol: "doc", isActive: model.tracker?.usesGoogleSheets == false) { selectingFile = false; chooseFolderAfterSettings = true; settings = false }
                     Button("Open tick.json…") { selectingFile = true; chooseFolderAfterSettings = true; settings = false }
                     Text("For OneDrive, open an existing tick.json file.").font(.caption)
                     Text(model.location).font(.caption)

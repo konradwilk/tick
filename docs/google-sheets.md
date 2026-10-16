@@ -40,7 +40,9 @@ them on each save; install the updated app on every device.
 ## Connect in the app
 
 1. Choose **Google Sheets** in Settings or on first launch.
-2. Choose **Sign in with Google** and approve access to files you use with Tick.
+2. Choose **Sign in with Google** to start Google sign-in directly, then approve
+   access to files you use with Tick. The storage choices explain the internet
+   requirement before you sign in.
 3. Choose **Create a new spreadsheet**, or select an existing Tick spreadsheet
    that appears in the list.
 4. For a new spreadsheet, keep **Time is Clearly Kept** or enter another name.
@@ -48,7 +50,10 @@ them on each save; install the updated app on every device.
 
 A new spreadsheet receives your current projects and sessions. An existing Tick
 dataset opens without merging; its name and data are preserved. The choice is
-remembered. To switch back, choose Local file and a new folder to copy your current
+remembered. On macOS, iOS/iPadOS, Windows, Android, and Linux, Settings marks the
+current storage option in green with **✓ Active**; the other option is gray and
+labeled **Not active**. The highlight changes after a successful connection or
+folder selection. To switch back, choose Local file and a new folder to copy your current
 data, or an existing folder to open its `tick.json`.
 
 Internet is required. Local file storage remains available for offline work.
