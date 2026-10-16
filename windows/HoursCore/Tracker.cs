@@ -206,13 +206,15 @@ public sealed class StorageLocation(string settingsPath, string defaultPath)
     public string CurrentPath { get; private set; } = defaultPath;
     private string SheetsSettingsPath => settingsPath + ".sheets";
     public bool UsesGoogleSheets => File.Exists(SheetsSettingsPath);
-    public string Label => UsesGoogleSheets ? "Google Sheets (online)" : "Local file: " + CurrentPath;
+    private string spreadsheetName = "Time is Clearly Kept";
+    public string Label => UsesGoogleSheets ? "Google Sheets (online): " + spreadsheetName : "Local file: " + CurrentPath;
     public Tracker SelectSheets(SheetsStore store, TrackerState? copy = null)
     {
         var state = store.Load(false);
         if (state == null) { state = copy ?? TrackerState.Empty(); store.Save(state); }
         var tracker = new Tracker(state, store.Save, () => store.Load()!);
         FileStore.WriteAtomically(SheetsSettingsPath, JsonSerializer.SerializeToUtf8Bytes(store.Configuration));
+        spreadsheetName = store.Configuration.SpreadsheetName;
         return tracker;
     }
     public Tracker Open()
@@ -220,7 +222,9 @@ public sealed class StorageLocation(string settingsPath, string defaultPath)
         if (File.Exists(SheetsSettingsPath)) {
             var config = JsonSerializer.Deserialize<SheetsConfiguration>(File.ReadAllText(SheetsSettingsPath)) ?? throw new InvalidDataException("Invalid Sheets settings.");
             var sheets = new SheetsStore(config);
-            return new Tracker(sheets.Load()!, sheets.Save, () => sheets.Load()!);
+            var sheetsTracker = new Tracker(sheets.Load()!, sheets.Save, () => sheets.Load()!);
+            spreadsheetName = config.SpreadsheetName;
+            return sheetsTracker;
         }
 
         var selected = File.Exists(settingsPath);

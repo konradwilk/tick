@@ -143,7 +143,10 @@ public final class Tracker {
     private var snapshot: Data?
     private var sheets: SheetsStore?
     public var usesGoogleSheets: Bool { sheets != nil }
-    public var storageLabel: String { sheets == nil ? "Local file: " + file.path : "Google Sheets (online)" }
+    public var storageLabel: String {
+        if let sheets { return "Google Sheets (online): " + sheets.configuration.spreadsheetName }
+        return "Local file: " + file.path
+    }
     // Coordinate access so cloud providers can download files and publish writes.
     private static func read(_ file: URL, requireExisting: Bool = true) throws -> Data? {
         if !requireExisting && !FileManager.default.fileExists(atPath: file.path) { return nil }

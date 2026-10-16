@@ -79,14 +79,14 @@ class StorageLocation(private val context: Context) {
         val state = loaded ?: (current?.state ?: TrackerState()).also { store.save(it) }
         val next = Tracker(state, reload = { requireNotNull(store.load()) }, save = store::save)
         check(preferences.edit().putString("sheetId", store.sheetId).putString("sheetsName", store.spreadsheetName).remove("sheetsEndpoint").remove("sheetsKey").commit()) { "Could not remember your spreadsheet." }
-        label = "Google Sheets (online)"; usesGoogleSheets = true; return next
+        label = "Google Sheets (online): ${store.spreadsheetName}"; usesGoogleSheets = true; return next
     }
     fun open(): Tracker? {
         preferences.getString("sheetId", null)?.let { id ->
             val account = GoogleAccount(context)
             val store = SheetsStore(GoogleSheetsAPI(account::accessToken), id, preferences.getString("sheetsName", "Time is Clearly Kept")!!)
             val next = Tracker(requireNotNull(store.load()), reload = { requireNotNull(store.load()) }, save = store::save)
-            label = "Google Sheets (online)"; usesGoogleSheets = true; return next
+            label = "Google Sheets (online): ${store.spreadsheetName}"; usesGoogleSheets = true; return next
         }
         check(!preferences.contains("sheetsEndpoint")) { "Reconnect with Google sign-in in Settings. Your previous spreadsheet is unchanged." }
 

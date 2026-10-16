@@ -139,7 +139,7 @@ class HoursWindow(Gtk.ApplicationWindow):
     def refresh(self):
         self.controls.set_sensitive(True)
         self.refresh_storage_choices()
-        self.location_label.set_text("Local file: " + str(self.tracker.store.path) if self.tracker.store.path else "Google Sheets (online)")
+        self.location_label.set_text("Local file: " + str(self.tracker.store.path) if self.tracker.store.path else "Google Sheets (online): " + self.tracker.store.spreadsheet_name)
         state = self.tracker.state
         self.first_run.set_visible(not state["nonprofits"])
         selected = self.selected_id

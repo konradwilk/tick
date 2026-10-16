@@ -1,6 +1,8 @@
 # Shared data storage
 
 All clients offer Local file and Google Sheets in Settings and on first launch.
+In Google Sheets mode, Data storage shows `Google Sheets (online): <spreadsheet name>`
+on every platform, including after reopening the app.
 See [Google Sheets setup and migration](google-sheets.md) for the API backend,
 network requirements, conflict handling, and the separate Python migration tool.
 The file-specific behavior below applies to Local file mode.
