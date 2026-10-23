@@ -177,7 +177,7 @@ import HoursCore
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Save") {
+                WriteButton("Save") {
                     do {
                         guard let tracker = model.tracker else { throw TrackerError.missingSession }
                         try tracker.updateTimes(sessionId: session.sessionId, start: start, end: end)
@@ -214,7 +214,7 @@ struct SessionNotesEditor: View {
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Save") {
+                WriteButton("Save") {
                     do {
                         guard let tracker = model.tracker else { throw TrackerError.missingSession }
                         try tracker.updateNotes(sessionId: session.sessionId, notes: notes)
@@ -256,7 +256,7 @@ struct MenuBarTrackerView: View {
                     TextField("Notes (optional)", text: $model.notes)
                 }
             }
-            Button(action: model.toggleTracking) {
+            WriteButton(action: { model.toggleTracking() }) {
                 Label(active == nil ? "Start" : "Stop", systemImage: active == nil ? "play.fill" : "stop.fill")
                     .frame(maxWidth: .infinity).padding(.vertical, 6)
             }

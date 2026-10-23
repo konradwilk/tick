@@ -25,7 +25,7 @@ def build_layout(window):
     capture.append(window.nonprofits)
     window.toggle = Gtk.Button(label="Start")
     window.toggle.set_size_request(140, 48)
-    window.toggle.connect("clicked", lambda *_: window.toggle_tracking())
+    window.toggle.connect("clicked", lambda button: window.write_feedback.run(button, window.toggle_tracking, root))
     capture.append(window.toggle)
     window.controls.append(capture)
     window.clock = Gtk.Label(xalign=0, wrap=True)
@@ -49,9 +49,9 @@ def build_layout(window):
     body.append(window.settings_panel)
     panel.append(Gtk.Label(label="Settings", xalign=0))
     window.name = Gtk.Entry(placeholder_text="New project", hexpand=True)
-    window.name.connect("activate", lambda *_: window.add_nonprofit())
+    window.name.connect("activate", lambda *_: window.write_feedback.run(window.add, window.add_nonprofit, root))
     window.add = Gtk.Button(label="Add nonprofit")
-    window.add.connect("clicked", lambda *_: window.add_nonprofit())
+    window.add.connect("clicked", lambda *_: window.write_feedback.run(window.add, window.add_nonprofit, root))
     panel.append(window.name)
     panel.append(window.add)
     manual = Gtk.Button(label="Add session by hand…")
@@ -60,6 +60,12 @@ def build_layout(window):
     panel.append(Gtk.Label(label="Data storage: Local file works offline; Google Sheets shares data online.", xalign=0, wrap=True))
     provider = Gtk.CssProvider()
     provider.load_from_data(b"""
+        button.tick-writing, button.tick-writing:disabled {
+            background-image: none;
+            background-color: #9c6500;
+            color: white;
+            opacity: 1;
+        }
         button.tick-storage-active {
             background-image: none;
             background-color: rgba(46, 160, 67, 0.16);
@@ -127,7 +133,7 @@ def build_layout(window):
     window.export.connect("clicked", window.export_csv)
     report.append(window.export)
     window.copy = Gtk.Button(label="Copy summary", sensitive=False)
-    window.copy.connect("clicked", window.copy_report)
+    window.copy.connect("clicked", lambda button: window.write_feedback.run(button, window.copy_report, root))
     report.append(window.copy)
     window.copy_status = Gtk.Label(xalign=0, wrap=True)
     report.append(window.copy_status)

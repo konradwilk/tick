@@ -55,19 +55,23 @@ class MainActivity : ComponentActivity() {
         setContent { MaterialTheme {
             val scope = rememberCoroutineScope()
             var loading by remember { mutableStateOf(true) }
+            var storageBusy by remember { mutableStateOf(false) }
             var tracker by remember { mutableStateOf<Tracker?>(null) }
             var storageError by remember { mutableStateOf<String?>(null) }
             var location by remember { mutableStateOf(storage.label) }
             var openSettingsOnLoad by rememberSaveable { mutableStateOf(false) }
             val chooseFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
                 if (uri != null) scope.launch {
+                    storageBusy = true
                     try {
+                        delay(75)
                         val next = storageOperation { storage.select(uri, tracker) }
                         openSettingsOnLoad = tracker == null && next.state.nonprofits.isEmpty()
                         tracker = next
                         location = storage.label
                         storageError = null
                     } catch (error: Exception) { storageError = error.message }
+                    finally { storageBusy = false }
                 }
             }
             var sheetsDialog by rememberSaveable { mutableStateOf(false) }
@@ -100,7 +104,7 @@ class MainActivity : ComponentActivity() {
                     if (googleBusy) CircularProgressIndicator()
                     sheetsError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 } },
-                confirmButton = { TextButton(enabled = !googleBusy, onClick = { scope.launch {
+                confirmButton = { WriteButton(style = WriteButtonStyle.Text, enabled = !googleBusy, externalWorking = googleBusy, onClick = {
                     googleBusy = true; sheetsError = null
                     try {
                         if (!googleSignedIn) {
@@ -118,7 +122,7 @@ class MainActivity : ComponentActivity() {
                         googleConsent.launch(IntentSenderRequest.Builder(required.pendingIntent.intentSender).build())
                     } catch (error: Exception) { sheetsError = error.message }
                     finally { googleBusy = false }
-                } }) { Text(if (googleSignedIn) "Connect" else "Sign in with Google") } },
+                }) { Text(if (googleSignedIn) "Connect" else "Sign in with Google") } },
                 dismissButton = { TextButton(onClick = { sheetsDialog = false }, enabled = !googleBusy) { Text("Cancel") } }
             )
             var promptedForFolder by rememberSaveable { mutableStateOf(false) }
@@ -149,11 +153,11 @@ class MainActivity : ComponentActivity() {
                     storageError?.let { Text(it, Modifier.padding(20.dp), color = MaterialTheme.colorScheme.error) }
                     Box(Modifier.weight(1f)) {
                         val current = tracker
-                        if (current != null) key(current) { TrackerScreen(current, location, storage.usesGoogleSheets, openSettingsOnLoad, focusGeneration, chooseSheets = { sheetsDialog = true }) { chooseFolder.launch(null) } }
+                        if (current != null) key(current) { TrackerScreen(current, location, storage.usesGoogleSheets, openSettingsOnLoad, focusGeneration, storageBusy, chooseSheets = { sheetsDialog = true }) { chooseFolder.launch(null) } }
                         else if (loading) CircularProgressIndicator()
                         else Column(Modifier.padding(20.dp)) {
                             Text("Choose Local file (tick.json) for offline storage in a folder, or Google Sheets to share data across devices over the internet. You can switch in Settings. An empty destination receives your current data; an existing destination is opened without merging.")
-                            OutlinedButton(onClick = { chooseFolder.launch(null) }) { Text("Local file (tick.json)…") }
+                            WriteButton(style = WriteButtonStyle.Outlined, onClick = { chooseFolder.launch(null) }, externalWorking = storageBusy) { Text("Local file (tick.json)…") }
                             OutlinedButton(onClick = { sheetsDialog = true }) { Text("Google Sheets…") }
                         }
                     }
@@ -162,10 +166,10 @@ class MainActivity : ComponentActivity() {
         } }
     }
 
-    @Composable private fun StorageOptionButton(title: String, active: Boolean, onClick: () -> Unit) {
+    @Composable private fun StorageOptionButton(title: String, active: Boolean, working: Boolean = false, onClick: () -> Unit) {
         val green = if (isSystemInDarkTheme()) Color(0xFF81C784) else Color(0xFF1B5E20)
-        OutlinedButton(
-            onClick = onClick, modifier = Modifier.fillMaxWidth(),
+        WriteButton(
+            style = WriteButtonStyle.Outlined, onClick = { onClick() }, externalWorking = working, modifier = Modifier.fillMaxWidth(),
             border = BorderStroke(if (active) 2.dp else 1.dp, if (active) green else MaterialTheme.colorScheme.outline),
             colors = ButtonDefaults.outlinedButtonColors(
                 containerColor = if (active) green.copy(alpha = 0.14f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
@@ -177,7 +181,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    @Composable private fun TrackerScreen(tracker: Tracker, location: String, usesGoogleSheets: Boolean, initialSettings: Boolean, focusGeneration: Int, chooseSheets: () -> Unit, chooseFolder: () -> Unit) {
+    @Composable private fun TrackerScreen(tracker: Tracker, location: String, usesGoogleSheets: Boolean, initialSettings: Boolean, focusGeneration: Int, storageBusy: Boolean, chooseSheets: () -> Unit, chooseFolder: () -> Unit) {
         val scope = rememberCoroutineScope()
         var state by remember { mutableStateOf(tracker.state) }
         val projectPreferences = remember { getSharedPreferences("hours-project", MODE_PRIVATE) }
@@ -205,6 +209,7 @@ class MainActivity : ComponentActivity() {
         }
         var now by remember { mutableStateOf(Instant.now()) }
         var exportSnapshot by rememberSaveable { mutableStateOf("") }
+        var exporting by remember { mutableStateOf(false) }
         var editingId by rememberSaveable { mutableStateOf<String?>(null) }
         var editedNotes by rememberSaveable { mutableStateOf("") }
         var editError by remember { mutableStateOf<String?>(null) }
@@ -236,17 +241,25 @@ class MainActivity : ComponentActivity() {
         var manualError by remember { mutableStateOf<String?>(null) }
         val reportRange = runCatching { ExportRange.forDate(ExportPeriod.valueOf(reportPeriod), LocalDate.parse(reportDate)) }.getOrNull()
         val reportCount = reportRange?.let { tracker.exportSessions(it).size } ?: 0
-        fun action(block: suspend () -> Unit) {
-            scope.launch {
+        suspend fun action(block: suspend () -> Unit) {
+            run {
                 try { block(); error = null }
                 catch (e: Exception) { error = e.message ?: "Unable to save hours." }
                 finally { state = tracker.state }
             }
         }
         val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
-            if (uri != null) action {
-                val stream = requireNotNull(contentResolver.openOutputStream(uri, "wt")) { "Could not open export file." }
-                stream.bufferedWriter(Charsets.UTF_8).use { it.write(exportSnapshot) }
+            if (uri != null) scope.launch {
+                exporting = true
+                try {
+                    delay(75)
+                    val snapshot = exportSnapshot
+                    action { withContext(Dispatchers.IO) {
+                        val stream = requireNotNull(contentResolver.openOutputStream(uri, "wt")) { "Could not open export file." }
+                        stream.bufferedWriter(Charsets.UTF_8).use { it.write(snapshot) }
+                    } }
+                    delay(175)
+                } finally { exporting = false }
             }
         }
         LaunchedEffect(state.active?.sessionId) {
@@ -257,9 +270,9 @@ class MainActivity : ComponentActivity() {
             onDismissRequest = { settings = false }, title = { Text("Settings") },
             text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(name, { name = it }, label = { Text("New project") }, enabled = active == null)
-                Button(onClick = { action { selected = storageOperation { tracker.addNonprofit(name) }; name = "" } }, enabled = active == null && name.isNotBlank()) { Text("Add nonprofit") }
+                WriteButton(onClick = { action { selected = storageOperation { tracker.addNonprofit(name) }; name = "" } }, enabled = active == null && name.isNotBlank()) { Text("Add nonprofit") }
                 Text("Data storage: Local file works offline; Google Sheets shares data online.")
-                StorageOptionButton("Local file (tick.json)…", active = !usesGoogleSheets, onClick = chooseFolder)
+                StorageOptionButton("Local file (tick.json)…", active = !usesGoogleSheets, working = storageBusy, onClick = chooseFolder)
                 StorageOptionButton("Google Sheets…", active = usesGoogleSheets, onClick = { settings = false; chooseSheets() })
                 OutlinedButton(onClick = { settings = false
                     manualId = state.nonprofits.find { it.id == projectPreferences.getString("lastManualProject", null) }?.id
@@ -306,7 +319,7 @@ class MainActivity : ComponentActivity() {
                 }
                 manualError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             } },
-            confirmButton = { TextButton(onClick = { scope.launch {
+            confirmButton = { WriteButton(style = WriteButtonStyle.Text, onClick = {
                 try {
                     storageOperation { tracker.reload() }
                     state = tracker.state
@@ -315,7 +328,7 @@ class MainActivity : ComponentActivity() {
                     if (latest.isNotEmpty() && manualConfirmation != signature) {
                         manualConfirmation = signature
                         manualError = "Review the conflicts. Choose Save anyway to confirm intentional overlap."
-                        return@launch
+                        return@WriteButton
                     }
                     storageOperation { tracker.addSession(requireNotNull(manualId) { "Select a project." }, manualNotes, localTime(manualStart), localTime(manualEnd)) }
                     state = tracker.state
@@ -329,7 +342,7 @@ class MainActivity : ComponentActivity() {
                     error = null
                     copyStatus = ""
                 } catch (e: Exception) { manualError = e.message ?: "Could not save session." }
-            } }) { Text(if (manualConflicts.isNotEmpty() && manualConfirmation == manualSignature) "Save anyway" else "Save") } },
+            }) { Text(if (manualConflicts.isNotEmpty() && manualConfirmation == manualSignature) "Save anyway" else "Save") } },
             dismissButton = { TextButton(onClick = { manual = false }) { Text("Cancel") } }
         )
         editingId?.let { sessionId ->
@@ -344,14 +357,14 @@ class MainActivity : ComponentActivity() {
                         label = { Text("What did you work on?") }, minLines = 3, maxLines = 8)
                     editError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 } },
-                confirmButton = { TextButton(onClick = { scope.launch {
+                confirmButton = { WriteButton(style = WriteButtonStyle.Text, onClick = {
                     try {
                         storageOperation { tracker.updateNotes(sessionId, editedNotes) }
                         state = tracker.state
                         editingId = null
                         error = null
                     } catch (e: Exception) { editError = e.message ?: "Could not save notes." }
-                } }) { Text("Save") } },
+                }) { Text("Save") } },
                 dismissButton = { TextButton(onClick = { editingId = null }) { Text("Cancel") } }
             )
         }
@@ -364,7 +377,7 @@ class MainActivity : ComponentActivity() {
                     OutlinedTextField(editedEnd, { editedEnd = it }, label = { Text("Ended") }, singleLine = true)
                     timeError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 } },
-                confirmButton = { TextButton(onClick = { scope.launch {
+                confirmButton = { WriteButton(style = WriteButtonStyle.Text, onClick = {
                     try {
                         val original = requireNotNull(state.sessions.find { it.sessionId == sessionId }) { "The session could not be found." }
                         fun localTime(text: String, saved: String): Instant {
@@ -382,7 +395,7 @@ class MainActivity : ComponentActivity() {
                         copyStatus = ""
                         error = null
                     } catch (e: Exception) { timeError = e.message ?: "Could not save times." }
-                } }) { Text("Save") } },
+                }) { Text("Save") } },
                 dismissButton = { TextButton(onClick = { timeEditingId = null }) { Text("Cancel") } })
         }
         val history: @Composable () -> Unit = {
@@ -405,7 +418,7 @@ class MainActivity : ComponentActivity() {
                     val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     clipboard.setPrimaryClip(ClipData.newPlainText("Task durations and notes", tracker.clipboardText(range)))
                     copyStatus = "Copied durations and notes."
-                } } })
+                } } }, exporting = exporting)
         }
         Column(Modifier.fillMaxSize().imePadding().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

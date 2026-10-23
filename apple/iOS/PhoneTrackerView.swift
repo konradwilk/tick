@@ -19,6 +19,7 @@ import UIKit
     @State private var period = ExportPeriod.monthly
     @State private var date = Date()
     @State private var choosingFolder = false
+    @State private var storageWriting = false
     @State private var selectingFile = false
     @State private var chooseFolderAfterSettings = false
     @State private var exporting = false
@@ -36,9 +37,9 @@ import UIKit
             VStack(spacing: 12) {
                 if model.needsDataLocation {
                     Text("Choose Local file (tick.json) for offline storage in a folder, or Google Sheets to share data across devices over the internet. You can switch in Settings. An empty destination receives your current data; an existing destination is opened without merging.")
-                    Button("Local file (tick.json)…") { selectingFile = false; choosingFolder = true }
+                    WriteButton("Local file (tick.json)…", externalWorking: storageWriting && !selectingFile) { selectingFile = false; choosingFolder = true }
             Button("Google Sheets…") { settings = true }
-                    Button("Open tick.json…") { selectingFile = true; choosingFolder = true }
+                    WriteButton("Open tick.json…", externalWorking: storageWriting && selectingFile) { selectingFile = true; choosingFolder = true }
                     Text("For OneDrive, open an existing tick.json file.").font(.caption)
                 }
                 capture.padding(.horizontal)
@@ -71,8 +72,16 @@ import UIKit
         .fileImporter(isPresented: $choosingFolder, allowedContentTypes: selectingFile ? [.json] : [.folder]) { result in
             switch result {
             case .success(let url):
-                if selectingFile { model.selectFile(url) }
-                else { model.selectFolder(url) }
+                let file = selectingFile
+                storageWriting = true
+                Task { @MainActor in
+                    defer { storageWriting = false }
+                    do { try await Task.sleep(for: .milliseconds(75)) }
+                    catch { return }
+                    if file { model.selectFile(url) }
+                    else { model.selectFolder(url) }
+                    try? await Task.sleep(for: .milliseconds(175))
+                }
             case .failure(let error): model.error = error.localizedDescription
             }
         }
@@ -102,7 +111,7 @@ import UIKit
                 Text("Choose a project").tag(nil as UUID?)
                 ForEach(model.state.nonprofits) { Text($0.name).tag(Optional($0.id)) }
             }.disabled(model.tracker == nil || model.state.active != nil)
-            Button {
+            WriteButton {
                 model.perform { tracker in
                     if model.state.active != nil { try tracker.stop(); model.notes = "" }
                     else if let id = model.selected { try tracker.start(projectId: id, notes: model.notes, platform: "ios") }
@@ -143,7 +152,7 @@ import UIKit
                                         Button("Edit notes") { editing = session }
                                         Button("Edit times") { editingTimes = session }
                                         if let seconds = session.durationSeconds, seconds >= 0, seconds < 60 {
-                                            Button("Delete", role: .destructive) { model.perform { try $0.deleteSession(sessionId: session.sessionId); copyStatus = "" } }
+                                            WriteButton("Delete", role: .destructive) { model.perform { try $0.deleteSession(sessionId: session.sessionId); copyStatus = "" } }
                                         }
                                     }
                                 }
@@ -169,7 +178,7 @@ import UIKit
                 Text("Summary preview").font(.headline)
                 Text(count == 0 ? "No completed sessions in this period." : model.tracker?.clipboardText(range: range) ?? "")
                     .font(.system(.body, design: .monospaced)).textSelection(.enabled)
-                Button("Export CSV…") {
+                WriteButton("Export CSV…", externalWorking: exporting) {
                     guard let tracker = model.tracker else { return }
                     document = CSVDocument(text: tracker.csv(range: range))
                     let formatter = DateFormatter()
@@ -179,7 +188,7 @@ import UIKit
                     filename = "tick-\(period.rawValue.lowercased())-\(formatter.string(from: range.start))"
                     exporting = true
                 }.buttonStyle(.bordered).disabled(count == 0)
-                Button("Copy summary") {
+                WriteButton("Copy summary") {
                     guard let tracker = model.tracker else { return }
                     UIPasteboard.general.string = tracker.clipboardText(range: range)
                     copyStatus = "Copied durations and notes."
@@ -214,7 +223,7 @@ import UIKit
                     Text("Time overlap detected").foregroundStyle(.orange).bold()
                     ForEach(conflicts) { conflict in Text(conflict.description).font(.caption) }
                 }
-                Button(manualConfirmation == nil ? "Save session" : "Save anyway") {
+                WriteButton(manualConfirmation == nil ? "Save session" : "Save anyway") {
                     // Reload before checking overlap so manual entry uses shared history too.
                     guard let tracker = model.tracker else { return }
                     do {
@@ -268,7 +277,7 @@ import UIKit
             Form {
                 Section("Projects") {
                     TextField("New project", text: $newName)
-                    Button("Add project") { model.perform { model.selected = try $0.addNonprofit(newName); newName = "" } }
+                    WriteButton("Add project") { model.perform { model.selected = try $0.addNonprofit(newName); newName = "" } }
                         .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }.disabled(model.tracker == nil || model.state.active != nil)
                 Section { manualSessionForm }
@@ -277,8 +286,8 @@ import UIKit
                     Text("Google Sheets requires internet access and Google sign-in. After signing in, create a spreadsheet or open your existing Tick data.").font(.caption)
                     StorageOptionButton("Sign in with Google…", symbol: "cloud", isActive: model.tracker?.usesGoogleSheets == true) { connectingGoogle = true }
 
-                    StorageOptionButton("Local file (tick.json)…", symbol: "doc", isActive: model.tracker?.usesGoogleSheets == false) { selectingFile = false; chooseFolderAfterSettings = true; settings = false }
-                    Button("Open tick.json…") { selectingFile = true; chooseFolderAfterSettings = true; settings = false }
+                    StorageOptionButton("Local file (tick.json)…", symbol: "doc", isActive: model.tracker?.usesGoogleSheets == false, working: storageWriting && !selectingFile) { selectingFile = false; chooseFolderAfterSettings = true; settings = false }
+                    WriteButton("Open tick.json…", externalWorking: storageWriting && selectingFile) { selectingFile = true; chooseFolderAfterSettings = true; settings = false }
                     Text("For OneDrive, open an existing tick.json file.").font(.caption)
                     Text(model.location).font(.caption)
                     Text("Use one device at a time; reload after a conflict.").font(.caption)

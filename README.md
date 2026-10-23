@@ -26,6 +26,12 @@ phones or narrow windows. Capture stays visible while the workspace scrolls.
 The report panel previews the exact summary produced by **Copy summary**.
 Use **Settings** for adding projects and choosing **Local file** or **Google Sheets** storage.
 
+Across all five platforms, app buttons that write data turn amber and show
+**Working…** while the action runs. Repeated clicks are blocked, and the normal
+label, color, and availability return when the action finishes or fails. This
+includes saving edits, Start/Stop, deleting sessions, connecting storage, exporting,
+and copying. System file pickers retain their operating system's own appearance.
+
 In all five apps, choose **Settings → Add session by hand** to record completed
 work. Manual entry remembers its last selected project across app launches,
 independently of the tracking selector. Select a project, describe what you worked on, and enter the start and end

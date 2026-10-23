@@ -6,6 +6,7 @@ from gi.repository import Gtk, Gio, GLib, Gdk
 from datetime import datetime, timezone, date, timedelta
 from .core import FileStore, Tracker, data_path, elapsed, parse, StorageLocation, period_bounds
 from .layout import build_layout
+from .write_feedback import WriteFeedback
 
 
 class HoursWindow(Gtk.ApplicationWindow):
@@ -16,6 +17,7 @@ class HoursWindow(Gtk.ApplicationWindow):
         self.chooser = None
         self.selected_id = None
         self.refreshing_projects = False
+        self.write_feedback = WriteFeedback(GLib.timeout_add)
         self.location = StorageLocation()
         self.connect("close-request", self.on_close)
         build_layout(self)
@@ -42,7 +44,7 @@ class HoursWindow(Gtk.ApplicationWindow):
             self.reload()
 
     def reload(self):
-        if not self.tracker:
+        if not self.tracker or self.write_feedback.pending:
             return
         try:
             previous_active = self.tracker.active
@@ -201,7 +203,7 @@ class HoursWindow(Gtk.ApplicationWindow):
                 actions.append(times)
                 if session.get("durationSeconds") is not None and 0 <= session["durationSeconds"] < 60:
                     delete = Gtk.Button(label="Delete")
-                    delete.connect("clicked", lambda _, selected=session: self.perform(lambda: self.tracker.delete_session(selected["sessionId"])))
+                    delete.connect("clicked", lambda button, selected=session: self.write_feedback.run(button, lambda: self.perform(lambda: self.tracker.delete_session(selected["sessionId"])), self.get_child()))
                     actions.append(delete)
                 week_box.append(actions)
         self.update_clock()
@@ -363,7 +365,9 @@ class HoursWindow(Gtk.ApplicationWindow):
                 check_conflicts()
 
         dialog.connect("notify::is-active", on_manual_activation)
-        dialog.connect("response", respond)
+        dialog.connect("response", lambda owner, response: self.write_feedback.run(
+            owner.get_widget_for_response(response), lambda: respond(owner, response), owner
+        ) if response == Gtk.ResponseType.ACCEPT else respond(owner, response))
         dialog.present()
         return dialog
 
@@ -416,7 +420,9 @@ class HoursWindow(Gtk.ApplicationWindow):
                     error.set_text(str(problem))
                     return
             dialog.destroy()
-        dialog.connect("response", respond)
+        dialog.connect("response", lambda owner, response: self.write_feedback.run(
+            owner.get_widget_for_response(response), lambda: respond(owner, response), owner
+        ) if response == Gtk.ResponseType.ACCEPT else respond(owner, response))
         dialog.present()
         return dialog
 
@@ -453,7 +459,9 @@ class HoursWindow(Gtk.ApplicationWindow):
                     return
             dialog.destroy()
 
-        dialog.connect("response", respond)
+        dialog.connect("response", lambda owner, response: self.write_feedback.run(
+            owner.get_widget_for_response(response), lambda: respond(owner, response), owner
+        ) if response == Gtk.ResponseType.ACCEPT else respond(owner, response))
         dialog.present()
         return dialog
 
@@ -489,6 +497,9 @@ class HoursWindow(Gtk.ApplicationWindow):
         def run(operation, success, allow_cancel=True):
             dialog.get_widget_for_response(Gtk.ResponseType.CANCEL).set_sensitive(allow_cancel)
             dialog.set_deletable(allow_cancel)
+            original_label = connect_button.get_label()
+            connect_button.add_css_class("tick-writing")
+            connect_button.set_label("Working…")
             connect_button.set_sensitive(False)
             status.set_text("Connecting to Google…")
             def work():
@@ -498,6 +509,8 @@ class HoursWindow(Gtk.ApplicationWindow):
                 except Exception as error: GLib.idle_add(deliver, None, str(error))
             def deliver(result, error):
                 if cancelled.is_set(): return GLib.SOURCE_REMOVE
+                connect_button.set_label(original_label)
+                connect_button.remove_css_class("tick-writing")
                 connect_button.set_sensitive(True); status.set_text(error or "")
                 dialog.get_widget_for_response(Gtk.ResponseType.CANCEL).set_sensitive(True)
                 dialog.set_deletable(True)
@@ -542,7 +555,9 @@ class HoursWindow(Gtk.ApplicationWindow):
             return
         self.chooser = Gtk.FileChooserNative.new("Choose where to save tick.json", self,
             Gtk.FileChooserAction.SELECT_FOLDER, "Use this folder", "Cancel")
-        self.chooser.connect("response", self.on_data_response)
+        self.chooser.connect("response", lambda chooser, response: self.write_feedback.run(
+            self.local_storage_button, lambda: self.on_data_response(chooser, response), self.get_child()
+        ) if response == Gtk.ResponseType.ACCEPT else self.on_data_response(chooser, response))
         self.chooser.show()
 
     def on_data_response(self, chooser, response):
@@ -588,7 +603,9 @@ class HoursWindow(Gtk.ApplicationWindow):
         filter_.set_name("CSV files")
         filter_.add_pattern("*.csv")
         self.chooser.add_filter(filter_)
-        self.chooser.connect("response", self.on_export_response, snapshot)
+        self.chooser.connect("response", lambda chooser, response: self.write_feedback.run(
+            self.export, lambda: self.on_export_response(chooser, response, snapshot), self.get_child()
+        ) if response == Gtk.ResponseType.ACCEPT else self.on_export_response(chooser, response, snapshot))
         self.chooser.show()
 
     def report_selection(self):
@@ -642,6 +659,8 @@ class HoursWindow(Gtk.ApplicationWindow):
             self.chooser = None
 
     def on_close(self, *_):
+        if self.write_feedback.pending:
+            return True
         if self.layout_tick:
             self.remove_tick_callback(self.layout_tick)
             self.layout_tick = None

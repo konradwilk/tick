@@ -149,7 +149,7 @@ func duration(_ seconds: Int) -> String {
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("Save") {
+                        WriteButton("Save") {
                             do {
                                 guard let tracker = model.tracker else { throw TrackerError.missingSession }
                                 try tracker.updateTimes(sessionId: session.sessionId, start: start, end: end)
@@ -189,7 +189,7 @@ func duration(_ seconds: Int) -> String {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                    WriteButton("Save") {
                         do {
                             guard let tracker = model.tracker else { throw TrackerError.missingSession }
                             try tracker.updateNotes(sessionId: session.sessionId, notes: notes)

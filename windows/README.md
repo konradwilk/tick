@@ -9,6 +9,11 @@ In **History**, choose **Edit notes** on a completed session to update what you
 worked on. **Save** persists the notes and updates CSV exports; **Cancel** discards
 the edit. Session times and recorded hours stay unchanged.
 
+Buttons turn amber and show **Working…** while saving, starting/stopping a
+session, deleting, connecting storage, exporting, or copying. Repeat actions are
+blocked until the operation finishes, then the normal button appearance returns.
+Google Sheets writes run in the background so the window stays responsive.
+
 ## Build on Windows
 
 Install Git and Python 3.9+ (`python` on PATH) to generate the Settings version

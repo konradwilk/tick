@@ -28,7 +28,7 @@ struct TrackerView: View {
             }
             if model.needsDataLocation {
                 Text("Choose Local file (tick.json) for offline storage in a folder, or Google Sheets to share data across devices over the internet. You can switch in Settings. An empty destination receives your current data; an existing destination is opened without merging.")
-                Button("Local file (tick.json)…") { model.chooseDataLocation() }
+                WriteButton("Local file (tick.json)…") { model.chooseDataLocation() }
             Button("Google Sheets…") { settings = true }
             }
             HStack(alignment: .bottom, spacing: 20) {
@@ -36,7 +36,7 @@ struct TrackerView: View {
                     Text("Choose a project").tag(nil as UUID?)
                     ForEach(model.state.nonprofits) { Text($0.name).tag(Optional($0.id)) }
                 }.disabled(active != nil || model.tracker == nil)
-                Button(action: model.toggleTracking) {
+                WriteButton(action: { model.toggleTracking() }) {
                     Text(active == nil ? "Start" : "Stop").font(.title2.bold()).frame(minWidth: 120).padding(8)
                 }.buttonStyle(.borderedProminent).tint(active == nil ? .green : .red)
                     .disabled(model.tracker == nil || (active == nil && model.selected == nil))
@@ -67,7 +67,7 @@ struct TrackerView: View {
             }
         }
         .alert("Choose where to keep your data", isPresented: $explainingDataLocation) {
-            Button("Local file (tick.json)…") { model.chooseDataLocation() }
+            WriteButton("Local file (tick.json)…") { model.chooseDataLocation() }
             Button("Google Sheets…") { settings = true }
             Button("Later", role: .cancel) { }
         } message: { Text("Choose Local file (tick.json) for offline storage in a folder, or Google Sheets to share data across devices over the internet. You can switch in Settings. An empty destination receives your current data; an existing destination is opened without merging.") }
@@ -107,7 +107,7 @@ struct TrackerView: View {
                                         Button("Edit notes") { editingSession = session }
                                         Button("Edit times") { editingTimes = session }
                                         if let seconds = session.durationSeconds, seconds >= 0, seconds < 60 {
-                                            Button("Delete", role: .destructive) { model.perform { try $0.deleteSession(sessionId: session.sessionId) } }
+                                            WriteButton("Delete", role: .destructive) { model.perform { try $0.deleteSession(sessionId: session.sessionId) } }
                                         }
                                     }
                                 }
@@ -134,8 +134,8 @@ struct TrackerView: View {
                 Text(model.reportCount == 0 ? "No completed sessions in this period." : model.tracker?.clipboardText(range: model.reportRange) ?? "")
                     .font(.system(.body, design: .monospaced)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                 HStack {
-                    Button("Export CSV…") { model.export() }
-                    Button("Copy summary") { model.copyReport() }
+                    WriteButton("Export CSV…") { model.export() }
+                    WriteButton("Copy summary") { model.copyReport() }
                 }.disabled(model.reportCount == 0)
                 Text(model.copyStatus).font(.caption)
             }.padding(8).frame(maxWidth: .infinity, alignment: .leading)
@@ -165,7 +165,7 @@ struct TrackerView: View {
                     Text("Time overlap detected").foregroundStyle(.orange).bold()
                     ForEach(conflicts) { conflict in Text(conflict.description).font(.caption) }
                 }
-                Button(manualConfirmation == nil ? "Save session" : "Save anyway") {
+                WriteButton(manualConfirmation == nil ? "Save session" : "Save anyway") {
                     // Reload before checking overlap so manual entry uses shared history too.
                     guard let tracker = model.tracker else { return }
                     do {
@@ -218,7 +218,7 @@ struct TrackerView: View {
             Text("Settings").font(.title2)
             HStack {
                 TextField("New project", text: $newName)
-                Button("Add project") { model.perform { model.selected = try $0.addNonprofit(newName); newName = "" } }
+                WriteButton("Add project") { model.perform { model.selected = try $0.addNonprofit(newName); newName = "" } }
                     .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }.disabled(active != nil || model.tracker == nil)
             manualSessionForm

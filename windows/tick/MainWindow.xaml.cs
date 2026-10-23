@@ -9,6 +9,98 @@ public sealed partial class MainWindow : Window
 {
     private Tracker? tracker;
     private bool refreshingProjects;
+    private bool writing;
+    private async Task WriteAsync(Button? button, Func<Task> action, ContentDialog? dialog = null, bool allowCancel = false)
+    {
+        if (writing) return;
+        writing = true;
+        var root = (FrameworkElement)Content;
+        var rootHitTest = root.IsHitTestVisible;
+        var dialogHitTest = dialog?.IsHitTestVisible ?? true;
+        var background = button?.Background;
+        var foreground = button?.Foreground;
+        var label = button?.Content;
+        var contentBinding = button?.GetBindingExpression(Button.ContentProperty)?.ParentBinding;
+        var primary = button?.Name == "PrimaryButton";
+        var dialogLabel = dialog == null ? null : primary ? dialog.PrimaryButtonText : dialog.SecondaryButtonText;
+        var enabled = button?.IsEnabled ?? true;
+        var helpText = button == null ? "" : Microsoft.UI.Xaml.Automation.AutomationProperties.GetHelpText(button);
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        void BlockKeys(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs args) => args.Handled = true;
+        var keys = new[] { "ButtonBackground", "ButtonBackgroundPointerOver", "ButtonBackgroundPressed", "ButtonBackgroundDisabled", "ButtonForegroundDisabled" };
+        var previous = keys.Select(key => button?.Resources.ContainsKey(key) == true ? button.Resources[key] : null).ToArray();
+        try
+        {
+            root.IsHitTestVisible = false;
+            root.PreviewKeyDown += BlockKeys;
+            if (dialog != null && !allowCancel) { dialog.IsHitTestVisible = false; dialog.PreviewKeyDown += BlockKeys; }
+            if (button != null)
+            {
+                var busy = new SolidColorBrush(Colors.DarkGoldenrod);
+                button.Background = busy;
+                button.Foreground = new SolidColorBrush(Colors.White);
+                if (dialog == null) button.Content = "Working…";
+                else if (primary) dialog.PrimaryButtonText = "Working…";
+                else dialog.SecondaryButtonText = "Working…";
+                foreach (var key in keys) button.Resources[key] = key == "ButtonForegroundDisabled" ? new SolidColorBrush(Colors.White) : busy;
+                button.IsEnabled = false;
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetHelpText(button, "Working. Please wait.");
+            }
+            // Let Windows render the feedback before starting a write.
+            await Task.Delay(75);
+            await action();
+        }
+        finally
+        {
+            var remaining = 250 - (int)started.ElapsedMilliseconds;
+            if (remaining > 0) await Task.Delay(remaining);
+            if (button != null)
+            {
+                button.Background = background;
+                button.Foreground = foreground;
+                if (dialog != null)
+                {
+                    // Keep the dialog's binding intact and preserve labels changed by the action,
+                    // such as "Save anyway" or "Connect".
+                    if (primary && dialog.PrimaryButtonText == "Working…") dialog.PrimaryButtonText = dialogLabel;
+                    else if (!primary && dialog.SecondaryButtonText == "Working…") dialog.SecondaryButtonText = dialogLabel;
+                }
+                else if (contentBinding != null) button.SetBinding(Button.ContentProperty, contentBinding);
+                else button.Content = label;
+                button.IsEnabled = enabled;
+                for (var i = 0; i < keys.Length; i++)
+                    if (previous[i] is object value) button.Resources[keys[i]] = value;
+                    else button.Resources.Remove(keys[i]);
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetHelpText(button, helpText);
+            }
+            root.IsHitTestVisible = rootHitTest;
+            root.PreviewKeyDown -= BlockKeys;
+            if (dialog != null) dialog.IsHitTestVisible = dialogHitTest;
+            if (dialog != null) dialog.PreviewKeyDown -= BlockKeys;
+            writing = false;
+        }
+    }
+    private static Button? DialogButton(DependencyObject parent, string name)
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is Button button && button.Name == name) return button;
+            if (DialogButton(child, name) is Button found) return found;
+        }
+        return null;
+    }
+    private void HandleDialogWrite(ContentDialog dialog, Func<ContentDialogButtonClickEventArgs, Task> action, Func<bool>? allowCancel = null)
+    {
+        dialog.PrimaryButtonClick += async (_, args) =>
+        {
+            if (writing) { args.Cancel = true; return; }
+            var deferral = args.GetDeferral();
+            try { await WriteAsync(DialogButton(dialog, "PrimaryButton"), () => action(args), dialog, allowCancel?.Invoke() == true); }
+            catch (Exception e) { args.Cancel = true; ErrorText.Text = e.Message; }
+            finally { deferral.Complete(); }
+        };
+    }
     private readonly string projectSettingsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TimeIsClearlyKept", "last-project");
     private Nonprofit? DefaultProject()
@@ -63,7 +155,7 @@ public sealed partial class MainWindow : Window
     }
     private void Reload()
     {
-        if (tracker == null) return;
+        if (tracker == null || writing) return;
         try
         {
             var previousActive = tracker.State.Active;
@@ -109,10 +201,9 @@ public sealed partial class MainWindow : Window
         var dialog = new ContentDialog { XamlRoot = Controls.XamlRoot, Title = "Google Sheets", Content = panel, PrimaryButtonText = "Sign in with Google", CloseButtonText = "Cancel" };
         Tracker? next = null; bool signedIn = false;
         dialog.CloseButtonClick += (_, _) => cancel.Cancel();
-        dialog.PrimaryButtonClick += async (_, eventArgs) => {
-            var deferral = eventArgs.GetDeferral();
+        HandleDialogWrite(dialog, async eventArgs => {
             try {
-                dialog.IsPrimaryButtonEnabled = false; error.Text = "Connecting to Google…";
+                error.Text = "Connecting to Google…";
                 if (!signedIn) {
                     await account.SignInAsync(cancel.Token);
                     var files = await Task.Run(api.List, cancel.Token);
@@ -129,13 +220,15 @@ public sealed partial class MainWindow : Window
                 }
                 error.Text = "";
             } catch (Exception problem) { eventArgs.Cancel = true; error.Text = problem.Message; }
-            finally { dialog.IsPrimaryButtonEnabled = true; deferral.Complete(); }
-        };
-        dialog.SecondaryButtonClick += (_, eventArgs) => {
+        }, () => !signedIn);
+        dialog.SecondaryButtonClick += async (_, eventArgs) => {
             eventArgs.Cancel = true;
-            try { account.SignOut(); signedIn = false; choices.Items.Clear(); choices.Items.Add(new GoogleSpreadsheet("","Create a new spreadsheet")); choices.SelectedIndex=0;
+            if (writing) return;
+            var deferral = eventArgs.GetDeferral();
+            try { await WriteAsync(DialogButton(dialog, "SecondaryButton"), () => Task.Run(account.SignOut), dialog); signedIn = false; choices.Items.Clear(); choices.Items.Add(new GoogleSpreadsheet("","Create a new spreadsheet")); choices.SelectedIndex=0;
                 choices.Visibility = name.Visibility = Visibility.Collapsed; dialog.PrimaryButtonText="Sign in with Google"; dialog.SecondaryButtonText=""; }
             catch (Exception problem) { error.Text=problem.Message; }
+            finally { deferral.Complete(); }
         };
         await dialog.ShowAsync(); cancel.Cancel();
         if (next == null) return;
@@ -143,22 +236,24 @@ public sealed partial class MainWindow : Window
         Notes.Text = tracker.State.Active?.Notes ?? ""; ErrorText.Text = "";
         SettingsPanel.Visibility = Visibility.Visible;
     }
-    private void Perform(Action action)
+    private async void Perform(object sender, Func<Task> action)
     {
-        try { action(); ErrorText.Text = ""; Refresh(); }
+        if (writing) return;
+        try { await WriteAsync(sender as Button, action); ErrorText.Text = ""; Refresh(); }
         catch (Exception e) { if (tracker != null) Refresh(); ErrorText.Text = e.Message; }
     }
-    private void AddNonprofit(object sender, RoutedEventArgs args) => Perform(() =>
+    private void AddNonprofit(object sender, RoutedEventArgs args) => Perform(sender, async () =>
     {
-        var id = tracker!.AddNonprofit(NewName.Text);
+        var name = NewName.Text;
+        var id = await Task.Run(() => tracker!.AddNonprofit(name));
         NewName.Text = "";
         Refresh();
-        Nonprofits.SelectedItem = tracker.State.Nonprofits.First(n => n.Id == id);
+        Nonprofits.SelectedItem = tracker!.State.Nonprofits.First(n => n.Id == id);
     });
-    private void ToggleTracking(object sender, RoutedEventArgs args) => Perform(() =>
+    private void ToggleTracking(object sender, RoutedEventArgs args) => Perform(sender, async () =>
     {
-        if (tracker!.State.Active != null) { tracker.Stop(); Notes.Text = ""; }
-        else if (Nonprofits.SelectedItem is Nonprofit nonprofit) tracker.Start(nonprofit.Id, Notes.Text);
+        if (tracker!.State.Active != null) { await Task.Run(() => tracker.Stop()); Notes.Text = ""; }
+        else if (Nonprofits.SelectedItem is Nonprofit nonprofit) { var notes = Notes.Text; await Task.Run(() => tracker.Start(nonprofit.Id, notes)); }
         else throw new InvalidOperationException("Select a project first.");
     });
     private void RefreshStorageChoices()
@@ -213,7 +308,7 @@ public sealed partial class MainWindow : Window
     public record HistoryWeekEntries(string WeekLabel, HistoryEntry[] Entries);
     private void DeleteSession(object sender, RoutedEventArgs args)
     {
-        if (tracker != null && sender is Button { Tag: Guid id }) Perform(() => tracker.DeleteSession(id));
+        if (tracker != null && sender is Button { Tag: Guid id }) Perform(sender, () => Task.Run(() => tracker.DeleteSession(id)));
     }
     private async void AddManualSession(object sender, RoutedEventArgs args)
     {
@@ -294,12 +389,12 @@ public sealed partial class MainWindow : Window
         activity.TextChanged += (_, _) => UpdateConflicts();
         nonprofit.SelectionChanged += (_, _) => UpdateConflicts();
         UpdateConflicts();
-        dialog.PrimaryButtonClick += (_, eventArgs) =>
+        HandleDialogWrite(dialog, async eventArgs =>
         {
             try
             {
                 if (nonprofit.SelectedItem is not Nonprofit selected) throw new InvalidOperationException("Select a project. Add one in Settings first if needed.");
-                tracker.Reload();
+                await Task.Run(() => tracker.Reload());
                 Refresh();
                 var conflicts = Conflicts();
                 var signature = $"{selected.Id}|{activity.Text}|{LocalTime(startDate, startTime):O}|{LocalTime(endDate, endTime):O}|" + string.Join(";", conflicts.Select(c => $"{c.Session.SessionId}|{c.Session.StartTimeUtc:O}|{c.Session.EndTimeUtc:O}"));
@@ -311,7 +406,10 @@ public sealed partial class MainWindow : Window
                     error.Text = "Review the conflicts. Choose Save anyway to confirm intentional overlap.";
                     return;
                 }
-                tracker.AddSession(selected.Id, activity.Text, LocalTime(startDate, startTime), LocalTime(endDate, endTime));
+                var notes = activity.Text;
+                var from = LocalTime(startDate, startTime);
+                var to = LocalTime(endDate, endTime);
+                await Task.Run(() => tracker.AddSession(selected.Id, notes, from, to));
                 var savedEnd = endDate.Date!.Value.Date + endTime.Time;
                 var nextStart = savedEnd.AddMinutes(1);
                 var nextEnd = savedEnd.AddMinutes(15);
@@ -332,7 +430,7 @@ public sealed partial class MainWindow : Window
                 Refresh();
             }
             catch (Exception e) { eventArgs.Cancel = true; error.Text = e.Message; }
-        };
+        });
         await dialog.ShowAsync();
     }
     private async void EditTimes(object sender, RoutedEventArgs args)
@@ -361,11 +459,11 @@ public sealed partial class MainWindow : Window
                 throw new InvalidOperationException("This local time is missing or repeated due to a clock change. Choose an unambiguous time.");
             return new DateTimeOffset(value, TimeZoneInfo.Local.GetUtcOffset(value));
         }
-        dialog.PrimaryButtonClick += (_, eventArgs) =>
+        HandleDialogWrite(dialog, async eventArgs =>
         {
-            try { tracker.UpdateTimes(sessionId, LocalTime(startDate, startTime, start), LocalTime(endDate, endTime, end)); ErrorText.Text = ""; Refresh(); }
+            try { var from = LocalTime(startDate, startTime, start); var to = LocalTime(endDate, endTime, end); await Task.Run(() => tracker.UpdateTimes(sessionId, from, to)); ErrorText.Text = ""; Refresh(); }
             catch (Exception e) { eventArgs.Cancel = true; error.Text = e.Message; }
-        };
+        });
         await dialog.ShowAsync();
     }
     private async void EditNotes(object sender, RoutedEventArgs args)
@@ -388,11 +486,11 @@ public sealed partial class MainWindow : Window
             XamlRoot = Controls.XamlRoot, Title = "Edit session notes", Content = content,
             PrimaryButtonText = "Save", CloseButtonText = "Cancel"
         };
-        dialog.PrimaryButtonClick += (_, eventArgs) =>
+        HandleDialogWrite(dialog, async eventArgs =>
         {
-            try { tracker.UpdateNotes(sessionId, editor.Text); ErrorText.Text = ""; Refresh(); }
+            try { var notes = editor.Text; await Task.Run(() => tracker.UpdateNotes(sessionId, notes)); ErrorText.Text = ""; Refresh(); }
             catch (Exception e) { eventArgs.Cancel = true; error.Text = "Could not save notes. " + e.Message; }
-        };
+        });
         await dialog.ShowAsync();
     }
     private static string Elapsed(long seconds) => $"{seconds / 3600:00}:{seconds % 3600 / 60:00}:{seconds % 60:00}";
@@ -412,11 +510,11 @@ public sealed partial class MainWindow : Window
             if (folder == null) return;
             if (string.IsNullOrEmpty(folder.Path)) throw new IOException("Choose a local or mounted cloud folder.");
             var firstRun = tracker == null;
-            var next = location.Select(folder.Path, tracker?.State);
-            tracker = next;
+            var state = tracker?.State;
+            await WriteAsync(LocalStorageButton, async () => tracker = await Task.Run(() => location.Select(folder.Path, state)));
             Refresh();
             Nonprofits.SelectedItem = DefaultProject();
-            Notes.Text = tracker.State.Active?.Notes ?? "";
+            Notes.Text = tracker!.State.Active?.Notes ?? "";
             ErrorText.Text = "";
             if (firstRun && tracker.State.Nonprofits.Length == 0)
             {
@@ -436,7 +534,7 @@ public sealed partial class MainWindow : Window
             picker.FileTypeChoices.Add("CSV", new List<string> { ".csv" });
             WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
             var file = await picker.PickSaveFileAsync();
-            if (file != null) await Windows.Storage.FileIO.WriteTextAsync(file, snapshot);
+            if (file != null) await WriteAsync(ExportButton, async () => await Windows.Storage.FileIO.WriteTextAsync(file, snapshot));
             ErrorText.Text = "";
         }
         catch (Exception e) { ErrorText.Text = e.Message; }
@@ -468,16 +566,19 @@ public sealed partial class MainWindow : Window
         ExportButton.IsEnabled = CopyButton.IsEnabled = count > 0;
         CopyStatus.Text = "";
     }
-    private void CopyReport(object sender, RoutedEventArgs args)
+    private async void CopyReport(object sender, RoutedEventArgs args)
     {
         try
         {
             var text = tracker!.ClipboardText(SelectedRange());
             if (text.Length == 0) return;
-            var data = new Windows.ApplicationModel.DataTransfer.DataPackage();
-            data.SetText(text);
-            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(data);
-            Windows.ApplicationModel.DataTransfer.Clipboard.Flush();
+            await WriteAsync(CopyButton, () => {
+                var data = new Windows.ApplicationModel.DataTransfer.DataPackage();
+                data.SetText(text);
+                Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(data);
+                Windows.ApplicationModel.DataTransfer.Clipboard.Flush();
+                return Task.CompletedTask;
+            });
             CopyStatus.Text = "Copied durations and notes.";
             ErrorText.Text = "";
         }

@@ -6,9 +6,17 @@ import os
 import gi
 
 gi.require_version("Gtk", "4.0")
-from gi.repository import Gtk, Gio
+from gi.repository import Gtk, Gio, GLib
 from tick.app import HoursWindow
 from tick.core import FileStore, Tracker, StorageLocation
+
+def accept_response(dialog):
+    dialog.response(Gtk.ResponseType.ACCEPT)
+    # Let the feedback frame render and the deferred write finish.
+    loop = GLib.MainLoop()
+    GLib.timeout_add(150, lambda: loop.quit() or GLib.SOURCE_REMOVE)
+    loop.run()
+
 
 app = Gtk.Application(application_id="org.timeisclearlykept.Smoke", flags=Gio.ApplicationFlags.NON_UNIQUE)
 app.register(None)
@@ -110,32 +118,32 @@ with tempfile.TemporaryDirectory() as directory:
     assert "Existing activity" in warning.get_text()
     assert "Overlap: 00:30:00" in warning.get_text()
     count = len(reopened.tracker.state["sessions"])
-    dialog.response(Gtk.ResponseType.ACCEPT)
+    accept_response(dialog)
     assert len(reopened.tracker.state["sessions"]) == count
     assert dialog.get_widget_for_response(Gtk.ResponseType.ACCEPT).get_label() == "Save anyway"
     entries[2].set_text((start + timedelta(minutes=50)).astimezone().strftime("%Y-%m-%d %H:%M"))
     assert dialog.get_widget_for_response(Gtk.ResponseType.ACCEPT).get_label() == "Save"
-    dialog.response(Gtk.ResponseType.ACCEPT)
+    accept_response(dialog)
     assert len(reopened.tracker.state["sessions"]) == count
-    dialog.response(Gtk.ResponseType.ACCEPT)
+    accept_response(dialog)
     assert len(reopened.tracker.state["sessions"]) == count + 1
     assert entries[0].get_text() == ""
     # Successful saves advance the open form, including across midnight.
     entries[0].set_text("Late activity")
     entries[1].set_text("2020-01-02 23:00")
     entries[2].set_text("2020-01-02 23:59")
-    dialog.response(Gtk.ResponseType.ACCEPT)
+    accept_response(dialog)
     assert len(reopened.tracker.state["sessions"]) == count + 2
     assert entries[1].get_text() == "2020-01-03 00:00"
     assert entries[2].get_text() == "2020-01-03 00:14"
     assert entries[0].get_text() == ""
     entries[0].set_text("Next activity")
-    dialog.response(Gtk.ResponseType.ACCEPT)
+    accept_response(dialog)
     assert len(reopened.tracker.state["sessions"]) == count + 3
     assert entries[1].get_text() == "2020-01-03 00:15"
     assert entries[2].get_text() == "2020-01-03 00:29"
     # Invalid entries do not advance the form.
-    dialog.response(Gtk.ResponseType.ACCEPT)
+    accept_response(dialog)
     assert len(reopened.tracker.state["sessions"]) == count + 3
     assert entries[1].get_text() == "2020-01-03 00:15"
     assert entries[2].get_text() == "2020-01-03 00:29"
@@ -164,7 +172,7 @@ with tempfile.TemporaryDirectory() as directory:
     scroll = content.get_first_child().get_next_sibling().get_next_sibling()
     buffer = scroll.get_child().get_buffer()
     buffer.set_text("Updated dinner service\nCleanup")
-    dialog.response(Gtk.ResponseType.ACCEPT)
+    accept_response(dialog)
     assert restored.tracker.state["sessions"][0]["notes"] == "Updated dinner service\nCleanup"
     assert "Updated dinner service, Cleanup" in restored.report_preview.get_text()
     assert restored.tracker.state["sessions"][0]["durationSeconds"] == session["durationSeconds"]

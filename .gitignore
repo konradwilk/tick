@@ -1,6 +1,7 @@
 .DS_Store
 .idea/
 .gradle/
+.kotlin/
 build/
 DerivedData/
 *.xcuserstate
@@ -16,6 +17,7 @@ local.properties
 
 # Windows publish output
 windows/publish/
+windows/publish-*/
 
 # Python
 __pycache__/

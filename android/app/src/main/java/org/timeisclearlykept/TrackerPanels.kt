@@ -10,13 +10,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.Duration
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @Composable internal fun CapturePanel(state: TrackerState, selected: String?, notes: String, now: Instant,
-    onSelect: (String) -> Unit, onNotes: (String) -> Unit, onToggle: () -> Unit, onSettings: () -> Unit) {
+    onSelect: (String) -> Unit, onNotes: (String) -> Unit, onToggle: suspend () -> Unit, onSettings: () -> Unit) {
     var menu by remember { mutableStateOf(false) }
     val active = state.active
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -30,7 +31,7 @@ import java.time.format.DateTimeFormatter
                 }
             }
         }
-        Button(onClick = onToggle, enabled = active != null || selected != null, modifier = Modifier.fillMaxWidth(),
+        WriteButton(onClick = onToggle, enabled = active != null || selected != null, modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(containerColor = if (active == null) Color(0xFF176C45) else Color(0xFFB3261E))) {
             Text(if (active == null) "Start" else "Stop", style = MaterialTheme.typography.titleLarge)
         }
@@ -41,7 +42,7 @@ import java.time.format.DateTimeFormatter
     }
 }
 
-@Composable internal fun HistoryPanel(state: TrackerState, onDelete: (Session) -> Unit, onEditTimes: (Session) -> Unit, onEdit: (Session) -> Unit) {
+@Composable internal fun HistoryPanel(state: TrackerState, onDelete: suspend (Session) -> Unit, onEditTimes: (Session) -> Unit, onEdit: (Session) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("History", style = MaterialTheme.typography.headlineSmall)
         Text("Completed: %.2f hours".format(state.sessions.sumOf { it.durationSeconds ?: 0 } / 3600.0))
@@ -70,7 +71,7 @@ import java.time.format.DateTimeFormatter
                                     TextButton(onClick = { onEdit(session) }) { Text("Edit notes") }
                                     TextButton(onClick = { onEditTimes(session) }) { Text("Edit times") }
                                     if (session.durationSeconds != null && session.durationSeconds in 0L..59L)
-                                        TextButton(onClick = { onDelete(session) }) { Text("Delete") }
+                                        WriteButton(style = WriteButtonStyle.Text, onClick = { onDelete(session) }) { Text("Delete") }
                                 }
                             }
                         }
@@ -83,7 +84,7 @@ import java.time.format.DateTimeFormatter
 
 @Composable internal fun ReportPanel(period: String, date: String, range: ExportRange?, count: Int,
     preview: String, status: String, onPeriod: (String) -> Unit, onDate: (String) -> Unit,
-    onExport: () -> Unit, onCopy: () -> Unit) {
+    onExport: suspend () -> Unit, onCopy: suspend () -> Unit, exporting: Boolean = false) {
     OutlinedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Export & copy", style = MaterialTheme.typography.headlineSmall)
@@ -98,11 +99,61 @@ import java.time.format.DateTimeFormatter
             Text("Completed sessions by local start date. Weeks run Monday–Sunday.", style = MaterialTheme.typography.bodySmall)
             Text("Summary preview", style = MaterialTheme.typography.titleMedium)
             SelectionContainer { Text(preview.ifEmpty { "No completed sessions in this period." }, fontFamily = FontFamily.Monospace) }
-            OutlinedButton(onClick = onExport, enabled = count > 0, modifier = Modifier.fillMaxWidth()) { Text("Export CSV") }
-            OutlinedButton(onClick = onCopy, enabled = count > 0, modifier = Modifier.fillMaxWidth()) { Text("Copy summary") }
+            WriteButton(style = WriteButtonStyle.Outlined, onClick = onExport, enabled = count > 0, modifier = Modifier.fillMaxWidth(), externalWorking = exporting) { Text("Export CSV") }
+            WriteButton(style = WriteButtonStyle.Outlined, onClick = onCopy, enabled = count > 0, modifier = Modifier.fillMaxWidth()) { Text("Copy summary") }
             if (status.isNotEmpty()) Text(status, style = MaterialTheme.typography.bodySmall)
         }
     }
 }
 
 private fun displayDuration(seconds: Long) = "%02d:%02d:%02d".format(seconds / 3600, seconds % 3600 / 60, seconds % 60)
+
+
+/** Each write owns its feedback state; normal content and colors are never overwritten. */
+internal enum class WriteButtonStyle { Filled, Outlined, Text }
+
+@Composable internal fun WriteButton(
+    onClick: suspend () -> Unit,
+    enabled: Boolean = true,
+    modifier: Modifier = Modifier,
+    externalWorking: Boolean = false,
+    border: androidx.compose.foundation.BorderStroke? = null,
+    style: WriteButtonStyle = WriteButtonStyle.Filled,
+    colors: ButtonColors? = null,
+    content: @Composable RowScope.() -> Unit
+) {
+    var working by remember { mutableStateOf(false) }
+    val busy = working || externalWorking
+    val scope = rememberCoroutineScope()
+    val amber = Color(0xFF9C6500)
+    val click = {
+            if (!busy) {
+                working = true
+                scope.launch {
+                    try {
+                        kotlinx.coroutines.delay(75)
+                        onClick()
+                        kotlinx.coroutines.delay(175)
+                    } finally {
+                        working = false
+                    }
+                }
+            }
+        }
+    val palette = if (busy) ButtonDefaults.buttonColors(
+            disabledContainerColor = amber, disabledContentColor = Color.White
+        ) else colors ?: when (style) {
+            WriteButtonStyle.Filled -> ButtonDefaults.buttonColors()
+            WriteButtonStyle.Outlined -> ButtonDefaults.outlinedButtonColors()
+            WriteButtonStyle.Text -> ButtonDefaults.textButtonColors()
+        }
+    val label: @Composable RowScope.() -> Unit = {
+        if (busy) Text("Working…") else content()
+    }
+    when (style) {
+        WriteButtonStyle.Filled -> Button(onClick = click, enabled = enabled && !busy, modifier = modifier, colors = palette, border = border, content = label)
+        WriteButtonStyle.Outlined -> OutlinedButton(onClick = click, enabled = enabled && !busy, modifier = modifier, colors = palette,
+            border = border ?: androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline), content = label)
+        WriteButtonStyle.Text -> TextButton(onClick = click, enabled = enabled && !busy, modifier = modifier, colors = palette, content = label)
+    }
+}
