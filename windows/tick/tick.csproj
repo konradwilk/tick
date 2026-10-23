@@ -23,6 +23,12 @@
     <ProjectReference Include="../HoursCore/HoursCore.csproj" />
   </ItemGroup>
   <!-- WinUI compiles a preliminary assembly before BeforeCompile runs. -->
+  <Target Name="ValidateGooglePublishConfiguration" BeforeTargets="PrepareForPublish">
+    <PropertyGroup>
+      <GooglePython Condition="'$(GooglePython)' == ''">python</GooglePython>
+    </PropertyGroup>
+    <Exec Command="&quot;$(GooglePython)&quot; &quot;$(MSBuildProjectDirectory)/../../tools/configure_google.py&quot; --output &quot;$(IntermediateOutputPath)google-publish-check.json&quot;" />
+  </Target>
   <Target Name="GenerateBuildVersion" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <VersionPython Condition="'$(VersionPython)' == ''">python</VersionPython>

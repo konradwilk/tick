@@ -41,6 +41,8 @@ public sealed class GoogleAccount
     }
     public async Task SignInAsync(CancellationToken cancellation = default)
     {
+        if (string.IsNullOrWhiteSpace(GoogleDesktopClient.Secret))
+            throw new InvalidDataException("This Tick build is missing its Google sign-in configuration. Install a configured build from the maintainer.");
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         timeout.CancelAfter(TimeSpan.FromMinutes(3));
         var verifier = Base64(RandomNumberGenerator.GetBytes(64));

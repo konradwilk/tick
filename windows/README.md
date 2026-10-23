@@ -29,6 +29,13 @@ the app is unpackaged and includes its runtime dependencies. For ARM64 use
 library and tests are independent of WinUI. The repository's Native clients workflow
 builds the x64 app and uploads the published directory. No installer or signing yet.
 
+Publishing requires the maintainer's Google Desktop OAuth configuration: place the
+downloaded Desktop client JSON in the ignored `tick-credentials/` directory or set
+`TICK_GOOGLE_DESKTOP_CLIENT_SECRET` before building. For GitHub Actions, configure
+the repository secret with the same name. Publishing fails if this configuration
+is missing. Local builds and core tests can run without it, but Google sign-in
+will explain that a configured build is required before opening the browser.
+
 The green clock icon in the Windows system tray stays available when you close the
 window. Click it to reopen, or right-click for **Open Time is Clearly Kept** and **Quit**.
 Launching the app again also reopens the existing window. Windows may initially

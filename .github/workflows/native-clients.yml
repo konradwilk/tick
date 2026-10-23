@@ -32,6 +32,8 @@ jobs:
       - run: xcodebuild -quiet -project apple/iOS/tick.xcodeproj -scheme tick -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build
   windows:
     runs-on: windows-latest
+    env:
+      TICK_GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.TICK_GOOGLE_DESKTOP_CLIENT_SECRET }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
