@@ -48,14 +48,17 @@ internal class GoogleSheetsAPI(private val token: () -> String,
 internal class SheetsStore(private val api: GoogleSheetsAPI, val sheetId: String, val spreadsheetName: String = "Time is Clearly Kept") {
     private var revision: String? = null
     private var hasLog = false
+    private var rowStore: SheetsRows? = null
     private var metadata = buildJsonObject {}
     init { require(Regex("[A-Za-z0-9_-]+").matches(sheetId)) { "Choose a spreadsheet used by Tick." } }
     private val base get() = "https://sheets.googleapis.com/v4/spreadsheets/$sheetId"
     private fun rows(range: String) = api.request("GET", "$base/values/$range")["values"]?.jsonArray ?: JsonArray(emptyList())
     private fun read(): Pair<TrackerState?, String?> {
+        rowStore?.let { return it.read() }
         val meta = api.request("GET", "$base?fields=sheets.properties,properties.title")
         metadata = meta
         val tabs = meta["sheets"]?.jsonArray?.map { it.jsonObject.getValue("properties").jsonObject.getValue("title").jsonPrimitive.content }.orEmpty()
+        if("TickMeta" in tabs) { val rows=SheetsRows(api,base,meta);rowStore=rows;return rows.read() }
         hasLog = "TickLog" in tabs
         if (hasLog) { val values = rows("TickLog!A:F"); if (values.isNotEmpty()) return decodeLog(values) }
         if ("TickData" in tabs) {
@@ -77,77 +80,11 @@ internal class SheetsStore(private val api: GoogleSheetsAPI, val sheetId: String
         revision = latest; return state
     }
     fun save(state: TrackerState) {
-        val raw = PortableData.encode(state).toString(Charsets.UTF_8)
-        check(read().second == revision) { "Data changed on another device. Reload before saving." }
-        if (!hasLog) {
-            val request = Json.parseToJsonElement("""{"requests":[{"addSheet":{"properties":{"title":"TickLog","gridProperties":{"rowCount":1000,"columnCount":6}}}}]}""").jsonObject
-            api.request("POST", "$base:batchUpdate", request); read()
-        }
-        val id = UUID.randomUUID().toString()
-        val chunks = mutableListOf<String>(); var start = 0
-        while (start < raw.length) { var end = minOf(start + 40000, raw.length)
-            if (end < raw.length && raw[end-1].isHighSurrogate() && raw[end].isLowSurrogate()) end--
-            chunks += raw.substring(start, end); start = end
-        }
-        require(chunks.size <= 1000) { "This dataset is too large for a Tick revision in Google Sheets. Use Local file storage." }
-        val values = buildJsonArray { chunks.forEachIndexed { index, text -> add(buildJsonArray {
-            add("tick-log-v1"); add(id); add(revision ?: ""); add(index); add(chunks.size); add(text)
-        }) } }
-        val requests = tableRequests(raw).toMutableList()
-        val log = metadata.getValue("sheets").jsonArray.map { it.jsonObject.getValue("properties").jsonObject }.first { it.getValue("title").jsonPrimitive.content == "TickLog" }
-        requests += buildJsonObject { put("appendCells", buildJsonObject { put("sheetId", log["sheetId"]?.jsonPrimitive?.int ?: 0); put("rows", cells(values)); put("fields", "userEnteredValue") }) }
-        api.request("POST", "$base:batchUpdate", buildJsonObject { put("requests", JsonArray(requests)) })
-        val (saved, confirmed) = read()
-        check(confirmed == id && saved != null && PortableData.encode(saved).contentEquals(PortableData.encode(state))) { "Save could not be confirmed. Reload before retrying." }
-        revision = id
-    }
-
-    private fun cells(rows: JsonArray) = buildJsonArray { rows.forEach { row -> add(buildJsonObject { put("values", buildJsonArray { row.jsonArray.forEach { value -> add(buildJsonObject { put("userEnteredValue", buildJsonObject { put(if (value.jsonPrimitive.isString) "stringValue" else "numberValue", value) }) }) } }) }) } }
-    private fun tableRequests(raw: String): JsonArray {
-        val data = Json.parseToJsonElement(raw).jsonObject
-        val projects = data.getValue("nonprofits").jsonArray.map { it.jsonObject }
-        val names = projects.associate { it.getValue("id").jsonPrimitive.content to it.getValue("name").jsonPrimitive.content }
-        val totals = names.keys.associateWith { 0.0 to 0 }.toMutableMap()
-        val rows = mutableListOf<JsonElement>(buildJsonArray { listOf("Project", "Started (UTC)", "Ended (UTC)", "Duration", "Hours", "Notes", "Status", "Platform").forEach { add(it) } })
-        for (s in data.getValue("sessions").jsonArray.map { it.jsonObject }.sortedBy { it.getValue("startTimeUtc").jsonPrimitive.content }) {
-            val key = s.getValue("projectId").jsonPrimitive.content
-            val seconds = s["durationSeconds"]?.jsonPrimitive?.doubleOrNull
-            val n = (seconds ?: 0.0).toLong(); val ended = s["endTimeUtc"]?.jsonPrimitive?.contentOrNull
-            rows.add(buildJsonArray { add(names[key] ?: s.getValue("project").jsonPrimitive.content); add(java.time.Instant.parse(s.getValue("startTimeUtc").jsonPrimitive.content).atOffset(java.time.ZoneOffset.UTC).format(java.time.format.DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm:ss",java.util.Locale.ROOT))); add(ended?.let { java.time.Instant.parse(it).atOffset(java.time.ZoneOffset.UTC).format(java.time.format.DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm:ss",java.util.Locale.ROOT)) } ?: ""); add(if (seconds == null) "" else "%d:%02d:%02d".format(java.util.Locale.ROOT,n/3600,n/60%60,n%60)); if(seconds == null) add("") else add(seconds/3600); add(s.getValue("notes")); add(if(ended == null) "Running" else "Completed"); add(s.getValue("platform")) })
-            totals[key]?.let { totals[key] = (it.first+(seconds ?: 0.0)/3600) to (it.second+1) }
-        }
-        val summary = buildJsonArray { add(buildJsonArray { add("Project"); add("Total hours"); add("Sessions") }); projects.forEach { p -> val t=totals.getValue(p.getValue("id").jsonPrimitive.content); add(buildJsonArray { add(p.getValue("name")); add(t.first); add(t.second) }) } }
-        val tabs = metadata.getValue("sheets").jsonArray.map { it.jsonObject.getValue("properties").jsonObject }
-        val used = tabs.map { it["sheetId"]?.jsonPrimitive?.int ?: 0 }.toMutableSet()
-        val requests = mutableListOf<JsonElement>()
-        val styles = Json.parseToJsonElement("""[[{"updateSheetProperties":{"properties":{"sheetId":0,"index":0,"hidden":false,"gridProperties":{"frozenRowCount":1}},"fields":"index,hidden,gridProperties.frozenRowCount"}},{"updateCells":{"range":{"sheetId":0},"rows":[],"fields":"userEnteredValue,note"}},{"repeatCell":{"range":{"sheetId":0,"startRowIndex":0,"endRowIndex":1},"cell":{"userEnteredFormat":{"backgroundColor":{"red":0.92,"green":0.93,"blue":0.94},"textFormat":{"bold":true,"foregroundColor":{"red":0,"green":0,"blue":0}},"wrapStrategy":"WRAP"}},"fields":"userEnteredFormat"}},{"repeatCell":{"range":{"sheetId":0,"startRowIndex":1},"cell":{"userEnteredFormat":{"verticalAlignment":"TOP","wrapStrategy":"WRAP"}},"fields":"userEnteredFormat"}},{"updateDimensionProperties":{"range":{"sheetId":0,"dimension":"COLUMNS","startIndex":0,"endIndex":8},"properties":{"pixelSize":160},"fields":"pixelSize"}},{"setBasicFilter":{"filter":{"range":{"sheetId":0,"startRowIndex":0,"endRowIndex":1,"startColumnIndex":0,"endColumnIndex":8}}}}],[{"updateSheetProperties":{"properties":{"sheetId":0,"index":1,"hidden":false,"gridProperties":{"frozenRowCount":1}},"fields":"index,hidden,gridProperties.frozenRowCount"}},{"updateCells":{"range":{"sheetId":0},"rows":[],"fields":"userEnteredValue,note"}},{"repeatCell":{"range":{"sheetId":0,"startRowIndex":0,"endRowIndex":1},"cell":{"userEnteredFormat":{"backgroundColor":{"red":0.92,"green":0.93,"blue":0.94},"textFormat":{"bold":true,"foregroundColor":{"red":0,"green":0,"blue":0}},"wrapStrategy":"WRAP"}},"fields":"userEnteredFormat"}},{"repeatCell":{"range":{"sheetId":0,"startRowIndex":1},"cell":{"userEnteredFormat":{"verticalAlignment":"TOP","wrapStrategy":"WRAP"}},"fields":"userEnteredFormat"}},{"updateDimensionProperties":{"range":{"sheetId":0,"dimension":"COLUMNS","startIndex":0,"endIndex":3},"properties":{"pixelSize":160},"fields":"pixelSize"}},{"setBasicFilter":{"filter":{"range":{"sheetId":0,"startRowIndex":0,"endRowIndex":1,"startColumnIndex":0,"endColumnIndex":3}}}}]]""").jsonArray
-        listOf(JsonArray(rows), summary).forEachIndexed { index, values ->
-            val title = if(index == 0) "Sessions" else "Projects"
-            val tab = tabs.firstOrNull { it.getValue("title").jsonPrimitive.content == title }
-            var id = tab?.get("sheetId")?.jsonPrimitive?.int ?: (174001+index)
-            if(tab == null) { while(id in used) id++; used += id; requests += Json.parseToJsonElement("""{"addSheet":{"properties":{"sheetId":$id,"title":"$title","gridProperties":{"rowCount":${maxOf(1000,values.size)},"columnCount":${values[0].jsonArray.size}}}}}""") }
-            val size = maxOf(tab?.get("gridProperties")?.jsonObject?.get("rowCount")?.jsonPrimitive?.int ?: 1000, values.size, 2)
-            requests += Json.parseToJsonElement("""{"updateSheetProperties":{"properties":{"sheetId":$id,"gridProperties":{"rowCount":$size}},"fields":"gridProperties.rowCount"}}""")
-            val safe = JsonArray(values.map { row -> JsonArray(row.jsonArray.map { v -> if(v.jsonPrimitive.isString) { val text=v.jsonPrimitive.content; var end=minOf(20000,text.length); if(end<text.length && end>0 && text[end-1].isHighSurrogate())end--; JsonPrimitive(text.substring(0,end)) } else v }) })
-            fun replace(element: JsonElement): JsonElement = when(element) {
-                is JsonObject -> JsonObject(element.mapValues { (key,value) -> if(key == "sheetId") JsonPrimitive(id) else if(key == "endRowIndex" && value.jsonPrimitive.int == 1) JsonPrimitive(maxOf(2,values.size)) else replace(value) })
-                is JsonArray -> JsonArray(element.map { replace(it) })
-                else -> element
-            }
-            styles[index].jsonArray.forEach { part ->
-                // Header formatting ends at row 1; only the filter should extend through the data.
-                val name=part.jsonObject.keys.first()
-                var payload=replace(part.jsonObject.getValue(name)).jsonObject
-                if(name == "repeatCell") { val original=part.jsonObject.getValue(name).jsonObject.getValue("range").jsonObject; if(original["endRowIndex"]!=null) payload=JsonObject(payload + ("range" to JsonObject(payload.getValue("range").jsonObject + ("endRowIndex" to JsonPrimitive(1))))) }
-                if(name == "updateCells") { val cellRows=cells(safe).toMutableList(); val header=cellRows[0].jsonObject.getValue("values").jsonArray.toMutableList(); header[0]=JsonObject(header[0].jsonObject + ("note" to JsonPrimitive("Generated by Tick. Edit projects and sessions in Tick; these tables refresh on every save."))); cellRows[0]=buildJsonObject { put("values",JsonArray(header)) }; payload=JsonObject(payload + ("rows" to JsonArray(cellRows))) }
-                requests += buildJsonObject { put(name,payload) }
-            }
-            val column=if(index == 0) 4 else 1
-            requests += Json.parseToJsonElement("""{"repeatCell":{"range":{"sheetId":$id,"startRowIndex":1,"startColumnIndex":$column,"endColumnIndex":${column+1}},"cell":{"userEnteredFormat":{"numberFormat":{"type":"NUMBER","pattern":"0.00"}}},"fields":"userEnteredFormat.numberFormat"}}""")
-            if(index == 0) requests += Json.parseToJsonElement("""{"updateDimensionProperties":{"range":{"sheetId":$id,"dimension":"COLUMNS","startIndex":5,"endIndex":6},"properties":{"pixelSize":420},"fields":"pixelSize"}}""")
-        }
-        tabs.filter { it.getValue("title").jsonPrimitive.content in listOf("TickLog","TickData") }.forEach { tab -> val id=tab["sheetId"]?.jsonPrimitive?.int ?: 0; requests += Json.parseToJsonElement("""{"updateSheetProperties":{"properties":{"sheetId":$id,"hidden":true},"fields":"hidden"}}""") }
-        return JsonArray(requests)
+        rowStore?.let { revision=it.save(state,revision,false);return }
+        check(read().second==revision) { "Data changed on another device. Reload before saving." }
+        rowStore?.let { revision=it.save(state,revision,false);return }
+        val rows=SheetsRows(api,base,metadata);rowStore=rows
+        revision=rows.save(state,revision,true)
     }
 
     companion object {

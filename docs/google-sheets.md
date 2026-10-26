@@ -14,12 +14,26 @@ platform. A running session has no end time or final duration yet.
 let you find a project or session. Hours display two decimal places; calculations
 retain full precision.
 
-These are generated views. Make changes in Tick; editing these cells does not
-update Tick, and the next save replaces the views. Tick updates both views and
-its hidden recovery history in one Google API batch. `TickLog` contains the
-complete portable dataset, IDs, and saved revisions for app compatibility and
-recovery. Unusually long text is limited to 20,000 characters in the views;
-the full text remains in the recovery history.
+Tick stores one current row per session and project. IDs, versions, deletion markers,
+and complete records occupy hidden columns in those rows. Make changes in Tick;
+the visible columns are readable projections, not an editor for Tick's data.
+Text is always literal, including notes beginning with `=`. Long notes are
+preserved across hidden cells in the same row; the visible preview shows the
+first 20,000 characters.
+
+A normal save reads current rows and a small journal index in one batch, writes
+only changed rows in another batch, and verifies the result with one read. It
+does not download previous dataset snapshots or reapply formatting. A note edit
+usually updates one session row; stopping a session can also update its project's
+totals. Deleting a session marks its existing row deleted and clears its visible
+cells. Blank rows left by deletion are intentional.
+
+The hidden `TickChanges` journal retains only the rows changed by each save for
+conflict recovery. `TickMeta` identifies the row format and shared dataset.
+On the first save, an older `TickLog` or `TickData` dataset migrates automatically.
+Its original contents remain intact in `TickLogBackup` or `TickDataBackup`.
+Install this version on every device before migrating: older clients cannot open
+the new format. The first migration is larger than later saves.
 
 ### Fix a spreadsheet migrated by an older version
 
@@ -30,12 +44,13 @@ other devices, then refresh the existing spreadsheet's layout:
 python3 tools/migrate_to_sheets.py --upgrade-existing --spreadsheet SPREADSHEET_ID_OR_URL
 ```
 
-This adds the Sessions and Projects views, hides the internal history, and
-verifies the visible values. It preserves the spreadsheet's name, URL, IDs,
-projects, sessions, and recovery history. `Sessions` and `Projects` are reserved
-for Tick's generated views; put your own analysis in differently named tabs.
-New migrations create the readable views automatically. Updated apps refresh
-them on each save; install the updated app on every device.
+This upgrades an older Tick dataset to row storage and verifies its contents.
+The spreadsheet name, URL, IDs, projects, sessions, and old recovery history are
+preserved. Running the command again on row storage verifies it without adding
+a journal entry. `Sessions`, `Projects`, `TickMeta`, and `TickChanges` are reserved
+for Tick; put your own analysis in differently named tabs. Sorting complete rows
+is supported because Tick locates records by ID on each save; do not sort only
+the visible columns independently of their hidden columns.
 
 ## Connect in the app
 
@@ -117,6 +132,28 @@ open/reload the destination, and inspect it before retrying. A retry that target
 an initialized sheet refuses to overwrite it. A retry without `--spreadsheet`
 creates a separate new spreadsheet.
 
+## Python sign-in succeeds in the browser but migration fails
+
+The Python tool needs the generated Desktop OAuth configuration in addition to
+browser consent. From the project folder, prepare it using the existing downloaded
+Desktop client JSON:
+
+```sh
+python3 tools/configure_google.py
+python3 tools/migrate_to_sheets.py --upgrade-existing --spreadsheet SPREADSHEET_ID_OR_URL --sign-in
+```
+
+The first command writes ignored `linux/tick/google-client.json` without printing
+credentials. Keep that generated file with the Python distribution. If the
+Desktop client download is absent, the maintainer must provide the configured
+distribution; signing in repeatedly cannot fix missing app configuration.
+
+`invalid_client` means Google rejected the app credentials. Regenerate the
+configuration and check any `TICK_GOOGLE_DESKTOP_CLIENT_SECRET` environment
+override, which takes precedence over the file. `invalid_grant` means an
+expired/revoked or mismatched authorization; retry with `--sign-in`. The tool
+reports only recognized error codes and guidance, never raw token responses.
+
 ## Credentials and platform requirements
 
 Google refresh tokens are stored in macOS/iOS Keychain, Windows Credential Manager,
@@ -136,33 +173,34 @@ local sign-out option. Reconnect from Settings if access expires or is revoked.
 ## Concurrent writes and recovery
 
 Use one device at a time. Returning to Tick or pressing Start reloads shared
-history. Each save first checks the loaded revision, then appends a complete new
-revision to hidden `TickLog` together with refreshed readable views, and reads it
-back to confirm the result. User text is sent
-as literal `stringValue` cells, so it cannot become a formula.
+data. Each save checks the loaded journal version before writing and verifies
+both the saved rows and journal afterward. A stale save fails before writing.
 
-This is not a server lock or atomic compare-and-swap. If two devices save from the
-same parent at the same time, both revisions remain in `TickLog` and Tick reports
-a conflict instead of silently choosing or overwriting a version. Stop using
-that spreadsheet and keep it for recovery. Each revision's six-column rows store
-`tick-log-v1`, its revision ID, parent ID, zero-based chunk index, chunk count, and
-JSON text. Recover an individual revision by joining its chunks in index order;
-validate the resulting portable JSON before opening it locally or migrating it
-to a fresh spreadsheet. Do not manually edit the live history to hide conflicts. The separate read-only
-[recovery tool](../tools/recover_sheets.py) can list and export retained revisions:
+Google Sheets does not offer an atomic compare-and-swap or server lock. If two
+devices save from the same parent simultaneously, their row updates and appended
+journal entries are applied together in each batch. The journal retains both
+sets of changed rows and Tick reports the branched history. Stop using that
+spreadsheet and recover into a new file or spreadsheet; do not hide a conflict
+by editing the live journal. Complete-row sorting is safe between saves, but
+avoid editing/sorting the spreadsheet while a save is in flight.
+
+The read-only [recovery tool](../tools/recover_sheets.py) lists and exports either
+old full-dataset revisions or new row-based changes, including sibling branches:
 
 ```sh
 python3 tools/recover_sheets.py SPREADSHEET_ID
 python3 tools/recover_sheets.py SPREADSHEET_ID --revision REVISION_ID --output recovered-tick.json
 ```
 
-The recovery tool refuses to overwrite an existing output file. Open the recovered
-JSON locally or migrate it to a new spreadsheet after reviewing it.
+Add `--legacy-backup` to list or export pre-migration `TickLogBackup` revisions.
 
-Every revision retains a full dataset. Long histories increase spreadsheet size
-and read time; Google quota and sheet-size limits apply. There is no offline write
-queue or silent switch to a local file. Failed saves preserve the last confirmed
-in-memory state and display an error. CSV export still works.
+The recovery tool refuses to overwrite an existing output file. Review the
+recovered JSON locally before migrating it to a fresh spreadsheet. Journal
+payloads grow with changed rows rather than a full dataset on every save; normal
+reads fetch only their small version/chunk index. Google quota and sheet-size
+limits still apply. There is no offline write queue or silent switch to a local
+file. Failed saves preserve the last confirmed in-memory state and display an
+error. A timed-out write may have reached Google; reload before retrying.
 
 ## Moving from the previous connection
 
@@ -171,9 +209,9 @@ settings are not sufficient for Google sign-in: reconnect through Settings.
 A spreadsheet containing the previous `TickData` format can be read directly once
 Google grants Tick access. If it does not appear in Tick's authorized-file list,
 use your original `tick.json` with the migration tool to create a new spreadsheet.
-An arbitrary pasted URL does not grant Google permission. The old `TickData` is
-left intact when the first direct-API save creates `TickLog`. Stop older clients
-before switching; they do not understand the new log format.
+An arbitrary pasted URL does not grant Google permission. The old `TickData` contents are
+retained as `TickDataBackup` when the first row-based save migrates them. Stop
+older clients before switching; they do not understand row storage.
 
 ## Maintainer packaging
 

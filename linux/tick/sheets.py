@@ -58,15 +58,26 @@ class SheetsStore:
         self.revision = None
         self.path = None
         self.has_log = False
+        self.row_mode = False
+        self.entities = {"Sessions": {}, "Projects": {}}
+        self.log_count = 0
+        self.log_revision = None
 
     @property
     def base(self): return SHEETS + '/' + self.sheet_id
 
     def _read(self):
+        if self.row_mode:
+            state, latest, count = self._read_rows()
+            return state, latest
         metadata = self.api.request('GET', self.base + '?fields=sheets.properties,properties.title')
         self.metadata = metadata
         self.spreadsheet_name = metadata['properties']['title']
         tabs = [s['properties']['title'] for s in metadata.get('sheets', [])]
+        if 'TickMeta' in tabs:
+            self.row_mode = True
+            state, latest, count = self._read_rows()
+            return state, latest
         self.has_log = 'TickLog' in tabs
         if self.has_log:
             rows = self.api.request('GET', self.base + '/values/TickLog!A:F').get('values', [])
@@ -89,44 +100,169 @@ class SheetsStore:
         self.revision = revision
         return state
 
+    def _batch_rows(self, ranges):
+        url = self.base + '/values:batchGet?' + urlencode([('ranges', r) for r in ranges] + [('valueRenderOption', 'UNFORMATTED_VALUE')])
+        values = self.api.request('GET', url).get('valueRanges', [])
+        if len(values) != len(ranges): raise ValueError('Incomplete Google Sheets response. Reload before saving.')
+        return [v.get('values', []) for v in values]
+
+    def _read_rows(self):
+        meta, sessions, projects, changes = self._batch_rows(['TickMeta!A1:B1', 'Sessions', 'Projects', 'TickChanges!A:D'])
+        if len(meta) != 1 or len(meta[0]) != 2 or meta[0][0] != 'tick-rows-v1': raise ValueError('Invalid Tick row storage.')
+        root = json.loads(meta[0][1])
+        entities = {}
+        for title, values, offset, key in [('Sessions', sessions, 8, 'sessionId'), ('Projects', projects, 3, 'id')]:
+            records = {}
+            if not values or values[0][offset:offset+4] != ['Tick ID', 'Version', 'Deleted', 'Chunks']: raise ValueError('Invalid Tick row headers.')
+            for index, row in enumerate(values[1:], 1):
+                if not row: continue
+                if len(row) < offset+5: raise ValueError('Incomplete Tick row.')
+                identity, version, deleted, count = row[offset:offset+4]
+                count = int(count)
+                if identity.lower() in records or not identity or not version or deleted not in ('0', '1') or not 1 <= count <= 1000 or len(row) != offset+4+count: raise ValueError('Invalid or duplicate Tick row.')
+                payload = json.loads(''.join(row[offset+4:]))
+                if payload[key].lower() != identity.lower(): raise ValueError('Tick row identity changed.')
+                records[identity.lower()] = dict(index=index, version=version, deleted=deleted, payload=payload, row=row)
+            entities[title] = records
+        if not changes: raise ValueError('The Tick change journal is missing. Keep this spreadsheet for recovery.')
+        latest = None
+        position = 0
+        seen = set()
+        while position < len(changes):
+            row = changes[position]
+            if len(row) != 4: raise ValueError('Invalid Tick change journal.')
+            identity, parent, chunk, count = row; count = int(count)
+            if not identity or identity in seen or parent != (latest or '') or int(chunk) != 0 or not 1 <= count <= 1000 or position+count > len(changes): raise ValueError('Concurrent Google Sheets changes detected. Both changes remain in TickChanges; recover before continuing.')
+            for n in range(count):
+                if changes[position+n] != [identity, parent, n, count]: raise ValueError('Incomplete Tick change journal.')
+            seen.add(identity)
+            latest = identity; position += count
+        root['sessions'] = [v['payload'] for v in entities['Sessions'].values() if v['deleted'] == '0']
+        root['nonprofits'] = [v['payload'] for v in entities['Projects'].values() if v['deleted'] == '0']
+        state = decode_data(json.dumps(root))
+        state['sessions'].sort(key=lambda s: parse(s['startTimeUtc']))
+        for title, field, key in [('Sessions','sessions','sessionId'),('Projects','nonprofits','id')]:
+            for payload in state[field]: entities[title][payload[key].lower()]['payload'] = payload
+        self.entities = entities
+        self.log_count = len(changes)
+        return state, latest, len(changes)
+
+    def _initialize_rows(self, state):
+        tabs = {s['properties']['title']: s['properties'] for s in self.metadata['sheets']}
+        used = {p.get('sheetId', 0) for p in tabs.values()}
+        requests = []
+        for title in ('TickLog', 'TickData'):
+            if title in tabs:
+                backup = title + 'Backup'
+                if backup in tabs: raise ValueError('A Tick migration backup already exists. Keep this spreadsheet for recovery.')
+                requests.append({'updateSheetProperties': {'properties': {'sheetId': tabs[title].get('sheetId', 0), 'title': backup, 'hidden': True}, 'fields': 'title,hidden'}})
+        for index, title in enumerate(('Sessions', 'Projects', 'TickMeta', 'TickChanges')):
+            if title not in tabs:
+                identity = 174001+index
+                while identity in used: identity += 1
+                used.add(identity)
+                tabs[title] = {'sheetId': identity, 'title': title, 'gridProperties': {'rowCount': max(1000, len(state['sessions'])+1, len(state['nonprofits'])+1), 'columnCount': 26}}
+                requests.append({'addSheet': {'properties': tabs[title]}})
+        # Add visible tabs before hiding the old sole staging tab.
+        requests.sort(key=lambda r: 0 if 'addSheet' in r else 1)
+        self.metadata = {'sheets': [{'properties': p} for p in tabs.values()]}
+        self.entities = {'Sessions': {}, 'Projects': {}}
+        self.log_count = 0; self.log_revision = None
+        root = {k: v for k, v in state.items() if k not in ('sessions', 'nonprofits')}
+        requests.append(self._update('TickMeta', 0, [['tick-rows-v1', json.dumps(root)]]))
+        headers = [table_values(state)[0][0], table_values(state)[1][0]]
+        for title, header in zip(('Sessions', 'Projects'), headers):
+            requests.append(self._update(title, 0, [header + ['Tick ID', 'Version', 'Deleted', 'Chunks', 'Tick data']]))
+            identity = tabs[title]['sheetId']
+            requests += [{'updateSheetProperties': {'properties': {'sheetId': identity, 'gridProperties': {'frozenRowCount': 1}}, 'fields': 'gridProperties.frozenRowCount'}},
+                         {'repeatCell': {'range': {'sheetId': identity, 'startRowIndex': 0, 'endRowIndex': 1}, 'cell': {'userEnteredFormat': {'textFormat': {'bold': True}}}, 'fields': 'userEnteredFormat.textFormat'}},
+                         {'updateDimensionProperties': {'range': {'sheetId': identity, 'dimension': 'COLUMNS', 'startIndex': len(header), 'endIndex': max(len(header)+5, tabs[title].get('gridProperties', {}).get('columnCount', 26))}, 'properties': {'hiddenByUser': True}, 'fields': 'hiddenByUser'}}]
+        for title in ('TickMeta', 'TickChanges'):
+            requests.append({'updateSheetProperties': {'properties': {'sheetId': tabs[title]['sheetId'], 'hidden': True}, 'fields': 'hidden'}})
+        return requests
+
+    def _update(self, title, index, rows):
+        identity = next(s['properties'].get('sheetId', 0) for s in self.metadata['sheets'] if s['properties']['title'] == title)
+        return {'updateCells': {'range': {'sheetId': identity, 'startRowIndex': index, 'endRowIndex': index+len(rows), 'startColumnIndex': 0, 'endColumnIndex': max(len(r) for r in rows)}, 'rows': cell_rows(rows), 'fields': 'userEnteredValue'}}
+
     def save(self, state):
         state = decode_data(json.dumps(state))
-        state = dict(state, sessions=sorted(state['sessions'], key=lambda s: parse(s['startTimeUtc'])))
-        _, latest = self._read()
+        state['sessions'].sort(key=lambda s: parse(s['startTimeUtc']))
+        previous, latest = self._read()
         if latest != self.revision: raise ValueError('Data changed on another device. Reload before saving.')
-        if not self.has_log:
-            self.api.request('POST', self.base + ':batchUpdate', {'requests': [{'addSheet': {'properties': {'title': 'TickLog', 'gridProperties': {'rowCount': 1000, 'columnCount': 6}}}}]})
-            self._read()
+        initializing = not self.row_mode
+        requests = self._initialize_rows(state) if initializing else []
         revision = str(uuid4())
-        raw = json.dumps(state, ensure_ascii=False)
-        chunks = [raw[i:i+20000] for i in range(0, len(raw), 20000)]
-        if len(chunks) > 1000: raise ValueError('This dataset is too large for a Tick revision in Google Sheets. Use Local file storage.')
-        rows = [[MARKER, revision, self.revision or '', i, len(chunks), chunk] for i, chunk in enumerate(chunks)]
-        requests = table_requests(state, self.metadata)
-        log_id = next(s['properties'].get('sheetId', 0) for s in self.metadata['sheets'] if s['properties']['title'] == 'TickLog')
-        requests.append({'appendCells': {'sheetId': log_id, 'rows': cell_rows(rows), 'fields': 'userEnteredValue'}})
+        changes = []
+        display = table_values(state)
+        for title, key, items, visible in [('Sessions', 'sessionId', state['sessions'], display[0][1:]), ('Projects', 'id', state['nonprofits'], display[1][1:])]:
+            old = self.entities[title]
+            incoming = {p[key].lower(): (p, v) for p, v in zip(items, visible)}
+            next_index = max([v['index'] for v in old.values()] + [0])+1
+            for identity in dict.fromkeys([*old, *incoming]):
+                before = old.get(identity)
+                payload, view = incoming.get(identity, (before['payload'] if before else None, [''] * (8 if title == 'Sessions' else 3)))
+                deleted = '0' if identity in incoming else '1'
+                view = [v[:20000] if isinstance(v,str) else v for v in view]
+                # Project totals can change even when the project itself does not.
+                if before and before['payload'] == payload and before['deleted'] == deleted and before['row'][:len(view)] == view: continue
+                text = json.dumps(payload, ensure_ascii=False)
+                chunks = [text[i:i+20000] for i in range(0, len(text), 20000)]
+                if len(chunks) > 1000: raise ValueError('This Tick row is too large. Use Local file storage.')
+                row = view + [identity, revision, deleted, len(chunks)] + chunks
+                index = before['index'] if before else next_index
+                if not before: next_index += 1
+                # Clear obsolete chunks if a long note became shorter.
+                width = max(len(row), len(before['row']) if before else 0)
+                request = self._update(title, index, [row]); request['updateCells']['range']['endColumnIndex'] = width
+                requests.append(request)
+                changes.append({'table': title, 'id': identity, 'row': row})
+        if not changes and not initializing: return
+        audit = json.dumps({'changes': changes}, ensure_ascii=False)
+        chunks = [audit[i:i+20000] for i in range(0, len(audit), 20000)]
+        if len(chunks) > 1000: raise ValueError('This change is too large. Use Local file storage.')
+        for tab in self.metadata['sheets']:
+            props = tab['properties']; title = props['title']
+            if title not in ('Sessions','Projects','TickChanges'): continue
+            updates = [r['updateCells'] for r in requests if 'updateCells' in r and r['updateCells']['range']['sheetId'] == props.get('sheetId', 0)]
+            required_rows = max([u['range']['endRowIndex'] for u in updates] + [self.log_count + len(chunks) if title == 'TickChanges' else 1])
+            required_columns = max([u['range']['endColumnIndex'] for u in updates] + [5])
+            grid = props.get('gridProperties', {})
+            if required_rows > grid.get('rowCount',1000) or required_columns > grid.get('columnCount',26):
+                requests.insert(next((i for i,r in enumerate(requests) if 'updateCells' in r), len(requests)), {'updateSheetProperties': {'properties': {'sheetId': props['sheetId'], 'gridProperties': {'rowCount': max(required_rows,grid.get('rowCount',1000)), 'columnCount': max(required_columns,grid.get('columnCount',26))}}, 'fields': 'gridProperties.rowCount,gridProperties.columnCount'}})
+        for request in list(requests):
+            props = request.get('updateSheetProperties', {}).get('properties', {})
+            columns = props.get('gridProperties', {}).get('columnCount')
+            if columns:
+                title = next(s['properties']['title'] for s in self.metadata['sheets'] if s['properties']['sheetId'] == props['sheetId'])
+                if title in ('Sessions', 'Projects'):
+                    requests.append({'updateDimensionProperties': {'range': {'sheetId': props['sheetId'], 'dimension': 'COLUMNS', 'startIndex': 8 if title == 'Sessions' else 3, 'endIndex': columns}, 'properties': {'hiddenByUser': True}, 'fields': 'hiddenByUser'}})
+        log_id = next(s['properties']['sheetId'] for s in self.metadata['sheets'] if s['properties']['title'] == 'TickChanges')
+        requests.append({'appendCells': {'sheetId': log_id, 'rows': cell_rows([[revision, (latest or '') if not initializing else '', i, len(chunks), c] for i,c in enumerate(chunks)]), 'fields': 'userEnteredValue'}})
         self.api.request('POST', self.base + ':batchUpdate', {'requests': requests})
-        saved, confirmed = self._read()
-        if confirmed != revision or saved != state: raise ValueError('Save could not be confirmed. Reload before retrying.')
-        self.revision = revision
+        self.row_mode = True
+        saved, confirmed, count = self._read_rows()
+        def normalized(value):
+            return dict(value, nonprofits=sorted(value['nonprofits'], key=lambda p: p['id']))
+        rows_confirmed = all(self.entities[c['table']].get(c['id'], {}).get('row') == c['row'] for c in changes)
+        if confirmed != revision or normalized(saved) != normalized(state) or not rows_confirmed: raise ValueError('Save could not be confirmed. Reload before retrying.')
+        for request in requests:
+            props = request.get('updateSheetProperties', {}).get('properties', {})
+            if 'gridProperties' in props:
+                tab = next(s['properties'] for s in self.metadata['sheets'] if s['properties'].get('sheetId', 0) == props['sheetId'])
+                tab.setdefault('gridProperties', {}).update(props['gridProperties'])
+        self.revision = confirmed; self.log_revision = confirmed; self.log_count = count
 
     def refresh_tables(self):
-        """Upgrade an existing Tick sheet without appending or changing its history."""
-        state, revision = self._read()
-        if state is None: raise ValueError('No Tick data to display.')
-        self.api.request('POST', self.base + ':batchUpdate', {'requests': table_requests(state, self.metadata)})
-        saved, confirmed = self._read()
-        if confirmed != revision or saved != state: raise ValueError('Data changed during the layout upgrade. Reload and retry.')
+        state = self.load(require_existing=True)
+        self.save(state)
         self.verify_tables(state)
-        self.revision = revision
         return state
 
     def verify_tables(self, state):
-        for title, expected in zip(("Sessions", "Projects"), table_values(state)):
-            expected = [[v[:20000] if isinstance(v, str) else v for v in row] for row in expected]
-            end = "H" if title == "Sessions" else "C"
-            actual = self.api.request("GET", self.base + f"/values/{title}!A1:{end}{len(expected)}?valueRenderOption=UNFORMATTED_VALUE").get("values", [])
-            if actual != expected: raise ValueError(f"The {title} table could not be verified. Keep the spreadsheet and run --upgrade-existing to refresh it.")
+        saved = self.load(require_existing=True)
+        expected = decode_data(json.dumps(state)); expected['sessions'].sort(key=lambda s: parse(s['startTimeUtc']))
+        if saved != expected: raise ValueError('Tick rows could not be verified. Reload before retrying.')
 
 
 def cell_rows(rows):
@@ -150,107 +286,6 @@ def table_values(state):
     summary += [[name, *totals[key]] for key, name in projects.items()]
     return [sessions, summary]
 
-
-def table_requests(state, metadata):
-    import copy
-    tabs = {s['properties']['title']: s['properties'] for s in metadata['sheets']}
-    used = {s.get('sheetId', 0) for s in tabs.values()}
-    requests = []
-    for index, (title, rows) in enumerate(zip(('Sessions', 'Projects'), table_values(state))):
-        if title in tabs:
-            sheet_id = tabs[title].get('sheetId', 0)
-            size = max(tabs[title].get('gridProperties', {}).get('rowCount', 1000), len(rows), 2)
-        else:
-            sheet_id = 174001 + index
-            while sheet_id in used: sheet_id += 1
-            used.add(sheet_id)
-            size = max(1000, len(rows))
-            requests.append({'addSheet': {'properties': {'sheetId': sheet_id, 'title': title, 'gridProperties': {'rowCount': size, 'columnCount': len(rows[0])}}}})
-        requests.append({'updateSheetProperties': {'properties': {'sheetId': sheet_id, 'gridProperties': {'rowCount': size}}, 'fields': 'gridProperties.rowCount'}})
-        # Text is always literal, even when a note starts with '='. Long text remains complete in TickLog.
-        cells = cell_rows([[v[:20000] if isinstance(v, str) else v for v in row] for row in rows])
-        cells[0]['values'][0]['note'] = 'Generated by Tick. Edit projects and sessions in Tick; these tables refresh on every save.'
-        parts = copy.deepcopy(TABLE_STYLES[index])
-        for part in parts:
-            payload = next(iter(part.values()))
-            if 'properties' in payload and 'sheetId' in payload['properties']: payload['properties']['sheetId'] = sheet_id
-            if 'range' in payload: payload['range']['sheetId'] = sheet_id
-            if 'filter' in payload:
-                payload['filter']['range']['sheetId'] = sheet_id
-                payload['filter']['range']['endRowIndex'] = max(2, len(rows))
-        parts[1]['updateCells']['rows'] = cells
-        requests.extend(parts)
-        hours_column = 4 if index == 0 else 1
-        requests.append({'repeatCell': {'range': {'sheetId': sheet_id, 'startRowIndex': 1, 'startColumnIndex': hours_column, 'endColumnIndex': hours_column+1}, 'cell': {'userEnteredFormat': {'numberFormat': {'type': 'NUMBER', 'pattern': '0.00'}}}, 'fields': 'userEnteredFormat.numberFormat'}})
-        if index == 0:
-            requests.append({'updateDimensionProperties': {'range': {'sheetId': sheet_id, 'dimension': 'COLUMNS', 'startIndex': 5, 'endIndex': 6}, 'properties': {'pixelSize': 420}, 'fields': 'pixelSize'}})
-    for title in ('TickLog', 'TickData'):
-        if title in tabs:
-            requests.append({'updateSheetProperties': {'properties': {'sheetId': tabs[title].get('sheetId', 0), 'hidden': True}, 'fields': 'hidden'}})
-    return requests
-
-
-# Common presentation contract; keep native client layouts in sync.
-TABLE_STYLES = [[{'updateSheetProperties': {'properties': {'sheetId': 0,
-                                            'index': 0,
-                                            'hidden': False,
-                                            'gridProperties': {'frozenRowCount': 1}},
-                             'fields': 'index,hidden,gridProperties.frozenRowCount'}},
-  {'updateCells': {'range': {'sheetId': 0}, 'rows': [], 'fields': 'userEnteredValue,note'}},
-  {'repeatCell': {'range': {'sheetId': 0, 'startRowIndex': 0, 'endRowIndex': 1},
-                  'cell': {'userEnteredFormat': {'backgroundColor': {'red': 0.92,
-                                                                     'green': 0.93,
-                                                                     'blue': 0.94},
-                                                 'textFormat': {'bold': True,
-                                                                'foregroundColor': {'red': 0,
-                                                                                    'green': 0,
-                                                                                    'blue': 0}},
-                                                 'wrapStrategy': 'WRAP'}},
-                  'fields': 'userEnteredFormat'}},
-  {'repeatCell': {'range': {'sheetId': 0, 'startRowIndex': 1},
-                  'cell': {'userEnteredFormat': {'verticalAlignment': 'TOP', 'wrapStrategy': 'WRAP'}},
-                  'fields': 'userEnteredFormat'}},
-  {'updateDimensionProperties': {'range': {'sheetId': 0,
-                                           'dimension': 'COLUMNS',
-                                           'startIndex': 0,
-                                           'endIndex': 8},
-                                 'properties': {'pixelSize': 160},
-                                 'fields': 'pixelSize'}},
-  {'setBasicFilter': {'filter': {'range': {'sheetId': 0,
-                                           'startRowIndex': 0,
-                                           'endRowIndex': 1,
-                                           'startColumnIndex': 0,
-                                           'endColumnIndex': 8}}}}],
- [{'updateSheetProperties': {'properties': {'sheetId': 0,
-                                            'index': 1,
-                                            'hidden': False,
-                                            'gridProperties': {'frozenRowCount': 1}},
-                             'fields': 'index,hidden,gridProperties.frozenRowCount'}},
-  {'updateCells': {'range': {'sheetId': 0}, 'rows': [], 'fields': 'userEnteredValue,note'}},
-  {'repeatCell': {'range': {'sheetId': 0, 'startRowIndex': 0, 'endRowIndex': 1},
-                  'cell': {'userEnteredFormat': {'backgroundColor': {'red': 0.92,
-                                                                     'green': 0.93,
-                                                                     'blue': 0.94},
-                                                 'textFormat': {'bold': True,
-                                                                'foregroundColor': {'red': 0,
-                                                                                    'green': 0,
-                                                                                    'blue': 0}},
-                                                 'wrapStrategy': 'WRAP'}},
-                  'fields': 'userEnteredFormat'}},
-  {'repeatCell': {'range': {'sheetId': 0, 'startRowIndex': 1},
-                  'cell': {'userEnteredFormat': {'verticalAlignment': 'TOP', 'wrapStrategy': 'WRAP'}},
-                  'fields': 'userEnteredFormat'}},
-  {'updateDimensionProperties': {'range': {'sheetId': 0,
-                                           'dimension': 'COLUMNS',
-                                           'startIndex': 0,
-                                           'endIndex': 3},
-                                 'properties': {'pixelSize': 160},
-                                 'fields': 'pixelSize'}},
-  {'setBasicFilter': {'filter': {'range': {'sheetId': 0,
-                                           'startRowIndex': 0,
-                                           'endRowIndex': 1,
-                                           'startColumnIndex': 0,
-                                           'endColumnIndex': 3}}}}]]
 
 def decode_log(rows):
     """Every revision remains available; concurrent branches are errors, never silent overwrites."""

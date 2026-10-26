@@ -18,6 +18,7 @@
 		A00000000000000000000038 /* ../Sources/HoursCore/GoogleAccount.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000028; };
 		A00000000000000000000039 /* ../Sources/HoursCore/GoogleSheetsConnectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000029; };
 		A0000000000000000000003A /* GoogleDesktopClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000002A; };
+		A0000000000000000000003B /* SheetsRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000002B /* SheetsRows.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -33,6 +34,7 @@
 		A00000000000000000000028 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Sources/HoursCore/GoogleAccount.swift; sourceTree = "<group>"; };
 		A00000000000000000000029 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Sources/HoursCore/GoogleSheetsConnectView.swift; sourceTree = "<group>"; };
 		A0000000000000000000002A = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleDesktopClient.swift; sourceTree = DERIVED_FILE_DIR; };
+		A0000000000000000000002B /* SheetsRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Sources/HoursCore/SheetsRows.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -54,6 +56,7 @@
 				A00000000000000000000022 /* ../Sources/HoursCore/PortableData.swift */,
 				A00000000000000000000023 /* ../Sources/HoursCore/StorageLocation.swift */,
                 A00000000000000000000027 /* SheetsStore.swift */,
+                A0000000000000000000002B /* SheetsRows.swift */,
                 A0000000000000000000002A,
                 A00000000000000000000029,
                 A00000000000000000000028,
@@ -143,6 +146,7 @@
 				A00000000000000000000032 /* ../Sources/HoursCore/PortableData.swift in Sources */,
 				A00000000000000000000033 /* ../Sources/HoursCore/StorageLocation.swift in Sources */,
                 A00000000000000000000037 /* SheetsStore.swift in Sources */,
+                A0000000000000000000003B /* SheetsRows.swift in Sources */,
                 A0000000000000000000003A,
                 A00000000000000000000039,
                 A00000000000000000000038,

@@ -13,54 +13,80 @@ including consent resolution and token renewal.
 
 `GET https://www.googleapis.com/drive/v3/files` lists authorized spreadsheet files,
 with pagination. `POST https://sheets.googleapis.com/v4/spreadsheets` creates a
-spreadsheet with the requested title and a six-column `TickLog` tab.
+spreadsheet with the requested title and an empty staging tab; the first save
+initializes row storage.
 
-## TickLog v1
+## Row storage v1
 
-Each saved snapshot occupies one or more adjacent rows. A single
-`spreadsheets.batchUpdate` appends these rows using `appendCells`, refreshes the
-reserved Sessions and Projects views using `updateCells`, and hides TickLog
-(and legacy TickData). The batch is atomic; history and views cannot partially
-commit. Text uses explicit `userEnteredValue.stringValue` to prevent formulas.
-Each history row contains:
+The first save creates `TickMeta` and `TickChanges`, and initializes `Sessions`
+and `Projects`. Existing `TickLog`/`TickData` contents are preserved by renaming
+those tabs to `TickLogBackup`/`TickDataBackup`; this also prevents old clients
+from silently writing an obsolete dataset. Migration is one atomic
+`spreadsheets.batchUpdate`, including initial rows and its recovery entry.
 
-| Column | Value |
-| --- | --- |
-| A | `tick-log-v1` |
-| B | New revision UUID |
-| C | Parent revision ID, or empty string for a new dataset |
-| D | Zero-based chunk index |
-| E | Number of chunks in this revision |
-| F | Portable schema-v1 JSON text chunk |
+`TickMeta!A1:B1` contains `tick-rows-v1` and a JSON object with `schemaVersion` and
+`deviceId`. `Sessions` starts with Project, Started (UTC), Ended (UTC), Duration,
+Hours, Notes, Status, Platform. `Projects` starts with Project, Total hours,
+Sessions. The first row contains headers. Each data row then contains:
 
-Chunks respect Google's cell size limit and never split a Unicode surrogate pair.
-Readers reconstruct and validate all revisions in order. Each complete revision
-must refer to the previously read revision; duplicate revisions, missing chunks,
-malformed data, and sibling branches reject the read without changing app state.
-The root parent may identify a previous `TickData` revision when upgrading an old
-spreadsheet. The old tab retains its values and is hidden.
+| Relative column | Meaning |
+|---|---|
+| 0 | Permanent entity ID (sessionId or project id), lowercase |
+| 1 | Last modifying operation UUID |
+| 2 | Deleted: literal `0` or `1` |
+| 3 | Number of JSON chunks, 1–1000 |
+| 4 onward | Complete portable session/project JSON in chunks |
 
-Before appending, a client checks that the current revision matches its loaded
-revision. After appending, it verifies the returned history and saved snapshot.
-These checks do not provide atomic compare-and-swap. Concurrent sibling commits
-remain available for recovery and produce an explicit conflict. Writes are never
-automatically retried after an ambiguous timeout. No external server or server
-lock is used. Only portable data enters the sheet; tokens remain on the device.
+The offsets are zero-based 8 for Sessions (column I) and 3 for Projects (column
+D). Technical columns are hidden. Chunks contain at most 20,000 Unicode scalars
+(or 20,000 UTF-16 units on Windows/Android), below Google's cell size limit.
+Every write uses literal `stringValue` or `numberValue`, never formulas.
+Visible text previews are bounded, while hidden payloads preserve the full text.
+JSON chunk count and IDs must agree; malformed or duplicate rows fail closed.
 
-## Readable views
+Normal saves use a `values.batchGet` for `TickMeta!A1:B1`, `Sessions`, `Projects`,
+and `TickChanges!A:D`. Records are located by ID, never by a persisted row index.
+The loaded journal revision is checked, then only changed entity rows are sent
+as bounded `updateCells` ranges in one `spreadsheets.batchUpdate`. New records
+use the next unused row. Deletions retain their ID and payload with Deleted=1
+and blank visible fields. Updating shorter text clears obsolete chunk cells.
+Project summary rows update only when their data/totals change. Formatting is
+setup-only; grid dimensions grow only as needed. No-op saves perform no write.
+A final batch read validates the journal chain and confirms the saved state.
 
-Sessions is first, Projects second. Both have frozen headers, filters, wrapped
-text, and numeric hours formatted to two decimals. Sessions columns are Project,
-Started (UTC), Ended (UTC), Duration, Hours, Notes, Status, Platform. Projects
-columns are Project, Total hours, Sessions. Totals group by project ID, use current
-project names, and exclude unfinished durations; counts include running sessions.
-Durations display whole seconds; numeric hours retain fractional precision.
+## Changed-row journal
 
-Views are generated from the validated portable dataset and are not read back as
-user edits. Refreshes clear stale generated values, so deleted sessions disappear.
-Only these reserved tabs are rewritten. View text is capped at 20,000 Unicode
-scalars (or fewer UTF-16 units); full values remain in TickLog. Schema, OAuth,
-revision ancestry, and recovery remain compatible with previous direct-API data.
-The migration CLI verifies visible values in addition to the history. Its
-`--upgrade-existing --spreadsheet ID_OR_URL` mode rebuilds views without adding a
-history revision or uploading a source file.
+`TickChanges` has no header. Each operation occupies contiguous rows:
+
+| Column | Meaning |
+|---|---|
+| A | New operation UUID |
+| B | Parent operation UUID, or empty for initialization |
+| C | Zero-based chunk index |
+| D | Chunk count (1–1000) |
+| E | JSON chunk |
+
+The joined JSON is `{"changes":[{"table":"Sessions","id":"...","row":[...]}]}`.
+Each changed row includes its visible values, ID, operation UUID, deletion
+marker, chunk count and full payload. Project changes use table `Projects`.
+Initialization includes every entity; subsequent operations include only changed
+rows, including tombstones and affected project totals. Current state is read
+from entity rows. Journal payloads are read only during recovery.
+
+A normal reader checks all journal A:D metadata for complete chunks, unique
+operations and a single parent chain. It rejects stale writes before mutation.
+Two simultaneous batches can still share a parent: Sheets has no conditional
+write transaction. Both sets of changed records remain in the journal even if
+one overwrites current row cells. A post-write read detects the branch and
+requires recovery. Use one device at a time. The recovery tool reconstructs each
+operation by applying its changes to its own parent, so sibling branches can be
+exported independently. Network failures require reload before retrying.
+
+## Legacy input
+
+Readers accept the old `TickLog` six-column snapshot format and `TickData` JSON
+chunks until the first save migrates them. Legacy history is validated before
+migration. `TickLog` columns are marker `tick-log-v1`, revision ID, parent ID,
+chunk index, chunk count, JSON text. The backup remains available for manual
+recovery. The new protocol is shared by all five platforms; update every client
+before first migration. Cross-platform fixture: `fixtures/storage/sheets-rows-v1.json`.

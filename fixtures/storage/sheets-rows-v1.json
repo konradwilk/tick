@@ -1,0 +1,184 @@
+{
+  "state": {
+    "schemaVersion": 1,
+    "deviceId": "00000000-0000-4000-8000-000000000001",
+    "nonprofits": [
+      {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "name": "Kitchen 🍲"
+      }
+    ],
+    "sessions": [
+      {
+        "sessionId": "00000000-0000-4000-8000-000000000003",
+        "projectId": "00000000-0000-4000-8000-000000000002",
+        "project": "Kitchen 🍲",
+        "startTimeUtc": "2026-01-01T12:00:00Z",
+        "endTimeUtc": "2026-01-01T13:00:00Z",
+        "durationSeconds": 3600,
+        "notes": "=SUM(A1:A9) 🍲",
+        "deviceId": "00000000-0000-4000-8000-000000000001",
+        "platform": "linux",
+        "updatedAtUtc": "2026-01-01T13:00:00Z",
+        "syncState": "pending"
+      },
+      {
+        "sessionId": "00000000-0000-4000-8000-000000000004",
+        "projectId": "00000000-0000-4000-8000-000000000002",
+        "project": "Kitchen 🍲",
+        "startTimeUtc": "2026-01-02T12:00:00Z",
+        "endTimeUtc": "2026-01-02T12:00:45Z",
+        "durationSeconds": 45,
+        "notes": "=SUM(A1:A9) 🍲",
+        "deviceId": "00000000-0000-4000-8000-000000000001",
+        "platform": "linux",
+        "updatedAtUtc": "2026-01-02T12:00:45Z",
+        "syncState": "pending"
+      }
+    ]
+  },
+  "metadata": {
+    "properties": {
+      "title": "Fixture"
+    },
+    "sheets": [
+      {
+        "properties": {
+          "sheetId": 0,
+          "title": "TickLogBackup",
+          "gridProperties": {
+            "rowCount": 1000,
+            "columnCount": 26
+          }
+        }
+      },
+      {
+        "properties": {
+          "sheetId": 174001,
+          "title": "Sessions",
+          "gridProperties": {
+            "rowCount": 1000,
+            "columnCount": 26
+          }
+        }
+      },
+      {
+        "properties": {
+          "sheetId": 174002,
+          "title": "Projects",
+          "gridProperties": {
+            "rowCount": 1000,
+            "columnCount": 26
+          }
+        }
+      },
+      {
+        "properties": {
+          "sheetId": 174003,
+          "title": "TickMeta",
+          "gridProperties": {
+            "rowCount": 1000,
+            "columnCount": 26
+          }
+        }
+      },
+      {
+        "properties": {
+          "sheetId": 174004,
+          "title": "TickChanges",
+          "gridProperties": {
+            "rowCount": 1000,
+            "columnCount": 26
+          }
+        }
+      }
+    ]
+  },
+  "tables": {
+    "TickLogBackup": [],
+    "TickMeta": [
+      [
+        "tick-rows-v1",
+        "{\"schemaVersion\": 1, \"deviceId\": \"00000000-0000-4000-8000-000000000001\"}"
+      ]
+    ],
+    "Sessions": [
+      [
+        "Project",
+        "Started (UTC)",
+        "Ended (UTC)",
+        "Duration",
+        "Hours",
+        "Notes",
+        "Status",
+        "Platform",
+        "Tick ID",
+        "Version",
+        "Deleted",
+        "Chunks",
+        "Tick data"
+      ],
+      [
+        "Kitchen 🍲",
+        "2026-01-01 12:00:00",
+        "2026-01-01 13:00:00",
+        "1:00:00",
+        1.0,
+        "=SUM(A1:A9) 🍲",
+        "Completed",
+        "linux",
+        "00000000-0000-4000-8000-000000000003",
+        "2aa261a7-678f-4bfb-9e92-7f04ba3cbb1f",
+        "0",
+        1,
+        "{\"sessionId\": \"00000000-0000-4000-8000-000000000003\", \"projectId\": \"00000000-0000-4000-8000-000000000002\", \"project\": \"Kitchen 🍲\", \"startTimeUtc\": \"2026-01-01T12:00:00Z\", \"endTimeUtc\": \"2026-01-01T13:00:00Z\", \"durationSeconds\": 3600, \"notes\": \"=SUM(A1:A9) 🍲\", \"deviceId\": \"00000000-0000-4000-8000-000000000001\", \"platform\": \"linux\", \"updatedAtUtc\": \"2026-01-01T13:00:00Z\", \"syncState\": \"pending\"}"
+      ],
+      [
+        "Kitchen 🍲",
+        "2026-01-02 12:00:00",
+        "2026-01-02 12:00:45",
+        "0:00:45",
+        0.0125,
+        "=SUM(A1:A9) 🍲",
+        "Completed",
+        "linux",
+        "00000000-0000-4000-8000-000000000004",
+        "2aa261a7-678f-4bfb-9e92-7f04ba3cbb1f",
+        "0",
+        1,
+        "{\"sessionId\": \"00000000-0000-4000-8000-000000000004\", \"projectId\": \"00000000-0000-4000-8000-000000000002\", \"project\": \"Kitchen 🍲\", \"startTimeUtc\": \"2026-01-02T12:00:00Z\", \"endTimeUtc\": \"2026-01-02T12:00:45Z\", \"durationSeconds\": 45, \"notes\": \"=SUM(A1:A9) 🍲\", \"deviceId\": \"00000000-0000-4000-8000-000000000001\", \"platform\": \"linux\", \"updatedAtUtc\": \"2026-01-02T12:00:45Z\", \"syncState\": \"pending\"}"
+      ]
+    ],
+    "Projects": [
+      [
+        "Project",
+        "Total hours",
+        "Sessions",
+        "Tick ID",
+        "Version",
+        "Deleted",
+        "Chunks",
+        "Tick data"
+      ],
+      [
+        "Kitchen 🍲",
+        1.0125,
+        2,
+        "00000000-0000-4000-8000-000000000002",
+        "2aa261a7-678f-4bfb-9e92-7f04ba3cbb1f",
+        "0",
+        1,
+        "{\"id\": \"00000000-0000-4000-8000-000000000002\", \"name\": \"Kitchen 🍲\"}"
+      ]
+    ],
+    "TickChanges": [
+      [
+        "2aa261a7-678f-4bfb-9e92-7f04ba3cbb1f",
+        "",
+        0,
+        1,
+        "{\"changes\": [{\"table\": \"Sessions\", \"id\": \"00000000-0000-4000-8000-000000000003\", \"row\": [\"Kitchen 🍲\", \"2026-01-01 12:00:00\", \"2026-01-01 13:00:00\", \"1:00:00\", 1.0, \"=SUM(A1:A9) 🍲\", \"Completed\", \"linux\", \"00000000-0000-4000-8000-000000000003\", \"2aa261a7-678f-4bfb-9e92-7f04ba3cbb1f\", \"0\", 1, \"{\\\"sessionId\\\": \\\"00000000-0000-4000-8000-000000000003\\\", \\\"projectId\\\": \\\"00000000-0000-4000-8000-000000000002\\\", \\\"project\\\": \\\"Kitchen 🍲\\\", \\\"startTimeUtc\\\": \\\"2026-01-01T12:00:00Z\\\", \\\"endTimeUtc\\\": \\\"2026-01-01T13:00:00Z\\\", \\\"durationSeconds\\\": 3600, \\\"notes\\\": \\\"=SUM(A1:A9) 🍲\\\", \\\"deviceId\\\": \\\"00000000-0000-4000-8000-000000000001\\\", \\\"platform\\\": \\\"linux\\\", \\\"updatedAtUtc\\\": \\\"2026-01-01T13:00:00Z\\\", \\\"syncState\\\": \\\"pending\\\"}\"]}, {\"table\": \"Sessions\", \"id\": \"00000000-0000-4000-8000-000000000004\", \"row\": [\"Kitchen 🍲\", \"2026-01-02 12:00:00\", \"2026-01-02 12:00:45\", \"0:00:45\", 0.0125, \"=SUM(A1:A9) 🍲\", \"Completed\", \"linux\", \"00000000-0000-4000-8000-000000000004\", \"2aa261a7-678f-4bfb-9e92-7f04ba3cbb1f\", \"0\", 1, \"{\\\"sessionId\\\": \\\"00000000-0000-4000-8000-000000000004\\\", \\\"projectId\\\": \\\"00000000-0000-4000-8000-000000000002\\\", \\\"project\\\": \\\"Kitchen 🍲\\\", \\\"startTimeUtc\\\": \\\"2026-01-02T12:00:00Z\\\", \\\"endTimeUtc\\\": \\\"2026-01-02T12:00:45Z\\\", \\\"durationSeconds\\\": 45, \\\"notes\\\": \\\"=SUM(A1:A9) 🍲\\\", \\\"deviceId\\\": \\\"00000000-0000-4000-8000-000000000001\\\", \\\"platform\\\": \\\"linux\\\", \\\"updatedAtUtc\\\": \\\"2026-01-02T12:00:45Z\\\", \\\"syncState\\\": \\\"pending\\\"}\"]}, {\"table\": \"Projects\", \"id\": \"00000000-0000-4000-8000-000000000002\", \"row\": [\"Kitchen 🍲\", 1.0125, 2, \"00000000-0000-4000-8000-000000000002\", \"2aa261a7-678f-4bfb-9e92-7f04ba3cbb1f\", \"0\", 1, \"{\\\"id\\\": \\\"00000000-0000-4000-8000-000000000002\\\", \\\"name\\\": \\\"Kitchen 🍲\\\"}\"]}]}"
+      ]
+    ]
+  }
+}

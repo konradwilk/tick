@@ -23,18 +23,45 @@ TOKEN_URL = 'https://oauth2.googleapis.com/token'
 SERVICE = 'org.timeisclearlykept.google'
 
 
-def post_token(fields):
-    # Installed desktop secrets are app configuration, never user credentials.
+def desktop_client_secret():
+    """Resolve installed-app configuration without exposing credential contents."""
     secret = os.environ.get('TICK_GOOGLE_DESKTOP_CLIENT_SECRET')
+    if secret: return secret
     configuration = Path(__file__).with_name('google-client.json')
-    if not secret and configuration.exists():
-        secret = json.loads(configuration.read_text(encoding='utf-8')).get('client_secret')
-    if secret: fields = dict(fields, client_secret=secret)
+    if configuration.exists():
+        try:
+            data = json.loads(configuration.read_text(encoding='utf-8'))
+        except (ValueError, OSError) as error:
+            raise ValueError('Python Google OAuth configuration is unreadable. Run python3 tools/configure_google.py from the Tick project folder.') from error
+        if not isinstance(data, dict) or data.get('client_id') != CLIENT_ID:
+            raise ValueError('Python Google OAuth configuration belongs to a different client. Run python3 tools/configure_google.py from the Tick project folder.')
+        secret = data.get('client_secret')
+        if isinstance(secret, str) and secret.strip(): return secret
+    raise ValueError('Python Google OAuth configuration is missing. Run python3 tools/configure_google.py from the Tick project folder, then retry. A distributed copy must include linux/tick/google-client.json.')
+
+
+def post_token(fields):
+    fields = dict(fields, client_secret=desktop_client_secret())
     try:
         with urlopen(Request(TOKEN_URL, data=urlencode(fields).encode(), headers={'Content-Type': 'application/x-www-form-urlencoded'}), timeout=30) as stream:
             result = json.load(stream)
     except HTTPError as error:
-        raise ValueError('Google authorization failed. Sign in again, or check the app OAuth configuration.') from error
+        # Never print Google's raw response: it can contain supplied credentials.
+        try:
+            response = json.loads(error.read(16384).decode('utf-8'))
+            code = response.get('error') if isinstance(response, dict) else None
+        except (ValueError, OSError, UnicodeError):
+            code = None
+        messages = {
+            'invalid_client': 'Google rejected the app OAuth credentials (invalid_client). Run python3 tools/configure_google.py, then retry. If TICK_GOOGLE_DESKTOP_CLIENT_SECRET is set, check that it matches the Desktop client.',
+            'invalid_grant': 'Google rejected an expired, revoked, or mismatched authorization (invalid_grant). Retry the migration with --sign-in to obtain a new authorization.',
+            'unauthorized_client': 'Google rejected this OAuth client (unauthorized_client). Check that the configured credential is a Desktop app client enabled for Tick.',
+            'redirect_uri_mismatch': 'Google rejected the sign-in callback (redirect_uri_mismatch). Check the Desktop OAuth client configuration.',
+            'access_denied': 'Google denied authorization (access_denied). Allow Tick access or check your organization account policy.',
+            'invalid_request': 'Google rejected the token request (invalid_request). Regenerate the Desktop OAuth configuration with python3 tools/configure_google.py and retry with --sign-in.',
+        }
+        message = messages.get(code) if isinstance(code, str) else None
+        raise ValueError(message or f'Google authorization failed (HTTP {error.code}). Check the app OAuth configuration and retry with --sign-in.') from error
     if not result.get('access_token'):
         raise ValueError('Google did not grant access. Sign in and allow access to files used by Tick.')
     if 'scope' in result and SCOPE not in result['scope'].split():
@@ -143,6 +170,8 @@ class GoogleAccount:
         self.token, self.expires = None, 0
 
     def sign_in(self, timeout=180, opener=webbrowser.open, cancelled=None):
+        if cancelled is not None and cancelled.is_set(): raise ValueError('Google sign-in was cancelled.')
+        desktop_client_secret()  # Fail before opening a browser when app configuration is missing.
         verifier = secrets.token_urlsafe(64)
         challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip('=')
         state = secrets.token_urlsafe(32)

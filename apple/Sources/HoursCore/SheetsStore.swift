@@ -48,14 +48,20 @@ public final class SheetsStore: @unchecked Sendable {
     private let api: GoogleSheetsAPI
     private var revision: String?
     private var hasLog = false
+    private var rowStore: SheetsRows?
     private var metadata: [String: Any] = [:]
     public init(configuration: SheetsConfiguration, api: GoogleSheetsAPI = GoogleSheetsAPI()) throws { self.configuration = configuration; self.api = api }
     private var base: String { "https://sheets.googleapis.com/v4/spreadsheets/" + configuration.sheetID }
     private func rows(_ tab: String) throws -> [[Any]] { try api.request("GET", base + "/values/" + tab)["values"] as? [[Any]] ?? [] }
     private func read() throws -> (TrackerState?, String?) {
+        if let rowStore { let result = try rowStore.read(); return (result.0, result.1) }
         let meta = try api.request("GET", base + "?fields=sheets.properties,properties.title")
         metadata = meta
         let tabs = (meta["sheets"] as? [[String: Any]] ?? []).compactMap { ($0["properties"] as? [String: Any])?["title"] as? String }
+        if tabs.contains("TickMeta") {
+            let rows = SheetsRows(api: api, base: base, metadata: meta); rowStore = rows
+            let result = try rows.read(); return (result.0, result.1)
+        }
         hasLog = tabs.contains("TickLog")
         if hasLog {
             let values = try rows("TickLog!A:F")
@@ -78,77 +84,17 @@ public final class SheetsStore: @unchecked Sendable {
         revision = latest; return state
     }
     public func save(_ state: TrackerState) throws {
-        let bytes = try PortableData.encode(state)
+        if let rowStore {
+            revision = try rowStore.save(state, expected: revision, initializing: false)
+            return
+        }
         let (_, latest) = try read()
         guard latest == revision else { throw SheetsError.message("Data changed on another device. Reload before saving.") }
-        if !hasLog {
-            _ = try api.request("POST", base + ":batchUpdate", ["requests": [["addSheet": ["properties": ["title": "TickLog", "gridProperties": ["rowCount": 1000, "columnCount": 6]]]]]])
-            _ = try read()
-        }
-        let id = UUID().uuidString
-        let characters = Array(String(decoding: bytes, as: UTF8.self).unicodeScalars)
-        let chunks = stride(from: 0, to: characters.count, by: 20000).map { String(String.UnicodeScalarView(characters[$0..<min($0+20000, characters.count)])) }
-        guard chunks.count <= 1000 else { throw SheetsError.message("This dataset is too large for a Tick revision in Google Sheets. Use Local file storage.") }
-        let values: [[Any]] = chunks.enumerated().map { ["tick-log-v1", id, revision ?? "", $0.offset, chunks.count, $0.element] }
-        var requests = try tableRequests(bytes)
-        let tabs = metadata["sheets"] as? [[String: Any]] ?? []
-        let log = tabs.compactMap { $0["properties"] as? [String: Any] }.first { $0["title"] as? String == "TickLog" }!
-        requests.append(["appendCells": ["sheetId": log["sheetId"] as? Int ?? 0, "rows": Self.cells(values), "fields": "userEnteredValue"]])
-        _ = try api.request("POST", base + ":batchUpdate", ["requests": requests])
-        let (saved, confirmed) = try read()
-        guard confirmed == id, let saved, try PortableData.encode(saved) == bytes else { throw SheetsError.message("Save could not be confirmed. Reload before retrying.") }
-        revision = id
-    }
-
-    private static func cells(_ rows: [[Any]]) -> [[String: Any]] {
-        rows.map { ["values": $0.map { value -> [String: Any] in
-            if let text = value as? String { return ["userEnteredValue": ["stringValue": String(text.unicodeScalars.prefix(20000))]] }
-            return ["userEnteredValue": ["numberValue": value]]
-        }] }
-    }
-    private func tableRequests(_ bytes: Data) throws -> [[String: Any]] {
-        let data = try JSONSerialization.jsonObject(with: bytes) as! [String: Any]
-        let projects = data["nonprofits"] as! [[String: Any]], sessions = data["sessions"] as! [[String: Any]]
-        let names = Dictionary(uniqueKeysWithValues: projects.map { ($0["id"] as! String, $0["name"] as! String) })
-        var totals: [String: (Double, Int)] = [:]
-        var rows: [[Any]] = [["Project", "Started (UTC)", "Ended (UTC)", "Duration", "Hours", "Notes", "Status", "Platform"]]
-        for session in sessions.sorted(by: { ($0["startTimeUtc"] as! String) < ($1["startTimeUtc"] as! String) }) {
-            let key = session["projectId"] as! String, seconds = session["durationSeconds"] as? Double
-            let n = Int(seconds ?? 0), ended = session["endTimeUtc"] as? String
-            let duration = seconds == nil ? "" : String(format: "%d:%02d:%02d", n/3600, n/60%60, n%60)
-            rows.append([names[key] ?? session["project"] as! String, String((session["startTimeUtc"] as! String).prefix(19)).replacingOccurrences(of: "T", with: " "), ended.map { String($0.prefix(19)).replacingOccurrences(of: "T", with: " ") } ?? "", duration, seconds.map { $0/3600 as Any } ?? "", session["notes"]!, ended == nil ? "Running" : "Completed", session["platform"]!])
-            let old = totals[key] ?? (0, 0); totals[key] = (old.0 + (seconds ?? 0)/3600, old.1 + 1)
-        }
-        let summary: [[Any]] = [["Project", "Total hours", "Sessions"]] + projects.map { p in let t = totals[p["id"] as! String] ?? (0, 0); return [p["name"]!, t.0, t.1] }
-        let tabs = (metadata["sheets"] as? [[String: Any]] ?? []).compactMap { $0["properties"] as? [String: Any] }
-        var used = Set(tabs.map { $0["sheetId"] as? Int ?? 0 }), requests: [[String: Any]] = []
-        let styleText = #"[[{"updateSheetProperties":{"properties":{"sheetId":0,"index":0,"hidden":false,"gridProperties":{"frozenRowCount":1}},"fields":"index,hidden,gridProperties.frozenRowCount"}},{"updateCells":{"range":{"sheetId":0},"rows":[],"fields":"userEnteredValue,note"}},{"repeatCell":{"range":{"sheetId":0,"startRowIndex":0,"endRowIndex":1},"cell":{"userEnteredFormat":{"backgroundColor":{"red":0.92,"green":0.93,"blue":0.94},"textFormat":{"bold":true,"foregroundColor":{"red":0,"green":0,"blue":0}},"wrapStrategy":"WRAP"}},"fields":"userEnteredFormat"}},{"repeatCell":{"range":{"sheetId":0,"startRowIndex":1},"cell":{"userEnteredFormat":{"verticalAlignment":"TOP","wrapStrategy":"WRAP"}},"fields":"userEnteredFormat"}},{"updateDimensionProperties":{"range":{"sheetId":0,"dimension":"COLUMNS","startIndex":0,"endIndex":8},"properties":{"pixelSize":160},"fields":"pixelSize"}},{"setBasicFilter":{"filter":{"range":{"sheetId":0,"startRowIndex":0,"endRowIndex":1,"startColumnIndex":0,"endColumnIndex":8}}}}],[{"updateSheetProperties":{"properties":{"sheetId":0,"index":1,"hidden":false,"gridProperties":{"frozenRowCount":1}},"fields":"index,hidden,gridProperties.frozenRowCount"}},{"updateCells":{"range":{"sheetId":0},"rows":[],"fields":"userEnteredValue,note"}},{"repeatCell":{"range":{"sheetId":0,"startRowIndex":0,"endRowIndex":1},"cell":{"userEnteredFormat":{"backgroundColor":{"red":0.92,"green":0.93,"blue":0.94},"textFormat":{"bold":true,"foregroundColor":{"red":0,"green":0,"blue":0}},"wrapStrategy":"WRAP"}},"fields":"userEnteredFormat"}},{"repeatCell":{"range":{"sheetId":0,"startRowIndex":1},"cell":{"userEnteredFormat":{"verticalAlignment":"TOP","wrapStrategy":"WRAP"}},"fields":"userEnteredFormat"}},{"updateDimensionProperties":{"range":{"sheetId":0,"dimension":"COLUMNS","startIndex":0,"endIndex":3},"properties":{"pixelSize":160},"fields":"pixelSize"}},{"setBasicFilter":{"filter":{"range":{"sheetId":0,"startRowIndex":0,"endRowIndex":1,"startColumnIndex":0,"endColumnIndex":3}}}}]]"#
-        for (index, values) in [rows, summary].enumerated() {
-            let title = index == 0 ? "Sessions" : "Projects", tab = tabs.first { $0["title"] as? String == title }
-            var id = tab?["sheetId"] as? Int ?? (174001 + index)
-            if tab == nil {
-                while used.contains(id) { id += 1 }; used.insert(id)
-                requests.append(["addSheet": ["properties": ["sheetId": id, "title": title, "gridProperties": ["rowCount": max(1000, values.count), "columnCount": values[0].count]]]])
-            }
-            let size = max((tab?["gridProperties"] as? [String: Any])?["rowCount"] as? Int ?? 1000, values.count, 2)
-            requests.append(["updateSheetProperties": ["properties": ["sheetId": id, "gridProperties": ["rowCount": size]], "fields": "gridProperties.rowCount"]])
-            let styles = try JSONSerialization.jsonObject(with: Data(styleText.utf8)) as! [[[String: Any]]]
-            var parts = styles[index]
-            for i in parts.indices {
-                let name = parts[i].keys.first!; var payload = parts[i][name] as! [String: Any]
-                if var props = payload["properties"] as? [String: Any], props["sheetId"] != nil { props["sheetId"] = id; payload["properties"] = props }
-                if var range = payload["range"] as? [String: Any] { range["sheetId"] = id; payload["range"] = range }
-                if var filter = payload["filter"] as? [String: Any], var range = filter["range"] as? [String: Any] { range["sheetId"] = id; range["endRowIndex"] = max(2, values.count); filter["range"] = range; payload["filter"] = filter }
-                if name == "updateCells" { var cells = Self.cells(values); var header = cells[0]["values"] as! [[String: Any]]; header[0]["note"] = "Generated by Tick. Edit projects and sessions in Tick; these tables refresh on every save."; cells[0]["values"] = header; payload["rows"] = cells }
-                parts[i][name] = payload
-            }
-            requests += parts
-            let column = index == 0 ? 4 : 1
-            requests.append(["repeatCell": ["range": ["sheetId": id, "startRowIndex": 1, "startColumnIndex": column, "endColumnIndex": column+1], "cell": ["userEnteredFormat": ["numberFormat": ["type": "NUMBER", "pattern": "0.00"]]], "fields": "userEnteredFormat.numberFormat"]])
-            if index == 0 { requests.append(["updateDimensionProperties": ["range": ["sheetId": id, "dimension": "COLUMNS", "startIndex": 5, "endIndex": 6], "properties": ["pixelSize": 420], "fields": "pixelSize"]]) }
-        }
-        for tab in tabs where ["TickLog", "TickData"].contains(tab["title"] as? String ?? "") { requests.append(["updateSheetProperties": ["properties": ["sheetId": tab["sheetId"] as? Int ?? 0, "hidden": true], "fields": "hidden"]]) }
-        return requests
+        if let rowStore { revision = try rowStore.save(state, expected: revision, initializing: false); return }
+        let rows = SheetsRows(api: api, base: base, metadata: metadata)
+        // Retain the engine even after an ambiguous response, so retries validate row storage.
+        rowStore = rows
+        revision = try rows.save(state, expected: revision, initializing: true)
     }
 
     static func decodeLog(_ rows: [[Any]]) throws -> (TrackerState?, String?) {

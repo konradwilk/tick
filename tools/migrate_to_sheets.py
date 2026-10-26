@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Migrate tick.json to Google Sheets using only Python's standard library.
+"""Migrate tick.json or upgrade an existing Tick spreadsheet using Python's standard library.
 
 Run: python3 tools/migrate_to_sheets.py /path/to/tick.json
+Upgrade: python3 tools/migrate_to_sheets.py --upgrade-existing --spreadsheet ID_OR_URL
 Sign in in your browser; no Apps Script deployment or access key is needed.
 """
 import argparse
@@ -32,10 +33,10 @@ def migrate(source, store):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Copy tick.json into an empty Google Sheets destination. The source is never changed.")
+    parser = argparse.ArgumentParser(description="Copy tick.json to a new Tick spreadsheet, or upgrade an existing spreadsheet to row storage.")
     parser.add_argument("source", type=Path, nargs="?", help="Path to the existing tick.json")
-    parser.add_argument("--spreadsheet", help="ID or URL of an uninitialized Tick spreadsheet already authorized for the app; otherwise create a new one")
-    parser.add_argument("--upgrade-existing", action="store_true", help="Add readable tables to --spreadsheet without migrating a file or replacing history")
+    parser.add_argument("--spreadsheet", help="Spreadsheet ID or URL: existing Tick data with --upgrade-existing, or an empty destination for a JSON migration")
+    parser.add_argument("--upgrade-existing", action="store_true", help="Upgrade an existing Tick spreadsheet to row storage, preserving old data in hidden backup tabs; no tick.json needed")
     parser.add_argument("--sign-in", action="store_true", help="Choose a Google account again instead of using the saved sign-in")
     parser.add_argument("--name", default="Time is Clearly Kept", help="Spreadsheet name for the empty destination (default: Time is Clearly Kept)")
     parser.add_argument("--dry-run", action="store_true", help="Validate and count source data without contacting Google or requiring credentials")
@@ -57,7 +58,8 @@ def main(argv=None):
         store = SheetsStore(api, args.spreadsheet, args.name) if args.spreadsheet else api.create(args.name)
         if args.upgrade_existing:
             state = store.refresh_tables()
-            print(f"Upgraded readable tables for {len(state['nonprofits'])} projects and {len(state['sessions'])} sessions; history is unchanged.")
+            print(f"Upgraded and verified row storage for {len(state['nonprofits'])} projects and {len(state['sessions'])} sessions; old history is unchanged and retained in backup tabs.")
+            print("Use updated Tick apps on every device before opening this spreadsheet.")
             print("Spreadsheet: https://docs.google.com/spreadsheets/d/" + store.sheet_id + "/edit")
             return 0
         state = migrate(args.source, store)
