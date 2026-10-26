@@ -5,6 +5,7 @@ struct TrackerView: View {
     @Bindable var model: AppModel
     @State private var newName = ""
     @State private var settings = false
+    @State private var manual = false
     @State private var connectingGoogle = false
     @State private var explainingDataLocation = false
     @State private var manualNonprofit: UUID?
@@ -23,6 +24,17 @@ struct TrackerView: View {
             HStack {
                 Text("Time is Clearly Kept").font(.title2.bold())
                 Spacer()
+                Button("Add session by hand…") { manual = true }
+                    .disabled(model.tracker == nil)
+                    .popover(isPresented: $manual) {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 14) {
+                                Text("Add session by hand").font(.title2)
+                                manualSessionForm
+                                Button("Done") { manual = false }
+                            }.padding(20).frame(width: 440)
+                        }.frame(maxHeight: 560)
+                    }
                 Button("Settings") { settings.toggle() }
                     .popover(isPresented: $settings) { settingsView }
             }
@@ -142,7 +154,7 @@ struct TrackerView: View {
         }
     }
     private var manualSessionForm: some View {
-        DisclosureGroup("Add session by hand") {
+        VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 12) {
                 Picker("Project", selection: Binding(get: { manualNonprofit }, set: {
                     manualNonprofit = $0
@@ -221,7 +233,6 @@ struct TrackerView: View {
                 WriteButton("Add project") { model.perform { model.selected = try $0.addNonprofit(newName); newName = "" } }
                     .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }.disabled(active != nil || model.tracker == nil)
-            manualSessionForm
             Text("Data storage").font(.headline)
             Text("Local file: works offline. Google Sheets: shared online storage.").font(.caption)
             StorageOptionButton("Local file (tick.json)…", symbol: "doc", isActive: model.tracker?.usesGoogleSheets == false) { model.chooseDataLocation() }

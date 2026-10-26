@@ -274,9 +274,6 @@ class MainActivity : ComponentActivity() {
                 Text("Data storage: Local file works offline; Google Sheets shares data online.")
                 StorageOptionButton("Local file (tick.json)…", active = !usesGoogleSheets, working = storageBusy, onClick = chooseFolder)
                 StorageOptionButton("Google Sheets…", active = usesGoogleSheets, onClick = { settings = false; chooseSheets() })
-                OutlinedButton(onClick = { settings = false
-                    manualId = state.nonprofits.find { it.id == projectPreferences.getString("lastManualProject", null) }?.id
-                    manual = true; manualError = null; manualConfirmation = null }) { Text("Add session by hand…") }
                 Text(location, style = MaterialTheme.typography.bodySmall)
                 Text("All changes are saved here. Use one device at a time.", style = MaterialTheme.typography.bodySmall)
                 Text("Timing continues when the app closes. Reopen and press Stop to finish.", style = MaterialTheme.typography.bodySmall)
@@ -421,9 +418,15 @@ class MainActivity : ComponentActivity() {
                 } } }, exporting = exporting)
         }
         Column(Modifier.fillMaxSize().imePadding().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.fillMaxWidth()) {
                 Text("Time is Clearly Kept", style = MaterialTheme.typography.titleLarge)
-                TextButton(onClick = { settings = true }) { Text("Settings") }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = {
+                        manualId = state.nonprofits.find { it.id == projectPreferences.getString("lastManualProject", null) }?.id
+                        manual = true; manualError = null; manualConfirmation = null
+                    }) { Text("Add session by hand…") }
+                    TextButton(onClick = { settings = true }) { Text("Settings") }
+                }
             }
             CapturePanel(state, selected, notes, now, { selected = it }, { notes = it },
                 onToggle = { action { if (active != null) { storageOperation { tracker.stop() }; notes = "" } else selected?.let { storageOperation { tracker.start(it, notes) } } } },

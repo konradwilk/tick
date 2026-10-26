@@ -6,6 +6,7 @@ import UIKit
     @Bindable var model: PhoneModel
     @State private var newName = ""
     @State private var settings = false
+    @State private var manual = false
     @State private var connectingGoogle = false
     @State private var explainingDataLocation = false
     @State private var manualNonprofit: UUID?
@@ -55,7 +56,10 @@ import UIKit
                 }
             }
             .navigationTitle("Time is Clearly Kept").navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Settings") { settings = true } } }
+            .toolbar { ToolbarItemGroup(placement: .topBarTrailing) {
+                Button("Add session by hand") { manual = true }.disabled(model.tracker == nil)
+                Button("Settings") { settings = true }
+            } }
         }
         .task {
             if model.needsDataLocation && !model.promptedForDataLocation {
@@ -98,6 +102,14 @@ import UIKit
         }) { settingsView }
         .fileExporter(isPresented: $exporting, document: document, contentType: .commaSeparatedText, defaultFilename: filename) { result in
             if case .failure(let error) = result { model.error = error.localizedDescription }
+        }
+        .sheet(isPresented: $manual) {
+            NavigationStack {
+                Form { manualSessionForm }
+                    .navigationTitle("Add session by hand")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { manual = false } } }
+            }
         }
         .sheet(item: $editing) { PhoneNotesEditor(session: $0, model: model) }
         .sheet(item: $editingTimes) { PhoneTimesEditor(session: $0, model: model) }
@@ -198,7 +210,7 @@ import UIKit
         }
     }
     private var manualSessionForm: some View {
-        DisclosureGroup("Add session by hand") {
+        VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 12) {
                 Picker("Project", selection: Binding(get: { manualNonprofit }, set: {
                     manualNonprofit = $0
@@ -280,7 +292,6 @@ import UIKit
                     WriteButton("Add project") { model.perform { model.selected = try $0.addNonprofit(newName); newName = "" } }
                         .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }.disabled(model.tracker == nil || model.state.active != nil)
-                Section { manualSessionForm }
                 Section("Data storage") {
                     Text("Local file: works offline. Google Sheets: shared online storage.").font(.caption)
                     Text("Google Sheets requires internet access and Google sign-in. After signing in, create a spreadsheet or open your existing Tick data.").font(.caption)

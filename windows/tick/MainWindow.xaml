@@ -1,7 +1,7 @@
 <Window x:Class="Tick.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Time is Clearly Kept">
 <Grid Padding="24" RowSpacing="18" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-<Grid><TextBlock Text="Time is Clearly Kept" FontSize="24" FontWeight="SemiBold"/><Button Content="Settings" Click="ShowSettings" HorizontalAlignment="Right"/></Grid>
+<Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Time is Clearly Kept" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap"/><StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12"><Button x:Name="ManualButton" Content="Add session by hand…" Click="AddManualSession"/><Button Content="Settings" Click="ShowSettings"/></StackPanel></Grid>
 <StackPanel x:Name="Controls" Grid.Row="1" Spacing="12">
 <Grid x:Name="CaptureRow" ColumnSpacing="18" RowSpacing="10" SizeChanged="CaptureResized">
 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
@@ -17,7 +17,6 @@
 <Border x:Name="SettingsPanel" Visibility="Collapsed" Padding="18" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"><StackPanel Spacing="12">
 <TextBlock Text="Settings" FontSize="20" FontWeight="SemiBold"/>
 <TextBox x:Name="NewName" Header="New project"/><Button x:Name="AddButton" Content="Add nonprofit" Click="AddNonprofit"/>
-<Button x:Name="ManualButton" Content="Add session by hand…" Click="AddManualSession"/>
 <TextBlock Text="Data storage: Local file works offline; Google Sheets shares data online." TextWrapping="Wrap"/><Button x:Name="LocalStorageButton" Content="Local file (tick.json)… — Not active" Click="ChooseDataLocation" HorizontalAlignment="Stretch"/><Button x:Name="SheetsStorageButton" Content="Google Sheets… — Not active" Click="ChooseSheets" HorizontalAlignment="Stretch"/><TextBlock x:Name="DataLocation" TextWrapping="Wrap" IsTextSelectionEnabled="True"/>
 <TextBlock Text="All changes are saved in this folder. Use one device at a time." TextWrapping="Wrap"/>
 <TextBlock Text="Closing this window hides it to the system tray. Timing continues until you press Stop." TextWrapping="Wrap"/>
