@@ -43,6 +43,8 @@ import java.time.format.DateTimeFormatter
 }
 
 @Composable internal fun HistoryPanel(state: TrackerState, onDelete: suspend (Session) -> Unit, onEditTimes: (Session) -> Unit, onEdit: (Session) -> Unit) {
+    val expandedWeeks = remember { mutableStateMapOf<java.time.LocalDate, Boolean>() }
+    val cutoff = remember { java.time.LocalDate.now().minusMonths(1) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("History", style = MaterialTheme.typography.headlineSmall)
         Text("Completed: %.2f hours".format(state.sessions.sumOf { it.durationSeconds ?: 0 } / 3600.0))
@@ -57,21 +59,28 @@ import java.time.format.DateTimeFormatter
             val label = "${start.format(firstFormat)} – ${lastDay.format(DateTimeFormatter.ofPattern("MMM d, uuuu"))}"
             OutlinedCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(label, modifier = Modifier.semantics { heading() }, style = MaterialTheme.typography.titleSmall)
-                    HorizontalDivider()
-                    sessions.forEachIndexed { index, session ->
-                        if (index > 0) HorizontalDivider()
-                        Column(Modifier.fillMaxWidth()) {
-                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text(session.project, style = MaterialTheme.typography.titleMedium)
-                                Text(Instant.parse(session.startTimeUtc).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("MMM d, yyyy HH:mm")), style = MaterialTheme.typography.bodySmall)
-                                Text(session.durationSeconds?.let(::displayDuration) ?: "In progress")
-                                Text(session.notes.ifBlank { "No notes" })
-                                if (session.endTimeUtc != null) Row {
-                                    TextButton(onClick = { onEdit(session) }) { Text("Edit notes") }
-                                    TextButton(onClick = { onEditTimes(session) }) { Text("Edit times") }
-                                    if (session.durationSeconds != null && session.durationSeconds in 0L..59L)
-                                        WriteButton(style = WriteButtonStyle.Text, onClick = { onDelete(session) }) { Text("Delete") }
+                    val expanded = expandedWeeks[start] ?: sessions.any {
+                        !Instant.parse(it.startTimeUtc).atZone(ZoneId.systemDefault()).toLocalDate().isBefore(cutoff)
+                    }
+                    TextButton(onClick = { expandedWeeks[start] = !expanded }, modifier = Modifier.fillMaxWidth()) {
+                        Text("${if (expanded) "▾" else "▸"} $label", modifier = Modifier.semantics { heading() }, style = MaterialTheme.typography.titleSmall)
+                    }
+                    if (expanded) {
+                        HorizontalDivider()
+                        sessions.forEachIndexed { index, session ->
+                            if (index > 0) HorizontalDivider()
+                            Column(Modifier.fillMaxWidth()) {
+                                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(session.project, style = MaterialTheme.typography.titleMedium)
+                                    Text(Instant.parse(session.startTimeUtc).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("MMM d, yyyy HH:mm")), style = MaterialTheme.typography.bodySmall)
+                                    Text(session.durationSeconds?.let(::displayDuration) ?: "In progress")
+                                    Text(session.notes.ifBlank { "No notes" })
+                                    if (session.endTimeUtc != null) Row {
+                                        TextButton(onClick = { onEdit(session) }) { Text("Edit notes") }
+                                        TextButton(onClick = { onEditTimes(session) }) { Text("Edit times") }
+                                        if (session.durationSeconds != null && session.durationSeconds in 0L..59L)
+                                            WriteButton(style = WriteButtonStyle.Text, onClick = { onDelete(session) }) { Text("Delete") }
+                                    }
                                 }
                             }
                         }

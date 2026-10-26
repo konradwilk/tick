@@ -12,6 +12,10 @@ from .write_feedback import WriteFeedback
 class HoursWindow(Gtk.ApplicationWindow):
     def __init__(self, application, path=None):
         super().__init__(application=application, title="Time is Clearly Kept", default_width=1000, default_height=760)
+        self.history_expanded = {}
+        today = date.today()
+        previous_month = today.replace(day=1) - timedelta(days=1)
+        self.history_cutoff = previous_month.replace(day=min(today.day, previous_month.day))
         self.tracker = None
         self.timer = None
         self.chooser = None
@@ -177,16 +181,12 @@ class HoursWindow(Gtk.ApplicationWindow):
                 if week_start.year != last_day.year:
                     first_label += f", {week_start.year}"
                 week_label = f"{first_label} – {last_day:%b} {last_day.day}, {last_day.year}"
-                divider = Gtk.Box(spacing=12, margin_top=8, margin_bottom=4)
-                heading = Gtk.Label(label=week_label, xalign=0, wrap=True)
-                heading.add_css_class("heading")
-                divider.append(heading)
-                divider.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL, hexpand=True, valign=Gtk.Align.CENTER))
                 week_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12,
                                    margin_top=12, margin_bottom=12, margin_start=12, margin_end=12)
-                week_frame = Gtk.Frame()
+                week_frame = Gtk.Expander(label=week_label)
                 week_frame.set_child(week_box)
-                week_box.append(divider)
+                week_frame.set_expanded(self.history_expanded.get(week_start, day >= self.history_cutoff))
+                week_frame.connect("notify::expanded", lambda widget, _, key=week_start: self.history_expanded.__setitem__(key, widget.get_expanded()))
                 self.history.append(week_frame)
             previous_week = week_start
             duration = elapsed(session["durationSeconds"]) if session.get("endTimeUtc") else "In progress"

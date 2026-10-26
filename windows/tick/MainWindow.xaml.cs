@@ -7,6 +7,8 @@ using Windows.Storage.Pickers;
 namespace Tick;
 public sealed partial class MainWindow : Window
 {
+    private readonly Dictionary<DateOnly, HistoryWeekEntries> historyWeeks = new();
+    private readonly DateOnly historyCutoff = DateOnly.FromDateTime(DateTime.Today.AddMonths(-1));
     private Tracker? tracker;
     private bool refreshingProjects;
     private bool writing;
@@ -298,14 +300,27 @@ public sealed partial class MainWindow : Window
             .Select(group => {
                 var lastDay = group.Key.AddDays(6);
                 var firstLabel = group.Key.Year == lastDay.Year ? group.Key.ToString("MMM d") : group.Key.ToString("MMM d, yyyy");
-                return new HistoryWeekEntries($"{firstLabel} – {lastDay:MMM d, yyyy}", group.Select(s => new HistoryEntry(s.SessionId,
+                var entries = group.Select(s => new HistoryEntry(s.SessionId,
                     $"{s.Project} — {s.StartTimeUtc.ToLocalTime():g}\n{(s.DurationSeconds is long seconds ? Elapsed(seconds) : "In progress")}\n{s.Notes}", s.EndTimeUtc != null,
-                    s.EndTimeUtc != null && s.DurationSeconds is >= 0 and < 60 ? Visibility.Visible : Visibility.Collapsed)).ToArray());
+                    s.EndTimeUtc != null && s.DurationSeconds is >= 0 and < 60 ? Visibility.Visible : Visibility.Collapsed)).ToArray();
+                if (!historyWeeks.TryGetValue(group.Key, out var week))
+                {
+                    week = new HistoryWeekEntries($"{firstLabel} – {lastDay:MMM d, yyyy}", entries,
+                        group.Any(s => DateOnly.FromDateTime(s.StartTimeUtc.LocalDateTime) >= historyCutoff));
+                    historyWeeks[group.Key] = week;
+                }
+                week.Entries = entries;
+                return week;
             }).ToArray();
         UpdateClock();
     }
     public record HistoryEntry(Guid SessionId, string Summary, bool CanEdit, Visibility DeleteVisibility);
-    public record HistoryWeekEntries(string WeekLabel, HistoryEntry[] Entries);
+    public class HistoryWeekEntries(string weekLabel, HistoryEntry[] entries, bool isExpanded)
+    {
+        public string WeekLabel { get; } = weekLabel;
+        public HistoryEntry[] Entries { get; set; } = entries;
+        public bool IsExpanded { get; set; } = isExpanded;
+    }
     private void DeleteSession(object sender, RoutedEventArgs args)
     {
         if (tracker != null && sender is Button { Tag: Guid id }) Perform(sender, () => Task.Run(() => tracker.DeleteSession(id)));

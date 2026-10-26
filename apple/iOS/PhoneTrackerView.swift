@@ -141,17 +141,20 @@ import UIKit
             if model.state.nonprofits.isEmpty { Button("Add your first project in Settings.") { settings = true }.font(.caption) }
         }
     }
+    @State private var expandedHistoryWeeks: [Date: Bool] = [:]
+    @State private var historyCutoff = Calendar.current.date(byAdding: .month, value: -1, to: Calendar.current.startOfDay(for: Date()))!
+    private func historyExpanded(_ week: HistoryWeek) -> Binding<Bool> {
+        Binding(get: {
+            expandedHistoryWeeks[week.start] ?? week.sessions.contains { $0.startTimeUtc >= historyCutoff }
+        }, set: { expandedHistoryWeeks[week.start] = $0 })
+    }
     private var history: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("History").font(.title2.bold())
             Text("Completed: \(Double(model.state.sessions.compactMap(\.durationSeconds).reduce(0, +)) / 3600, specifier: "%.2f") hours").font(.subheadline)
             if model.state.sessions.isEmpty { Text("Sessions will appear here.").foregroundStyle(.secondary) }
             ForEach(historyWeeks(sessions: model.state.sessions)) { week in
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 12) {
-                        Text(week.label).font(.subheadline.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
-                        Rectangle().fill(.separator).frame(maxWidth: .infinity).frame(height: 1)
-                    }.accessibilityAddTraits(.isHeader)
+                DisclosureGroup(isExpanded: historyExpanded(week)) {
                     ForEach(week.sessions) { session in
                         GroupBox {
                             VStack(alignment: .leading, spacing: 8) {
@@ -171,6 +174,9 @@ import UIKit
                             }.frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
+                } label: {
+                    Text(week.label).font(.subheadline.weight(.semibold))
+                        .fixedSize(horizontal: false, vertical: true)
                 }.padding(12)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.separator, lineWidth: 1))
